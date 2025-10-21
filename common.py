@@ -1,0 +1,114 @@
+import os
+import json
+import logging
+from ldap3 import Server, Connection, ALL
+from cryptography.fernet import Fernet
+
+# ==============================================================================
+# Configuração Base
+# ==============================================================================
+basedir = os.path.abspath(os.path.dirname(__file__))
+data_dir = os.path.join(basedir, 'data')
+logs_dir = os.path.join(basedir, 'logs')
+os.makedirs(data_dir, exist_ok=True)
+os.makedirs(logs_dir, exist_ok=True)
+
+CONFIG_FILE = os.path.join(data_dir, 'config.json')
+KEY_FILE = os.path.join(data_dir, 'secret.key')
+SCHEDULE_FILE = os.path.join(data_dir, 'schedules.json')
+DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
+GROUP_SCHEDULE_FILE = os.path.join(data_dir, 'group_schedules.json')
+
+# ==============================================================================
+# Funções de Criptografia e Configuração
+# ==============================================================================
+def write_key():
+    """Gera uma chave e a salva em 'secret.key'."""
+    key = Fernet.generate_key()
+    with open(KEY_FILE, "wb") as key_file:
+        key_file.write(key)
+
+def load_key():
+    """Carrega a chave de 'secret.key'."""
+    if not os.path.exists(KEY_FILE):
+        write_key()
+    return open(KEY_FILE, "rb").read()
+
+key = load_key()
+cipher_suite = Fernet(key)
+
+SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
+
+def load_config():
+    """Carrega, descriptografa e retorna os dados de configuração."""
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            encrypted_config = json.load(f)
+
+        config = {}
+        for k, v in encrypted_config.items():
+            if k in SENSITIVE_KEYS and v:
+                try:
+                    config[k] = cipher_suite.decrypt(v.encode()).decode()
+                except Exception:
+                    config[k] = v
+            else:
+                config[k] = v
+        return config
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_config(config):
+    """Criptografa e salva os dados de configuração."""
+    encrypted_config = {}
+    config_copy = config.copy()
+    for k, v in config_copy.items():
+        if k in SENSITIVE_KEYS and v:
+            encrypted_config[k] = cipher_suite.encrypt(v.encode()).decode()
+        else:
+            encrypted_config[k] = v
+
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(encrypted_config, f, indent=4)
+
+# ==============================================================================
+# Funções de Conexão e Lógica AD
+# ==============================================================================
+def get_ldap_connection(user=None, password=None):
+    """Cria uma conexão LDAP com base na configuração."""
+    config = load_config()
+    ad_server = config.get('AD_SERVER')
+    use_ldaps = config.get('USE_LDAPS', False)
+    if not ad_server:
+        raise Exception("Servidor AD não configurado.")
+
+    if user and password:
+        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
+        return Connection(server, user=user, password=password, auto_bind=True)
+    else:
+        service_user = config.get('SERVICE_ACCOUNT_USER')
+        service_password = config.get('SERVICE_ACCOUNT_PASSWORD')
+        if not service_user or not service_password:
+            raise Exception("Conta de serviço não configurada.")
+        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
+        return Connection(server, user=service_user, password=service_password, auto_bind=True)
+
+def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
+    if attributes is None:
+        attributes = ALL
+    config = load_config()
+    search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
+    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=attributes)
+    if conn.entries:
+        return conn.entries[0]
+    return None
+
+def get_group_by_name(conn, group_name, attributes=None):
+    if attributes is None:
+        attributes = ALL
+    config = load_config()
+    search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
+    conn.search(search_base, f'(&(objectClass=group)(cn={group_name}))', attributes=attributes)
+    if conn.entries:
+        return conn.entries[0]
+    return None
