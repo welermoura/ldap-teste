@@ -3,10 +3,10 @@ import os
 import json
 from datetime import date
 import logging
-import ldap3
-from ldap3 import Server, Connection, ALL
-from cryptography.fernet import Fernet
-
+from ldap3 import MODIFY_REPLACE
+from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, DISABLE_SCHEDULE_FILE, GROUP_SCHEDULE_FILE
+import json
+import os
 # ==============================================================================
 # Configuração Base
 # ==============================================================================
@@ -21,76 +21,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     encoding='utf-8'
 )
-
-data_dir = os.path.join(basedir, 'data') # Define o diretório de dados
-CONFIG_FILE = os.path.join(data_dir, 'config.json')
-KEY_FILE = os.path.join(data_dir, 'secret.key')
-SCHEDULE_FILE = os.path.join(data_dir, 'schedules.json')
-DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
-GROUP_SCHEDULE_FILE = os.path.join(data_dir, 'group_schedules.json')
-
-# ==============================================================================
-# Funções de Criptografia e Configuração
-# ==============================================================================
-def load_key():
-    """Carrega a chave de 'secret.key' ou a cria se não existir."""
-    if not os.path.exists(KEY_FILE):
-        logging.warning("Arquivo de chave 'secret.key' não encontrado. Gerando um novo.")
-        key = Fernet.generate_key()
-        with open(KEY_FILE, "wb") as key_file:
-            key_file.write(key)
-        return key
-    return open(KEY_FILE, "rb").read()
-
-def load_config():
-    """Carrega a configuração de 'config.json' ou cria um arquivo vazio."""
-    if not os.path.exists(CONFIG_FILE):
-        logging.warning("Arquivo 'config.json' não encontrado. Criando um arquivo de configuração vazio.")
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump({}, f)
-        return {}
-    try:
-        key = load_key()
-        cipher_suite = Fernet(key)
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            encrypted_config = json.load(f)
-        config = {}
-        SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
-        for k, v in encrypted_config.items():
-            if k in SENSITIVE_KEYS and v:
-                try:
-                    config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception:
-                    config[k] = v
-            else:
-                config[k] = v
-        return config
-    except Exception as e:
-        logging.error(f"Erro ao carregar configuração: {e}")
-        return {}
-
-# ==============================================================================
-# Funções de Conexão e Lógica AD
-# ==============================================================================
-def get_ldap_connection(config):
-    if not all(k in config for k in ['AD_SERVER', 'SERVICE_ACCOUNT_USER', 'SERVICE_ACCOUNT_PASSWORD']):
-        logging.error("Configuração do AD incompleta.")
-        return None
-    try:
-        server = Server(config['AD_SERVER'], use_ssl=config.get('USE_LDAPS', False), get_info=ALL)
-        conn = Connection(server, user=config['SERVICE_ACCOUNT_USER'], password=config['SERVICE_ACCOUNT_PASSWORD'], auto_bind=True)
-        return conn
-    except Exception as e:
-        logging.error(f"Falha ao conectar ao AD: {e}")
-        return None
-
-def get_user_by_samaccountname(conn, sam_account_name, search_base):
-    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=['distinguishedName', 'userAccountControl'])
-    return conn.entries[0] if conn.entries else None
-
-def get_group_by_name(conn, group_name, search_base):
-    conn.search(search_base, f'(&(objectClass=group)(cn={group_name}))', attributes=['distinguishedName'])
-    return conn.entries[0] if conn.entries else None
 
 # ==============================================================================
 # Lógica Principal do Script
@@ -216,7 +146,7 @@ if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando Gerenciador de Agendamentos do AD.")
     config = load_config()
-    conn = get_ldap_connection(config)
+    conn = get_ldap_connection()
 
     if conn:
         search_base = config.get('AD_SEARCH_BASE')

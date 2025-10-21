@@ -13,11 +13,11 @@ import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import re
-from cryptography.fernet import Fernet
 import secrets
 import io
 import csv
 import base64
+from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name
 
 # ==============================================================================
 # Configuração Base
@@ -53,63 +53,6 @@ DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
 PERMISSIONS_FILE = os.path.join(data_dir, 'permissions.json')
 KEY_FILE = os.path.join(data_dir, 'secret.key')
 CONFIG_FILE = os.path.join(data_dir, 'config.json')
-
-
-# ==============================================================================
-# Funções de Criptografia e Configuração Segura
-# ==============================================================================
-def write_key():
-    """Gera uma chave e a salva em 'secret.key'."""
-    key = Fernet.generate_key()
-    with open(KEY_FILE, "wb") as key_file:
-        key_file.write(key)
-
-def load_key():
-    """Carrega a chave de 'secret.key'."""
-    if not os.path.exists(KEY_FILE):
-        write_key()
-    return open(KEY_FILE, "rb").read()
-
-# Garante que a chave exista na inicialização
-key = load_key()
-cipher_suite = Fernet(key)
-
-SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
-
-def load_config():
-    """Carrega, descriptografa e retorna os dados de configuração."""
-    try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            encrypted_config = json.load(f)
-
-        config = {}
-        for k, v in encrypted_config.items():
-            if k in SENSITIVE_KEYS and v:
-                try:
-                    config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception:
-                    # Se falhar a descriptografia, pode ser um valor antigo não criptografado.
-                    # Trate como está, mas a próxima gravação irá criptografá-lo.
-                    config[k] = v
-            else:
-                config[k] = v
-        return config
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-def save_config(config):
-    """Criptografa e salva os dados de configuração."""
-    encrypted_config = {}
-    # Make a copy to avoid modifying the dictionary while iterating
-    config_copy = config.copy()
-    for k, v in config_copy.items():
-        if k in SENSITIVE_KEYS and v:
-            encrypted_config[k] = cipher_suite.encrypt(v.encode()).decode()
-        else:
-            encrypted_config[k] = v
-
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(encrypted_config, f, indent=4)
 
 # ==============================================================================
 # Funções Auxiliares de User/Schedule/Permissions (sem alteração)
@@ -398,23 +341,9 @@ class DeleteUserForm(FlaskForm):
 # ==============================================================================
 # Funções Auxiliares do Active Directory
 # ==============================================================================
-def get_ldap_connection(user, password):
-    """Cria uma conexão LDAP com base na configuração."""
-    config = load_config()
-    ad_server = config.get('AD_SERVER')
-    use_ldaps = config.get('USE_LDAPS', False)
-    if not ad_server:
-        raise Exception("Servidor AD não configurado.")
-    server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
-    return Connection(server, user=user, password=password, auto_bind=True)
-
 def get_service_account_connection():
-    config = load_config()
-    user = config.get('SERVICE_ACCOUNT_USER')
-    password = config.get('SERVICE_ACCOUNT_PASSWORD')
-    if not user or not password:
-        raise Exception("Conta de serviço não configurada no painel de administração.")
-    return get_ldap_connection(user, password)
+    """Obtém uma conexão LDAP usando a conta de serviço."""
+    return get_ldap_connection()
 
 def get_read_connection():
     """
@@ -1303,14 +1232,6 @@ def remove_member_temp(group_name, user_sam):
         logging.error(f"Erro ao remover temporariamente o usuário '{user_sam}' do grupo '{group_name}': {e}", exc_info=True)
 
     return redirect(url_for('view_group', group_name=group_name))
-
-def filetime_to_datetime(ft):
-    EPOCH_AS_FILETIME = 116444736000000000
-    HUNDREDS_OF_NANOSECONDS = 10000000
-    if ft is None or int(ft) == 0 or int(ft) == 9223372036854775807:
-        return None
-    # Retorna um datetime "aware" em UTC para evitar erros de comparação
-    return datetime.fromtimestamp((int(ft) - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS, tz=timezone.utc)
 
 @app.route('/view_user/<username>')
 @require_auth

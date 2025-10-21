@@ -3,10 +3,10 @@ import os
 import json
 from datetime import date
 import logging
-import ldap3
-from ldap3 import Server, Connection, ALL, SUBTREE
-from cryptography.fernet import Fernet
-
+from ldap3 import MODIFY_REPLACE
+from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, GROUP_SCHEDULE_FILE
+import json
+import os
 # ==============================================================================
 # Configuração Base
 # ==============================================================================
@@ -22,83 +22,6 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     encoding='utf-8'
 )
-
-# Caminhos dos arquivos
-CONFIG_FILE = os.path.join(basedir, 'config.json')
-KEY_FILE = os.path.join(basedir, 'secret.key')
-SCHEDULE_FILE = os.path.join(basedir, 'schedules.json')
-GROUP_SCHEDULE_FILE = os.path.join(basedir, 'group_schedules.json')
-
-# ==============================================================================
-# Funções de Criptografia e Configuração (copiadas de app.py)
-# ==============================================================================
-def load_key():
-    """Carrega a chave de 'secret.key'."""
-    try:
-        return open(KEY_FILE, "rb").read()
-    except FileNotFoundError:
-        logging.error("Arquivo de chave 'secret.key' não encontrado. O script não pode descriptografar a configuração.")
-        raise
-
-def load_config():
-    """Carrega, descriptografa e retorna os dados de configuração."""
-    try:
-        key = load_key()
-        cipher_suite = Fernet(key)
-
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            encrypted_config = json.load(f)
-
-        config = {}
-        SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
-
-        for k, v in encrypted_config.items():
-            if k in SENSITIVE_KEYS and v:
-                try:
-                    config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception as e:
-                    logging.error(f"Falha ao descriptografar a chave '{k}'. Erro: {e}")
-                    # Pode ser um valor antigo não criptografado, mas logamos o erro.
-                    config[k] = v
-            else:
-                config[k] = v
-        return config
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logging.error(f"Erro ao carregar o arquivo de configuração: {e}")
-        return {}
-
-# ==============================================================================
-# Funções de Conexão e Lógica AD
-# ==============================================================================
-def get_ldap_connection(config):
-    """Cria e retorna uma conexão LDAP."""
-    ad_server = config.get('AD_SERVER')
-    use_ldaps = config.get('USE_LDAPS', False)
-    user = config.get('SERVICE_ACCOUNT_USER')
-    password = config.get('SERVICE_ACCOUNT_PASSWORD')
-
-    if not all([ad_server, user, password]):
-        logging.error("Configuração do servidor AD ou da conta de serviço está incompleta.")
-        return None
-
-    try:
-        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
-        conn = Connection(server, user=user, password=password, auto_bind=True)
-        logging.info(f"Conexão com o servidor AD '{ad_server}' estabelecida com sucesso.")
-        return conn
-    except Exception as e:
-        logging.error(f"Falha ao conectar ao servidor AD '{ad_server}': {e}")
-        return None
-
-def get_user_by_samaccountname(conn, sam_account_name, search_base):
-    """Busca um usuário pelo sAMAccountName."""
-    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=['distinguishedName', 'userAccountControl'])
-    return conn.entries[0] if conn.entries else None
-
-def get_group_by_name(conn, group_name, search_base):
-    """Busca um grupo pelo nome (cn)."""
-    conn.search(search_base, f'(&(objectClass=group)(cn={group_name}))', attributes=['distinguishedName'])
-    return conn.entries[0] if conn.entries else None
 
 # ==============================================================================
 # Lógica Principal do Script
@@ -204,7 +127,7 @@ if __name__ == "__main__":
         logging.critical("Configuração não carregada. Abortando.")
         exit(1)
 
-    conn = get_ldap_connection(config)
+    conn = get_ldap_connection()
     if not conn:
         logging.critical("Não foi possível estabelecer conexão com o AD. Abortando.")
         exit(1)
