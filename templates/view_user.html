@@ -57,12 +57,6 @@
                     {% if check_permission(action='can_edit') %}
                         <a href="{{ url_for('edit_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Editar Usuário</a>
                     {% endif %}
-
-                    {% if check_permission(action='can_move_user') %}
-                        <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#moveUserModal">
-                            <i class="fas fa-arrows-alt-h me-2"></i>Mover Usuário
-                        </button>
-                    {% endif %}
                 </div>
             </div>
         </div>
@@ -178,35 +172,6 @@
   </div>
 </div>
 
-<!-- Modal para Mover Usuário -->
-{% if check_permission(action='can_move_user') %}
-<div class="modal fade" id="moveUserModal" tabindex="-1" aria-labelledby="moveUserModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="moveUserModalLabel">Mover {{ get_attr_value(user, 'displayName') }}</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form id="moveUserForm" action="{{ url_for('move_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
-        {{ form.csrf_token }}
-        <div class="modal-body">
-          <p>Selecione a nova Unidade Organizacional (OU) para a qual o usuário será movido.</p>
-          <div class="mb-3">
-            <label for="ou-tree" class="form-label">Nova OU de Destino</label>
-            <div id="ou-tree"></div>
-            <input type="hidden" id="new_ou_dn" name="new_ou_dn">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary" id="moveUserSubmitBtn" disabled>Mover Usuário</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-{% endif %}
-
 {% endblock %}
 
 {% block scripts %}
@@ -281,51 +246,6 @@
             });
             renderGroups(filteredGroups);
         });
-    });
-
-    // Script para o Modal "Mover Usuário" com Tree View
-    document.addEventListener('DOMContentLoaded', function() {
-        const moveUserModal = document.getElementById('moveUserModal');
-        if (moveUserModal) {
-            moveUserModal.addEventListener('show.bs.modal', async function () {
-                const treeElement = $('#ou-tree');
-                const hiddenInput = $('#new_ou_dn');
-                const submitBtn = $('#moveUserSubmitBtn');
-
-                // Evita recarregar se a árvore já foi inicializada
-                if (treeElement.data('treeview')) {
-                    // Des-seleciona todos os nós ao reabrir
-                    treeElement.treeview('unselectNode', [ treeElement.treeview('getSelected'), { silent: true } ]);
-                    hiddenInput.val('');
-                    submitBtn.prop('disabled', true);
-                    return;
-                }
-
-                try {
-                    const response = await fetch('/api/ous');
-                    if (!response.ok) throw new Error('Falha ao buscar as OUs.');
-
-                    const ouTreeData = await response.json();
-
-                    treeElement.treeview({
-                        data: ouTreeData,
-                        levels: 1, // Começa com o primeiro nível expandido
-                        onNodeSelected: function(event, node) {
-                            hiddenInput.val(node.dn);
-                            submitBtn.prop('disabled', false);
-                        },
-                        onNodeUnselected: function(event, node) {
-                            hiddenInput.val('');
-                            submitBtn.prop('disabled', true);
-                        }
-                    });
-
-                } catch (error) {
-                    console.error('Erro ao popular a árvore de OUs:', error);
-                    treeElement.html('<div class="alert alert-danger">Erro ao carregar a árvore de OUs.</div>');
-                }
-            });
-        }
     });
 </script>
 <style>

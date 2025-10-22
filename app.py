@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
 import ldap3
-from ldap3 import Server, Connection, ALL, SUBTREE, BASE
+from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL
 from ldap3.utils.conv import escape_filter_chars
 from datetime import datetime, timedelta, date, timezone
 import json
@@ -33,7 +33,7 @@ os.makedirs(logs_dir, exist_ok=True)
 
 log_path = os.path.join(logs_dir, 'ad_creator.log')
 logging.basicConfig(filename=log_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', encoding='utf-8')
-app = Flask(__name__)
+app = Flask(__name__, static_folder="frontend/dist", static_url_path="/")
 
 def get_flask_secret_key():
     key_file_path = os.path.join(data_dir, 'flask_secret.key')
@@ -769,6 +769,12 @@ def select_model():
 def result():
     return redirect(url_for('index'))
 
+@app.route('/ad-tree')
+@require_auth
+def ad_tree():
+    """Serve a página da árvore do AD (aplicação React)."""
+    return app.send_static_file('index.html')
+
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
 def manage_users():
@@ -1151,6 +1157,53 @@ def api_get_ous():
         logging.error(f"Erro ao buscar OUs via API: {e}", exc_info=True)
         return jsonify({'error': 'Falha ao buscar Unidades Organizacionais.'}), 500
 
+@app.route('/api/ou_members/<path:ou_dn>')
+@require_auth
+def api_ou_members(ou_dn):
+    """Retorna os membros diretos (filhos) de uma Unidade Organizacional."""
+    try:
+        conn = get_read_connection()
+
+        # A busca LEVEL recupera apenas os filhos imediatos
+        conn.search(search_base=ou_dn,
+                    search_filter='(objectClass=*)',
+                    search_scope=LEVEL,
+                    attributes=['objectClass', 'name', 'ou', 'cn', 'sAMAccountName', 'userAccountControl', 'distinguishedName'])
+
+        items = []
+        for entry in conn.entries:
+            obj_class = entry.objectClass.values
+            item = {'dn': entry.distinguishedName.value}
+
+            if 'organizationalUnit' in obj_class:
+                item['type'] = 'ou'
+                item['name'] = entry.ou.value if 'ou' in entry else entry.name.value
+            elif 'group' in obj_class:
+                item['type'] = 'group'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+            elif 'user' in obj_class and 'person' in obj_class:
+                item['type'] = 'user'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+                item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
+                item['status'] = get_user_status(entry)
+            else:
+                # Pula outros tipos de objeto ou os manipula conforme necessário
+                continue
+
+            items.append(item)
+
+        # Ordena os itens: OUs primeiro, depois grupos, depois usuários, todos em ordem alfabética
+        type_order = {'ou': 0, 'group': 1, 'user': 2}
+        items.sort(key=lambda x: (type_order.get(x['type'], 99), x['name'].lower()))
+
+        return jsonify(items)
+    except ldap3.core.exceptions.LDAPInvalidDnError:
+        logging.warning(f"API ou_members chamada com DN inválido: '{ou_dn}'")
+        return jsonify({'error': 'O caminho da Unidade Organizacional fornecido é inválido.'}), 400
+    except Exception as e:
+        logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
+        return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
+
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -1462,42 +1515,6 @@ def delete_user(username):
     else:
         # Se a validação do formulário falhar (ex: CSRF inválido), exibe uma mensagem de erro.
         flash("Erro de validação do formulário. A exclusão foi cancelada.", "danger")
-
-    return redirect(url_for('view_user', username=username))
-
-@app.route('/move_user/<username>', methods=['POST'])
-@require_auth
-@require_permission(action='can_move_user')
-def move_user(username):
-    """Move um usuário para uma nova Unidade Organizacional."""
-    new_ou_dn = request.form.get('new_ou_dn')
-    if not new_ou_dn:
-        flash("Nenhuma Unidade Organizacional de destino foi selecionada.", "error")
-        return redirect(url_for('view_user', username=username))
-
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, attributes=['distinguishedName', 'cn'])
-        if not user:
-            flash("Usuário não encontrado.", "error")
-            return redirect(url_for('manage_users'))
-
-        current_dn = user.distinguishedName.value
-        user_cn = user.cn.value
-        new_dn = f"CN={user_cn},{new_ou_dn}"
-
-        # Utiliza a operação modify_dn para mover o usuário
-        conn.modify_dn(current_dn, f"CN={user_cn}", new_parent=new_ou_dn)
-
-        if conn.result['description'] == 'success':
-            flash(f"Usuário '{username}' movido com sucesso para a nova OU!", "success")
-            logging.info(f"Usuário '{username}' movido de '{get_ou_from_dn(current_dn)}' para '{new_ou_dn}' por '{session.get('user_display_name')}'.")
-        else:
-            flash(f"Falha ao mover o usuário: {conn.result['message']}", "error")
-
-    except Exception as e:
-        flash(f"Ocorreu um erro ao mover o usuário: {e}", "error")
-        logging.error(f"Erro em move_user para {username}: {e}", exc_info=True)
 
     return redirect(url_for('view_user', username=username))
 
