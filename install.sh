@@ -3,49 +3,55 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "--- Starting Environment Setup ---"
+echo "--- Starting Full Environment Setup ---"
 
-# --- Find Python 3 Executable ---
-PYTHON_EXEC=""
-if command -v python3 &> /dev/null; then
-    PYTHON_EXEC="python3"
-    echo "Found 'python3' in PATH."
-elif [ -f "/usr/bin/python3" ]; then
-    PYTHON_EXEC="/usr/bin/python3"
-    echo "Found 'python3' at /usr/bin/python3."
-else
-    echo "Error: Could not find a python3 executable. Please install Python 3."
+# --- Setup Python Virtual Environment ---
+echo "[Python] Setting up virtual environment..."
+if ! python3 -m venv venv; then
+    echo "[Python] Error: Failed to create virtual environment."
     exit 1
 fi
 
-VENV_DIR="venv"
+# Activate virtual environment
+source venv/bin/activate
+echo "[Python] Virtual environment activated."
 
-# --- Create Virtual Environment ---
-if [ -d "$VENV_DIR" ]; then
-    echo "Virtual environment '$VENV_DIR' already exists. Skipping creation."
+# --- Install/Upgrade Python Dependencies ---
+echo "[Python] Upgrading pip..."
+pip install --upgrade pip
+
+echo "[Python] Installing/Upgrading dependencies from requirements.txt..."
+pip install --upgrade -r requirements.txt
+
+# Deactivate after finishing Python setup
+deactivate
+echo "[Python] Python setup complete."
+
+# --- Setup Node.js Frontend Dependencies ---
+if [ -d "frontend" ]; then
+    echo "[Node.js] Found 'frontend' directory. Setting up dependencies..."
+    cd frontend
+
+    if command -v npm &> /dev/null; then
+        echo "[Node.js] Installing dependencies with npm..."
+        npm install
+        echo "[Node.js] Frontend setup complete."
+    else
+        echo "[Node.js] Warning: 'npm' command not found. Skipping frontend dependency installation."
+        echo "Please install Node.js and npm to set up the frontend."
+    fi
+
+    cd .. # Return to the root directory
 else
-    echo "Creating Python virtual environment in './$VENV_DIR'..."
-    $PYTHON_EXEC -m venv $VENV_DIR
+    echo "[Node.js] 'frontend' directory not found. Skipping frontend setup."
 fi
 
-# --- Install Dependencies ---
-echo "Installing dependencies from requirements.txt into the virtual environment..."
-$VENV_DIR/bin/pip install -r requirements.txt
-
-# --- Final Instructions ---
 echo ""
-echo "--- Setup Complete! ---"
+echo "--- Full Setup Complete! ---"
 echo ""
-echo "To run the application manually in the future, first activate the environment:"
-echo "source $VENV_DIR/bin/activate"
+echo "To run the application, first activate the Python environment:"
+echo "source venv/bin/activate"
 echo ""
-echo "Then run the server:"
-echo "flask run"
-echo ""
-echo "----------------------------------------"
-echo "--- Starting Application Server now... ---"
-echo "--- Press CTRL+C to stop the server. ---"
-"----------------------------------------"
-
-# --- Launch Application ---
-$VENV_DIR/bin/python -m flask run
+echo "Then, run the Flask application:"
+echo "python app.py"
+echo "--------------------------------"
