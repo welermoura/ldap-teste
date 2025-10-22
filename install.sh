@@ -27,28 +27,41 @@ pip install --upgrade -r requirements.txt
 deactivate
 echo "[Python] Python setup complete."
 
-# --- Setup Node.js Frontend Dependencies ---
+# --- Setup Node.js Environment and Dependencies ---
 if [ -d "frontend" ]; then
-    echo "[Node.js] Found 'frontend' directory. Setting up dependencies and building..."
-    cd frontend
+    echo "[Node.js] Found 'frontend' directory. Setting up Node.js environment..."
 
-    if command -v npm &> /dev/null; then
-        echo "[Node.js] Installing dependencies with npm..."
-        npm install
-
-        echo "[Node.js] Building frontend application..."
-        npm run build
-
-        echo "[Node.js] Frontend setup complete."
+    # Check for NVM and .nvmrc
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        source "$NVM_DIR/nvm.sh"
+        echo "[Node.js] NVM found. Using version specified in .nvmrc..."
+        nvm install
+        nvm use
+    elif command -v nvm &> /dev/null; then
+        echo "[Node.js] NVM found. Using version specified in .nvmrc..."
+        nvm install
+        nvm use
     else
-        echo "[Node.js] Warning: 'npm' command not found. Skipping frontend dependency installation."
-        echo "Please install Node.js and npm to set up the frontend."
+        echo "[Node.js] Error: NVM (Node Version Manager) is not installed." >&2
+        echo "Please install NVM to manage Node.js versions. See: https://github.com/nvm-sh/nvm#installing-and-updating" >&2
+        exit 1
     fi
 
+    echo "[Node.js] Using Node version: $(node --version) and npm version: $(npm --version)"
+
+    cd frontend
+    echo "[Node.js] Installing dependencies with npm..."
+    npm install
+
+    echo "[Node.js] Building frontend application..."
+    npm run build
+
+    echo "[Node.js] Frontend setup complete."
     cd .. # Return to the root directory
 else
     echo "[Node.js] 'frontend' directory not found. Skipping frontend setup."
 fi
+
 
 echo ""
 echo "--- Full Setup Complete! ---"
