@@ -778,10 +778,16 @@ def ad_tree():
         with open(manifest_path, 'r') as f:
             manifest = json.load(f)
 
-        # O ponto de entrada principal é geralmente 'index.html' ou 'src/main.jsx'
-        entry_point = manifest.get('index.html', {})
+        # A chave de entrada correta geralmente corresponde ao arquivo de entrada do projeto Vite
+        entry_point_key = 'src/main.jsx'
+        if entry_point_key not in manifest:
+            # Fallback para a primeira chave se o nome não for o esperado
+            entry_point_key = next(iter(manifest))
+
+        entry_point = manifest[entry_point_key]
         js_file = entry_point.get('file')
-        css_file = entry_point.get('css', [None])[0]
+        css_files = entry_point.get('css', [])
+        css_file = css_files[0] if css_files else None
 
         return render_template('ad_tree.html', js_file=js_file, css_file=css_file)
     except Exception as e:
