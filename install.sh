@@ -31,10 +31,11 @@ echo "[Python] Python setup complete."
 if [ -d "frontend" ]; then
     echo "[Node.js] Found 'frontend' directory. Setting up Node.js environment..."
 
-    # Check for NVM and .nvmrc
+    # Preferred method: Use NVM if available
+    # NVM sourced from standard install paths
     if [ -s "$NVM_DIR/nvm.sh" ]; then
-        source "$NVM_DIR/nvm.sh"
         echo "[Node.js] NVM found. Using version specified in .nvmrc..."
+        source "$NVM_DIR/nvm.sh"
         nvm install
         nvm use
     elif command -v nvm &> /dev/null; then
@@ -42,9 +43,26 @@ if [ -d "frontend" ]; then
         nvm install
         nvm use
     else
-        echo "[Node.js] Error: NVM (Node Version Manager) is not installed." >&2
-        echo "Please install NVM to manage Node.js versions. See: https://github.com/nvm-sh/nvm#installing-and-updating" >&2
-        exit 1
+        # Fallback method: Check system-wide Node.js version
+        echo "[Node.js] NVM not found. Checking for a compatible system-wide Node.js version..."
+
+        if ! command -v node &> /dev/null; then
+            echo "[Node.js] Error: Node.js is not installed and NVM is not available." >&2
+            echo "Please install NVM (recommended: https://github.com/nvm-sh/nvm) or a compatible version of Node.js manually." >&2
+            exit 1
+        fi
+
+        NODE_VERSION=$(node -v)
+        NODE_MAJOR_VERSION=$(echo "$NODE_VERSION" | cut -d'v' -f2 | cut -d'.' -f1)
+        REQUIRED_MAJOR_VERSION=$(cat .nvmrc)
+
+        if [ "$NODE_MAJOR_VERSION" -lt "$REQUIRED_MAJOR_VERSION" ]; then
+            echo "[Node.js] Error: Your system's Node.js version ($NODE_VERSION) is not compatible." >&2
+            echo "Vite requires Node.js version $REQUIRED_MAJOR_VERSION+. Please upgrade your Node.js version or install NVM." >&2
+            exit 1
+        else
+            echo "[Node.js] System Node.js version ($NODE_VERSION) is compatible. Proceeding..."
+        fi
     fi
 
     echo "[Node.js] Using Node version: $(node --version) and npm version: $(npm --version)"
