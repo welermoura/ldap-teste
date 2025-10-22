@@ -794,10 +794,10 @@ def ad_tree():
         logging.error(f"Erro ao carregar o manifesto do Vite: {e}", exc_info=True)
         return "Erro ao carregar a aplicação. Verifique os logs.", 500
 
-@app.route('/assets/<path:filename>')
+@app.route('/ad-tree/assets/<path:filename>')
 @require_auth
 def ad_tree_assets(filename):
-    """Serve os assets da aplicação React a partir da pasta dist."""
+    """Serve os assets da aplicação React."""
     return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
