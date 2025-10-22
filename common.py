@@ -3,6 +3,7 @@ import json
 import logging
 from ldap3 import Server, Connection, ALL
 from cryptography.fernet import Fernet
+from datetime import datetime, timezone
 
 # ==============================================================================
 # Configuração Base
@@ -102,6 +103,14 @@ def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
     if conn.entries:
         return conn.entries[0]
     return None
+
+def filetime_to_datetime(ft):
+    """Converts a Microsoft FILETIME timestamp to a Python datetime object."""
+    EPOCH_AS_FILETIME = 116444736000000000
+    HUNDREDS_OF_NANOSECONDS = 10000000
+    if ft is None or int(ft) == 0 or int(ft) == 9223372036854775807:
+        return None
+    return datetime.fromtimestamp((int(ft) - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS, tz=timezone.utc)
 
 def get_group_by_name(conn, group_name, attributes=None):
     if attributes is None:

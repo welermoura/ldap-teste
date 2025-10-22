@@ -192,15 +192,14 @@
         <div class="modal-body">
           <p>Selecione a nova Unidade Organizacional (OU) para a qual o usuário será movido.</p>
           <div class="mb-3">
-            <label for="new_ou_dn" class="form-label">Nova OU de Destino</label>
-            <select class="form-select" id="new_ou_dn" name="new_ou_dn" required>
-              <option value="">Carregando OUs...</option>
-            </select>
+            <label for="ou-tree" class="form-label">Nova OU de Destino</label>
+            <div id="ou-tree"></div>
+            <input type="hidden" id="new_ou_dn" name="new_ou_dn">
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Mover Usuário</button>
+          <button type="submit" class="btn btn-primary" id="moveUserSubmitBtn" disabled>Mover Usuário</button>
         </div>
       </form>
     </div>
@@ -284,33 +283,46 @@
         });
     });
 
-    // Script para o Modal "Mover Usuário"
+    // Script para o Modal "Mover Usuário" com Tree View
     document.addEventListener('DOMContentLoaded', function() {
         const moveUserModal = document.getElementById('moveUserModal');
         if (moveUserModal) {
             moveUserModal.addEventListener('show.bs.modal', async function () {
-                const ouSelect = document.getElementById('new_ou_dn');
-                // Evita recarregar se já estiver populado
-                if (ouSelect.options.length > 1) return;
+                const treeElement = $('#ou-tree');
+                const hiddenInput = $('#new_ou_dn');
+                const submitBtn = $('#moveUserSubmitBtn');
+
+                // Evita recarregar se a árvore já foi inicializada
+                if (treeElement.data('treeview')) {
+                    // Des-seleciona todos os nós ao reabrir
+                    treeElement.treeview('unselectNode', [ treeElement.treeview('getSelected'), { silent: true } ]);
+                    hiddenInput.val('');
+                    submitBtn.prop('disabled', true);
+                    return;
+                }
 
                 try {
                     const response = await fetch('/api/ous');
                     if (!response.ok) throw new Error('Falha ao buscar as OUs.');
 
-                    const ous = await response.json();
+                    const ouTreeData = await response.json();
 
-                    ouSelect.innerHTML = '<option value="" disabled selected>Selecione uma OU</option>'; // Limpa e adiciona placeholder
-
-                    ous.forEach(ou => {
-                        const option = document.createElement('option');
-                        option.value = ou.dn;
-                        option.textContent = ou.name;
-                        ouSelect.appendChild(option);
+                    treeElement.treeview({
+                        data: ouTreeData,
+                        levels: 1, // Começa com o primeiro nível expandido
+                        onNodeSelected: function(event, node) {
+                            hiddenInput.val(node.dn);
+                            submitBtn.prop('disabled', false);
+                        },
+                        onNodeUnselected: function(event, node) {
+                            hiddenInput.val('');
+                            submitBtn.prop('disabled', true);
+                        }
                     });
 
                 } catch (error) {
-                    console.error('Erro ao popular OUs:', error);
-                    ouSelect.innerHTML = '<option value="">Erro ao carregar OUs</option>';
+                    console.error('Erro ao popular a árvore de OUs:', error);
+                    treeElement.html('<div class="alert alert-danger">Erro ao carregar a árvore de OUs.</div>');
                 }
             });
         }
