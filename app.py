@@ -1,7 +1,7 @@
 # Reverted to stable version
 import os
 import logging
-from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response
+from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response, send_from_directory
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
@@ -33,7 +33,7 @@ os.makedirs(logs_dir, exist_ok=True)
 
 log_path = os.path.join(logs_dir, 'ad_creator.log')
 logging.basicConfig(filename=log_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', encoding='utf-8')
-app = Flask(__name__, static_folder="frontend/dist", static_url_path="/")
+app = Flask(__name__)
 
 def get_flask_secret_key():
     key_file_path = os.path.join(data_dir, 'flask_secret.key')
@@ -773,7 +773,13 @@ def result():
 @require_auth
 def ad_tree():
     """Serve a página da árvore do AD (aplicação React)."""
-    return app.send_static_file('index.html')
+    return send_from_directory('frontend/dist', 'index.html')
+
+@app.route('/ad-tree/assets/<path:filename>')
+@require_auth
+def ad_tree_assets(filename):
+    """Serve os assets da aplicação React."""
+    return send_from_directory('frontend/dist/assets', filename)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth

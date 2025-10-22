@@ -29,12 +29,16 @@ echo "[Python] Python setup complete."
 
 # --- Setup Node.js Frontend Dependencies ---
 if [ -d "frontend" ]; then
-    echo "[Node.js] Found 'frontend' directory. Setting up dependencies..."
+    echo "[Node.js] Found 'frontend' directory. Setting up dependencies and building..."
     cd frontend
 
     if command -v npm &> /dev/null; then
         echo "[Node.js] Installing dependencies with npm..."
         npm install
+
+        echo "[Node.js] Building frontend application..."
+        npm run build
+
         echo "[Node.js] Frontend setup complete."
     else
         echo "[Node.js] Warning: 'npm' command not found. Skipping frontend dependency installation."
