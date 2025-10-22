@@ -89,8 +89,9 @@
 }
 
 /* Space for the icon */
-.node-label i {
+.node-label i, .member-item i {
     margin-right: 8px;
+    color: #ffc107; /* Amarelo Bootstrap */
 }
 
 .member-list {

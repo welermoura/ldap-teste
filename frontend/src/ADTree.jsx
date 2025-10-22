@@ -60,16 +60,21 @@ const TreeNode = ({ node, onNodeClick }) => {
     if (!isOpen && children.length === 0 && node.type === 'ou') {
       axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
         .then(response => {
-          setChildren(response.data);
-          // Also update the parent with the newly fetched children
-          onNodeClick(node, response.data);
+          const allMembers = response.data;
+          const ouChildren = allMembers.filter(member => member.type === 'ou');
+          setChildren(ouChildren);
+          // Pass all members to the content panel, but only OUs to the tree
+          onNodeClick(node, allMembers);
         })
         .catch(error => {
           console.error("Error fetching OU members:", error);
         });
     } else {
-        // If we are just toggling, still notify the parent
-        onNodeClick(node, children);
+        // We need to refetch to get the full list for the panel
+        axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
+            .then(response => {
+                onNodeClick(node, response.data);
+            });
     }
   };
 
