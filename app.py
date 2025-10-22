@@ -772,14 +772,27 @@ def result():
 @app.route('/ad-tree')
 @require_auth
 def ad_tree():
-    """Serve a página da árvore do AD (aplicação React)."""
-    return send_from_directory('frontend/dist', 'index.html')
+    """Renderiza o template que hospeda a aplicação React."""
+    try:
+        manifest_path = os.path.join(basedir, 'frontend', 'dist', '.vite', 'manifest.json')
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
 
-@app.route('/ad-tree/assets/<path:filename>')
+        # O ponto de entrada principal é geralmente 'index.html' ou 'src/main.jsx'
+        entry_point = manifest.get('index.html', {})
+        js_file = entry_point.get('file')
+        css_file = entry_point.get('css', [None])[0]
+
+        return render_template('ad_tree.html', js_file=js_file, css_file=css_file)
+    except Exception as e:
+        logging.error(f"Erro ao carregar o manifesto do Vite: {e}", exc_info=True)
+        return "Erro ao carregar a aplicação. Verifique os logs.", 500
+
+@app.route('/assets/<path:filename>')
 @require_auth
 def ad_tree_assets(filename):
-    """Serve os assets da aplicação React."""
-    return send_from_directory('frontend/dist/assets', filename)
+    """Serve os assets da aplicação React a partir da pasta dist."""
+    return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
