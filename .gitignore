@@ -1,13 +1,17 @@
 # Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
+venv/
+instance/
 
-# Logs
-*.log
+# Node.js
+frontend/node_modules/
+frontend/dist/
+npm-debug.log
 
-# Local data and secrets
+# Data & Logs
 data/
-jules-scratch/
+logs/
+*.log
+secret.key
+flask_secret.key
