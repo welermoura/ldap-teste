@@ -17,7 +17,7 @@ import secrets
 import io
 import csv
 import base64
-from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name
+from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, filetime_to_datetime
 
 # ==============================================================================
 # Configuração Base
@@ -423,7 +423,7 @@ def search_general_users(conn, query):
         return []
 
 def get_all_ous(conn):
-    """Busca todas as OUs a partir da base de busca."""
+    """Busca todas as OUs e as retorna em uma estrutura de árvore hierárquica."""
     config = load_config()
     search_base = config.get('AD_SEARCH_BASE')
     if not search_base:
@@ -431,11 +431,43 @@ def get_all_ous(conn):
 
     conn.search(search_base, '(objectClass=organizationalUnit)', SUBTREE, attributes=['ou', 'distinguishedName'])
 
-    ous = [{'name': entry.ou.value, 'dn': entry.distinguishedName.value} for entry in conn.entries]
+    if not conn.entries:
+        return []
 
-    # Sort OUs by name for better readability in the frontend
-    sorted_ous = sorted(ous, key=lambda x: x['name'])
-    return sorted_ous
+    nodes = {}
+    # First pass: create all node objects and store them in a dictionary by their DN.
+    # The keys 'text' and 'nodes' are chosen for compatibility with common treeview libraries.
+    for entry in conn.entries:
+        dn = str(entry.distinguishedName)
+        nodes[dn] = {
+            'text': str(entry.ou),
+            'dn': dn,
+            'nodes': []  # 'nodes' will hold child OUs
+        }
+
+    tree_roots = []
+    # Second pass: link nodes together.
+    for dn, node in nodes.items():
+        # Determine the parent DN by removing the first component of the current DN.
+        parent_dn = ','.join(dn.split(',')[1:])
+
+        # If the parent DN exists in our dictionary, it's a child of that parent.
+        if parent_dn in nodes:
+            nodes[parent_dn]['nodes'].append(node)
+        # Otherwise, it's a root node in our hierarchy.
+        else:
+            tree_roots.append(node)
+
+    # Sort the tree and all sub-nodes alphabetically by 'text' for a clean UI.
+    def sort_tree_nodes_recursively(node_list):
+        node_list.sort(key=lambda x: x['text'])
+        for node in node_list:
+            if node['nodes']:
+                sort_tree_nodes_recursively(node['nodes'])
+
+    sort_tree_nodes_recursively(tree_roots)
+
+    return tree_roots
 
 def get_upn_suffix_from_base(search_base):
     """Deriva o sufixo UPN da base de busca. Ex: OU=Users,DC=corp,DC=com -> @corp.com"""
