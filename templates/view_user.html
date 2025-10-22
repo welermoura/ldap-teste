@@ -57,6 +57,12 @@
                     {% if check_permission(action='can_edit') %}
                         <a href="{{ url_for('edit_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Editar Usuário</a>
                     {% endif %}
+
+                    {% if check_permission(action='can_move_user') %}
+                        <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#moveUserModal">
+                            <i class="fas fa-arrows-alt-h me-2"></i>Mover Usuário
+                        </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -171,6 +177,37 @@
     </div>
   </div>
 </div>
+
+<!-- Modal para Mover Usuário -->
+{% if check_permission(action='can_move_user') %}
+<div class="modal fade" id="moveUserModal" tabindex="-1" aria-labelledby="moveUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="moveUserModalLabel">Mover {{ get_attr_value(user, 'displayName') }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="moveUserForm" action="{{ url_for('move_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+        {{ form.csrf_token }}
+        <div class="modal-body">
+          <p>Selecione a nova Unidade Organizacional (OU) para a qual o usuário será movido.</p>
+          <div class="mb-3">
+            <label for="new_ou_dn" class="form-label">Nova OU de Destino</label>
+            <select class="form-select" id="new_ou_dn" name="new_ou_dn" required>
+              <option value="">Carregando OUs...</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Mover Usuário</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -245,6 +282,38 @@
             });
             renderGroups(filteredGroups);
         });
+    });
+
+    // Script para o Modal "Mover Usuário"
+    document.addEventListener('DOMContentLoaded', function() {
+        const moveUserModal = document.getElementById('moveUserModal');
+        if (moveUserModal) {
+            moveUserModal.addEventListener('show.bs.modal', async function () {
+                const ouSelect = document.getElementById('new_ou_dn');
+                // Evita recarregar se já estiver populado
+                if (ouSelect.options.length > 1) return;
+
+                try {
+                    const response = await fetch('/api/ous');
+                    if (!response.ok) throw new Error('Falha ao buscar as OUs.');
+
+                    const ous = await response.json();
+
+                    ouSelect.innerHTML = '<option value="" disabled selected>Selecione uma OU</option>'; // Limpa e adiciona placeholder
+
+                    ous.forEach(ou => {
+                        const option = document.createElement('option');
+                        option.value = ou.dn;
+                        option.textContent = ou.name;
+                        ouSelect.appendChild(option);
+                    });
+
+                } catch (error) {
+                    console.error('Erro ao popular OUs:', error);
+                    ouSelect.innerHTML = '<option value="">Erro ao carregar OUs</option>';
+                }
+            });
+        }
     });
 </script>
 <style>

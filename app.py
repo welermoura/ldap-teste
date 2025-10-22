@@ -422,6 +422,21 @@ def search_general_users(conn, query):
         logging.error(f"Erro ao buscar usuários com a query '{query}': {str(e)}")
         return []
 
+def get_all_ous(conn):
+    """Busca todas as OUs a partir da base de busca."""
+    config = load_config()
+    search_base = config.get('AD_SEARCH_BASE')
+    if not search_base:
+        return []
+
+    conn.search(search_base, '(objectClass=organizationalUnit)', SUBTREE, attributes=['ou', 'distinguishedName'])
+
+    ous = [{'name': entry.ou.value, 'dn': entry.distinguishedName.value} for entry in conn.entries]
+
+    # Sort OUs by name for better readability in the frontend
+    sorted_ous = sorted(ous, key=lambda x: x['name'])
+    return sorted_ous
+
 def get_upn_suffix_from_base(search_base):
     """Deriva o sufixo UPN da base de busca. Ex: OU=Users,DC=corp,DC=com -> @corp.com"""
     dc_parts = [part.split('=')[1] for part in search_base.split(',') if part.strip().upper().startswith('DC=')]
@@ -1092,6 +1107,18 @@ def api_user_groups(username):
         logging.error(f"Erro na API de grupos do usuário '{username}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/ous')
+@require_auth
+def api_get_ous():
+    """Endpoint da API para listar todas as Unidades Organizacionais."""
+    try:
+        conn = get_read_connection()
+        ous = get_all_ous(conn)
+        return jsonify(ous)
+    except Exception as e:
+        logging.error(f"Erro ao buscar OUs via API: {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar Unidades Organizacionais.'}), 500
+
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -1406,6 +1433,41 @@ def delete_user(username):
 
     return redirect(url_for('view_user', username=username))
 
+@app.route('/move_user/<username>', methods=['POST'])
+@require_auth
+@require_permission(action='can_move_user')
+def move_user(username):
+    """Move um usuário para uma nova Unidade Organizacional."""
+    new_ou_dn = request.form.get('new_ou_dn')
+    if not new_ou_dn:
+        flash("Nenhuma Unidade Organizacional de destino foi selecionada.", "error")
+        return redirect(url_for('view_user', username=username))
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['distinguishedName', 'cn'])
+        if not user:
+            flash("Usuário não encontrado.", "error")
+            return redirect(url_for('manage_users'))
+
+        current_dn = user.distinguishedName.value
+        user_cn = user.cn.value
+        new_dn = f"CN={user_cn},{new_ou_dn}"
+
+        # Utiliza a operação modify_dn para mover o usuário
+        conn.modify_dn(current_dn, f"CN={user_cn}", new_parent=new_ou_dn)
+
+        if conn.result['description'] == 'success':
+            flash(f"Usuário '{username}' movido com sucesso para a nova OU!", "success")
+            logging.info(f"Usuário '{username}' movido de '{get_ou_from_dn(current_dn)}' para '{new_ou_dn}' por '{session.get('user_display_name')}'.")
+        else:
+            flash(f"Falha ao mover o usuário: {conn.result['message']}", "error")
+
+    except Exception as e:
+        flash(f"Ocorreu um erro ao mover o usuário: {e}", "error")
+        logging.error(f"Erro em move_user para {username}: {e}", exc_info=True)
+
+    return redirect(url_for('view_user', username=username))
 
 @app.route('/reset_password/<username>', methods=['POST'])
 @require_auth
@@ -1715,6 +1777,7 @@ def permissions():
                         'can_edit': f'{group}_can_edit' in request.form,
                         'can_manage_groups': f'{group}_can_manage_groups' in request.form,
                         'can_delete_user': f'{group}_can_delete_user' in request.form,
+                        'can_move_user': f'{group}_can_move_user' in request.form,
                     }
                     views = {
                         'can_export_data': f'{group}_can_export_data' in request.form,
