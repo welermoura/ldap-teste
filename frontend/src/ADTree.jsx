@@ -17,13 +17,13 @@ const ContentPanel = ({ selectedNode, members }) => {
     const getIcon = (type) => {
         switch (type) {
             case 'ou':
-                return <i className="bi bi-folder"></i>;
+                return <i className="fas fa-folder"></i>;
             case 'user':
-                return <i className="bi bi-person"></i>;
+                return <i className="fas fa-user"></i>;
             case 'group':
-                return <i className="bi bi-people"></i>;
+                return <i className="fas fa-users"></i>;
             default:
-                return null;
+                return <i className="fas fa-file"></i>;
         }
     };
 
@@ -76,13 +76,13 @@ const TreeNode = ({ node, onNodeClick }) => {
   const getIcon = (type) => {
     switch (type) {
         case 'ou':
-            return <i className="bi bi-folder"></i>;
+            return <i className="fas fa-folder"></i>;
         case 'user':
-            return <i className="bi bi-person"></i>;
+            return <i className="fas fa-user"></i>;
         case 'group':
-            return <i className="bi bi-people"></i>;
+            return <i className="fas fa-users"></i>;
         default:
-            return null;
+            return <i className="fas fa-file"></i>; // Fallback icon
     }
   };
 

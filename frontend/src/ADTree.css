@@ -59,10 +59,38 @@
     background-color: #f0f0f0;
 }
 
+.tree-node {
+    position: relative;
+}
+
 .node-children {
-    border-left: 1px solid #ddd;
-    margin-left: 10px;
-    padding-left: 10px;
+    margin-left: 20px;
+    padding-left: 20px;
+    border-left: 1px dashed #ccc;
+}
+
+.node-label {
+    display: flex;
+    align-items: center;
+    position: relative;
+    padding-left: 25px; /* Space for the line */
+}
+
+/* Horizontal line from the vertical line to the node */
+.node-label::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 20px;
+    height: 1px;
+    background-color: #ccc;
+    border-bottom: 1px dashed #ccc;
+}
+
+/* Space for the icon */
+.node-label i {
+    margin-right: 8px;
 }
 
 .member-list {
