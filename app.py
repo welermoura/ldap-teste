@@ -1,23 +1,23 @@
 # Reverted to stable version
 import os
 import logging
-from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response, send_from_directory
+from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
 import ldap3
-from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL
+from ldap3 import Server, Connection, ALL, SUBTREE, BASE
 from ldap3.utils.conv import escape_filter_chars
 from datetime import datetime, timedelta, date, timezone
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import re
+from cryptography.fernet import Fernet
 import secrets
 import io
 import csv
 import base64
-from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, filetime_to_datetime
 
 # ==============================================================================
 # Configuração Base
@@ -53,6 +53,63 @@ DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
 PERMISSIONS_FILE = os.path.join(data_dir, 'permissions.json')
 KEY_FILE = os.path.join(data_dir, 'secret.key')
 CONFIG_FILE = os.path.join(data_dir, 'config.json')
+
+
+# ==============================================================================
+# Funções de Criptografia e Configuração Segura
+# ==============================================================================
+def write_key():
+    """Gera uma chave e a salva em 'secret.key'."""
+    key = Fernet.generate_key()
+    with open(KEY_FILE, "wb") as key_file:
+        key_file.write(key)
+
+def load_key():
+    """Carrega a chave de 'secret.key'."""
+    if not os.path.exists(KEY_FILE):
+        write_key()
+    return open(KEY_FILE, "rb").read()
+
+# Garante que a chave exista na inicialização
+key = load_key()
+cipher_suite = Fernet(key)
+
+SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
+
+def load_config():
+    """Carrega, descriptografa e retorna os dados de configuração."""
+    try:
+        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            encrypted_config = json.load(f)
+
+        config = {}
+        for k, v in encrypted_config.items():
+            if k in SENSITIVE_KEYS and v:
+                try:
+                    config[k] = cipher_suite.decrypt(v.encode()).decode()
+                except Exception:
+                    # Se falhar a descriptografia, pode ser um valor antigo não criptografado.
+                    # Trate como está, mas a próxima gravação irá criptografá-lo.
+                    config[k] = v
+            else:
+                config[k] = v
+        return config
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+def save_config(config):
+    """Criptografa e salva os dados de configuração."""
+    encrypted_config = {}
+    # Make a copy to avoid modifying the dictionary while iterating
+    config_copy = config.copy()
+    for k, v in config_copy.items():
+        if k in SENSITIVE_KEYS and v:
+            encrypted_config[k] = cipher_suite.encrypt(v.encode()).decode()
+        else:
+            encrypted_config[k] = v
+
+    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        json.dump(encrypted_config, f, indent=4)
 
 # ==============================================================================
 # Funções Auxiliares de User/Schedule/Permissions (sem alteração)
@@ -341,9 +398,23 @@ class DeleteUserForm(FlaskForm):
 # ==============================================================================
 # Funções Auxiliares do Active Directory
 # ==============================================================================
+def get_ldap_connection(user, password):
+    """Cria uma conexão LDAP com base na configuração."""
+    config = load_config()
+    ad_server = config.get('AD_SERVER')
+    use_ldaps = config.get('USE_LDAPS', False)
+    if not ad_server:
+        raise Exception("Servidor AD não configurado.")
+    server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
+    return Connection(server, user=user, password=password, auto_bind=True)
+
 def get_service_account_connection():
-    """Obtém uma conexão LDAP usando a conta de serviço."""
-    return get_ldap_connection()
+    config = load_config()
+    user = config.get('SERVICE_ACCOUNT_USER')
+    password = config.get('SERVICE_ACCOUNT_PASSWORD')
+    if not user or not password:
+        raise Exception("Conta de serviço não configurada no painel de administração.")
+    return get_ldap_connection(user, password)
 
 def get_read_connection():
     """
@@ -421,53 +492,6 @@ def search_general_users(conn, query):
     except Exception as e:
         logging.error(f"Erro ao buscar usuários com a query '{query}': {str(e)}")
         return []
-
-def get_all_ous(conn):
-    """Busca todas as OUs e as retorna em uma estrutura de árvore hierárquica."""
-    config = load_config()
-    search_base = config.get('AD_SEARCH_BASE')
-    if not search_base:
-        return []
-
-    conn.search(search_base, '(objectClass=organizationalUnit)', SUBTREE, attributes=['ou', 'distinguishedName'])
-
-    if not conn.entries:
-        return []
-
-    nodes = {}
-    # First pass: create all node objects and store them in a dictionary by their DN.
-    # The keys 'text' and 'nodes' are chosen for compatibility with common treeview libraries.
-    for entry in conn.entries:
-        dn = str(entry.distinguishedName)
-        nodes[dn] = {
-            'text': str(entry.ou),
-            'dn': dn,
-            'nodes': []  # 'nodes' will hold child OUs
-        }
-
-    tree_roots = []
-    # Second pass: link nodes together.
-    for dn, node in nodes.items():
-        # Determine the parent DN by removing the first component of the current DN.
-        parent_dn = ','.join(dn.split(',')[1:])
-
-        # If the parent DN exists in our dictionary, it's a child of that parent.
-        if parent_dn in nodes:
-            nodes[parent_dn]['nodes'].append(node)
-        # Otherwise, it's a root node in our hierarchy.
-        else:
-            tree_roots.append(node)
-
-    # Sort the tree and all sub-nodes alphabetically by 'text' for a clean UI.
-    def sort_tree_nodes_recursively(node_list):
-        node_list.sort(key=lambda x: x['text'])
-        for node in node_list:
-            if node['nodes']:
-                sort_tree_nodes_recursively(node['nodes'])
-
-    sort_tree_nodes_recursively(tree_roots)
-
-    return tree_roots
 
 def get_upn_suffix_from_base(search_base):
     """Deriva o sufixo UPN da base de busca. Ex: OU=Users,DC=corp,DC=com -> @corp.com"""
@@ -768,37 +792,6 @@ def select_model():
 @require_auth
 def result():
     return redirect(url_for('index'))
-
-@app.route('/ad-tree')
-@require_auth
-def ad_tree():
-    """Renderiza o template que hospeda a aplicação React."""
-    try:
-        manifest_path = os.path.join(basedir, 'frontend', 'dist', '.vite', 'manifest.json')
-        with open(manifest_path, 'r') as f:
-            manifest = json.load(f)
-
-        # A chave de entrada correta geralmente corresponde ao arquivo de entrada do projeto Vite
-        entry_point_key = 'src/main.jsx'
-        if entry_point_key not in manifest:
-            # Fallback para a primeira chave se o nome não for o esperado
-            entry_point_key = next(iter(manifest))
-
-        entry_point = manifest[entry_point_key]
-        js_file = entry_point.get('file')
-        css_files = entry_point.get('css', [])
-        css_file = css_files[0] if css_files else None
-
-        return render_template('ad_tree.html', js_file=js_file, css_file=css_file)
-    except Exception as e:
-        logging.error(f"Erro ao carregar o manifesto do Vite: {e}", exc_info=True)
-        return "Erro ao carregar a aplicação. Verifique os logs.", 500
-
-@app.route('/ad-tree/assets/<path:filename>')
-@require_auth
-def ad_tree_assets(filename):
-    """Serve os assets da aplicação React."""
-    return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
@@ -1170,65 +1163,6 @@ def api_user_groups(username):
         logging.error(f"Erro na API de grupos do usuário '{username}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ous')
-@require_auth
-def api_get_ous():
-    """Endpoint da API para listar todas as Unidades Organizacionais."""
-    try:
-        conn = get_read_connection()
-        ous = get_all_ous(conn)
-        return jsonify(ous)
-    except Exception as e:
-        logging.error(f"Erro ao buscar OUs via API: {e}", exc_info=True)
-        return jsonify({'error': 'Falha ao buscar Unidades Organizacionais.'}), 500
-
-@app.route('/api/ou_members/<path:ou_dn>')
-@require_auth
-def api_ou_members(ou_dn):
-    """Retorna os membros diretos (filhos) de uma Unidade Organizacional."""
-    try:
-        conn = get_read_connection()
-
-        # A busca LEVEL recupera apenas os filhos imediatos
-        conn.search(search_base=ou_dn,
-                    search_filter='(objectClass=*)',
-                    search_scope=LEVEL,
-                    attributes=['objectClass', 'name', 'ou', 'cn', 'sAMAccountName', 'userAccountControl', 'distinguishedName'])
-
-        items = []
-        for entry in conn.entries:
-            obj_class = entry.objectClass.values
-            item = {'dn': entry.distinguishedName.value}
-
-            if 'organizationalUnit' in obj_class:
-                item['type'] = 'ou'
-                item['name'] = entry.ou.value if 'ou' in entry else entry.name.value
-            elif 'group' in obj_class:
-                item['type'] = 'group'
-                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
-            elif 'user' in obj_class and 'person' in obj_class:
-                item['type'] = 'user'
-                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
-                item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
-                item['status'] = get_user_status(entry)
-            else:
-                # Pula outros tipos de objeto ou os manipula conforme necessário
-                continue
-
-            items.append(item)
-
-        # Ordena os itens: OUs primeiro, depois grupos, depois usuários, todos em ordem alfabética
-        type_order = {'ou': 0, 'group': 1, 'user': 2}
-        items.sort(key=lambda x: (type_order.get(x['type'], 99), x['name'].lower()))
-
-        return jsonify(items)
-    except ldap3.core.exceptions.LDAPInvalidDnError:
-        logging.warning(f"API ou_members chamada com DN inválido: '{ou_dn}'")
-        return jsonify({'error': 'O caminho da Unidade Organizacional fornecido é inválido.'}), 400
-    except Exception as e:
-        logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
-        return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
-
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -1369,6 +1303,14 @@ def remove_member_temp(group_name, user_sam):
         logging.error(f"Erro ao remover temporariamente o usuário '{user_sam}' do grupo '{group_name}': {e}", exc_info=True)
 
     return redirect(url_for('view_group', group_name=group_name))
+
+def filetime_to_datetime(ft):
+    EPOCH_AS_FILETIME = 116444736000000000
+    HUNDREDS_OF_NANOSECONDS = 10000000
+    if ft is None or int(ft) == 0 or int(ft) == 9223372036854775807:
+        return None
+    # Retorna um datetime "aware" em UTC para evitar erros de comparação
+    return datetime.fromtimestamp((int(ft) - EPOCH_AS_FILETIME) / HUNDREDS_OF_NANOSECONDS, tz=timezone.utc)
 
 @app.route('/view_user/<username>')
 @require_auth
@@ -1542,6 +1484,7 @@ def delete_user(username):
         flash("Erro de validação do formulário. A exclusão foi cancelada.", "danger")
 
     return redirect(url_for('view_user', username=username))
+
 
 @app.route('/reset_password/<username>', methods=['POST'])
 @require_auth
@@ -1851,7 +1794,6 @@ def permissions():
                         'can_edit': f'{group}_can_edit' in request.form,
                         'can_manage_groups': f'{group}_can_manage_groups' in request.form,
                         'can_delete_user': f'{group}_can_delete_user' in request.form,
-                        'can_move_user': f'{group}_can_move_user' in request.form,
                     }
                     views = {
                         'can_export_data': f'{group}_can_export_data' in request.form,
