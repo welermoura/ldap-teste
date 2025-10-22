@@ -36,7 +36,7 @@ const TreeNode = ({ node }) => {
   return (
     <div style={{ marginLeft: '20px' }}>
       <div onClick={toggleOpen} style={{ cursor: 'pointer' }}>
-        {getIcon(node.type)} {node.name}
+        {getIcon(node.type)} {node.text || node.name}
       </div>
       {isOpen && (
         <div>
