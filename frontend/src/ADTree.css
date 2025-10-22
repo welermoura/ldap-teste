@@ -119,3 +119,13 @@
 .member-name {
     font-size: 1rem;
 }
+
+.drop-target-highlight {
+    background-color: #e0f7fa; /* Um azul claro para indicar a área de soltar */
+    border: 1px dashed #007bff;
+    border-radius: 5px;
+}
+
+.member-item:not(.non-draggable) {
+    cursor: move; /* Cursor de movimento para itens arrastáveis */
+}
