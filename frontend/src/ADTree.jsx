@@ -193,7 +193,6 @@ const ADExplorerPage = () => {
     return (
         <DndProvider backend={HTML5Backend}>
             <div className="ad-explorer-container">
-                <h1 className="main-header">Explorador do Active Directory</h1>
                 <div className="panels-container">
                     <div className="tree-panel">
                         {treeData.map(rootNode => (
