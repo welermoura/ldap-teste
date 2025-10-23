@@ -196,6 +196,7 @@ const ADExplorerPage = () => {
         // Busca os membros do nó clicado (OUs e outros objetos)
         axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
             .then(response => {
+                console.log("Dados recebidos da API:", response.data); // Log de Depuração
                 setMembers(response.data);
                 // Se o nó foi aberto e ainda não tem filhos OUs carregados, atualiza a árvore
                 if (isOpen && (!node.nodes || node.nodes.length === 0)) {
