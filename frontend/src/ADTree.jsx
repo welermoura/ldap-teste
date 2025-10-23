@@ -147,6 +147,9 @@ const ADExplorerPage = () => {
     }, [findAndUpdateNode]);
 
     const handleMoveObject = useCallback((item, targetNode) => {
+        // Alerta de Depuração
+        alert(`Movendo: "${item.name}"\nPARA: "${targetNode.text}"`);
+
         const sourceOuDn = item.dn.substring(item.dn.indexOf(',') + 1);
 
         // Evita mover para a mesma OU
