@@ -1211,6 +1211,9 @@ def api_ou_members(ou_dn):
                 item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
                 item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
                 item['status'] = get_user_status(entry)
+            elif 'computer' in obj_class:
+                item['type'] = 'computer'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
             else:
                 # Pula outros tipos de objeto ou os manipula conforme necessário
                 continue
