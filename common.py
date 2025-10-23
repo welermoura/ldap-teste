@@ -2,7 +2,11 @@ import os
 import json
 import logging
 from ldap3 import Server, Connection, ALL
+from ldap3.utils.log import set_library_log_detail_level, EXTENDED
 from cryptography.fernet import Fernet
+
+# Habilita o logging detalhado para a biblioteca ldap3 para depuração
+set_library_log_detail_level(EXTENDED)
 from datetime import datetime, timezone
 
 # ==============================================================================
