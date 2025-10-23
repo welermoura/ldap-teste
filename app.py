@@ -1254,8 +1254,9 @@ def move_object():
             logging.info(f"Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
             return jsonify({'success': True, 'message': 'Objeto movido com sucesso.'})
         else:
-            logging.error(f"Falha ao mover objeto '{object_dn}': {conn.result['message']}")
-            return jsonify({'error': f"Falha ao mover objeto: {conn.result['message']}"}), 500
+            error_message = conn.result.get('message', 'Erro desconhecido do LDAP.')
+            logging.error(f"Falha ao mover objeto '{object_dn}': {error_message}")
+            return jsonify({'error': f"Falha do LDAP: {error_message}"}), 500
 
     except ldap3.core.exceptions.LDAPInvalidDnError as e:
         logging.warning(f"Tentativa de mover objeto com DN inválido: {e}")

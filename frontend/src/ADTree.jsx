@@ -86,7 +86,9 @@ const TreeNode = ({ node, onNodeClick, refreshNode }) => {
             })
             .catch(error => {
                 console.error("Erro ao mover objeto:", error);
-                alert('Ocorreu um erro ao mover o objeto.');
+                // Exibe a mensagem de erro específica retornada pela API, se disponível
+                const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação ao mover o objeto.';
+                alert(errorMessage);
             });
         },
         canDrop: (item) => item.type !== 'ou', // OUs não podem ser movidas (por enquanto)
