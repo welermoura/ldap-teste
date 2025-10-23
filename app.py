@@ -1243,27 +1243,45 @@ def move_object():
 
     try:
         conn = get_service_account_connection()
-
-        # O novo RDN (Relative Distinguished Name) será o mesmo, apenas a localização muda.
-        # Extrai o CN do DN original, ex: "CN=John Doe" de "CN=John Doe,OU=Users,DC=corp,DC=com"
         new_rdn = object_dn.split(',')[0]
 
         conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
 
+        # Se a operação foi um sucesso direto, retorna a confirmação.
         if conn.result['description'] == 'success':
             logging.info(f"Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
             return jsonify({'success': True, 'message': 'Objeto movido com sucesso.'})
-        else:
-            error_message = conn.result.get('message', 'Erro desconhecido do LDAP.')
-            logging.error(f"Falha ao mover objeto '{object_dn}': {error_message}")
-            return jsonify({'error': f"Falha do LDAP: {error_message}"}), 500
 
-    except ldap3.core.exceptions.LDAPInvalidDnError as e:
-        logging.warning(f"Tentativa de mover objeto com DN inválido: {e}")
-        return jsonify({'error': 'DN inválido fornecido.'}), 400
+        # Se falhou, extrai a mensagem de erro para análise.
+        error_message = conn.result.get('message', 'Erro desconhecido do LDAP.')
+        raise Exception(error_message)
+
     except Exception as e:
-        logging.error(f"Erro ao mover objeto '{object_dn}': {e}", exc_info=True)
-        return jsonify({'error': 'Ocorreu um erro interno ao mover o objeto.'}), 500
+        # Verifica se o erro é o específico "WILL_NOT_PERFORM"
+        if "WILL_NOT_PERFORM" in str(e):
+            logging.warning(f"Recebido 'WILL_NOT_PERFORM' ao mover '{object_dn}'. Verificando se a operação foi bem-sucedida...")
+            try:
+                # Tenta buscar o objeto na nova OU para confirmar se a movimentação ocorreu
+                new_dn = f"{new_rdn},{target_ou_dn}"
+                conn.search(search_base=new_dn, search_filter='(objectClass=*)', search_scope=BASE, attributes=['cn'])
+
+                if conn.entries:
+                    logging.info(f"VERIFICAÇÃO BEM-SUCEDIDA: Objeto '{object_dn}' foi movido para '{target_ou_dn}' apesar do erro inicial.")
+                    return jsonify({'success': True, 'message': 'Objeto movido com sucesso (verificado).'})
+                else:
+                    logging.error(f"FALHA NA VERIFICAÇÃO: Objeto '{object_dn}' não encontrado em '{target_ou_dn}' após erro 'WILL_NOT_PERFORM'.")
+                    return jsonify({'error': 'O servidor se recusou a realizar a operação e a verificação falhou.'}), 500
+            except Exception as verification_e:
+                logging.error(f"Erro durante a verificação da movimentação do objeto '{object_dn}': {verification_e}", exc_info=True)
+                return jsonify({'error': 'Ocorreu um erro secundário ao verificar a movimentação do objeto.'}), 500
+
+        # Trata outros erros
+        logging.error(f"Falha ao mover objeto '{object_dn}': {e}", exc_info=True)
+
+        if isinstance(e, ldap3.core.exceptions.LDAPInvalidDnError):
+            return jsonify({'error': 'DN inválido fornecido.'}), 400
+
+        return jsonify({'error': f"Falha do LDAP: {str(e)}"}), 500
 
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
