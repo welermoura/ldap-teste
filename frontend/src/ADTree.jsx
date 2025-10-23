@@ -111,12 +111,37 @@ const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
     );
 };
 
+// Componente para o Modal de Confirmação
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-backdrop">
+            <div className="modal-content">
+                <div className="modal-header">
+                    <h5 className="modal-title">{title}</h5>
+                    <button type="button" className="btn-close" onClick={onClose}></button>
+                </div>
+                <div className="modal-body">
+                    {children}
+                </div>
+                <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+                    <button type="button" className="btn btn-primary" onClick={onConfirm}>Confirmar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // Componente principal da página
 const ADExplorerPage = () => {
     const [treeData, setTreeData] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [members, setMembers] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [moveDetails, setMoveDetails] = useState(null);
 
     // Função recursiva para encontrar e atualizar um nó na árvore
     const findAndUpdateNode = useCallback((nodes, dn, updateCallback) => {
@@ -147,13 +172,16 @@ const ADExplorerPage = () => {
     }, [findAndUpdateNode]);
 
     const handleMoveObject = useCallback((item, targetNode) => {
-        // Alerta de Depuração
-        alert(`Movendo: "${item.name}"\nPARA: "${targetNode.text}"`);
-
         const sourceOuDn = item.dn.substring(item.dn.indexOf(',') + 1);
-
-        // Evita mover para a mesma OU
         if (sourceOuDn === targetNode.dn) return;
+
+        setMoveDetails({ item, targetNode, sourceOuDn });
+        setIsModalOpen(true);
+    }, []);
+
+    const confirmMove = () => {
+        if (!moveDetails) return;
+        const { item, targetNode, sourceOuDn } = moveDetails;
 
         axios.post('/api/move_object', {
             object_dn: item.dn,
@@ -161,13 +189,10 @@ const ADExplorerPage = () => {
         })
         .then(response => {
             if (response.data.success) {
-                // Atualização Otimista da Interface
-                // 1. Remove o membro da lista da OU selecionada (se for a origem)
                 if (selectedNode && selectedNode.dn === sourceOuDn) {
                     setMembers(prevMembers => prevMembers.filter(m => m.dn !== item.dn));
                 }
-                // 2. Adiciona o membro à lista da OU selecionada (se for o destino)
-                 if (selectedNode && selectedNode.dn === targetNode.dn) {
+                if (selectedNode && selectedNode.dn === targetNode.dn) {
                     const newDn = `${item.dn.split(',')[0]},${targetNode.dn}`;
                     const movedItem = { ...item, dn: newDn };
                     setMembers(prevMembers => [...prevMembers, movedItem].sort((a, b) => a.name.localeCompare(b.name)));
@@ -179,8 +204,12 @@ const ADExplorerPage = () => {
         .catch(error => {
             const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
             alert(errorMessage);
+        })
+        .finally(() => {
+            setIsModalOpen(false);
+            setMoveDetails(null);
         });
-    }, [selectedNode]);
+    };
 
     useEffect(() => {
         axios.get('/api/ous')
@@ -208,6 +237,18 @@ const ADExplorerPage = () => {
                     </div>
                     <ContentPanel selectedNode={selectedNode} members={members} getIcon={getIcon} />
                 </div>
+                <ConfirmationModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onConfirm={confirmMove}
+                    title="Confirmar Movimentação"
+                >
+                    {moveDetails && (
+                        <p>
+                            Tem certeza que deseja mover <strong>{moveDetails.item.name}</strong> para a Unidade Organizacional <strong>{moveDetails.targetNode.text}</strong>?
+                        </p>
+                    )}
+                </ConfirmationModal>
             </div>
         </DndProvider>
     );
