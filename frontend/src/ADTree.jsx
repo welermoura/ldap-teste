@@ -62,66 +62,28 @@ const ContentPanel = ({ selectedNode, members, getIcon }) => {
 };
 
 // O componente de nó da árvore, agora com capacidade de 'drop'
-const TreeNode = ({ node, onNodeClick, refreshNode }) => {
+const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [children, setChildren] = useState([]);
+    // Os filhos agora são passados como prop para permitir o gerenciamento de estado centralizado
+    const children = node.nodes || [];
 
     const [{ isOver, canDrop }, drop] = useDrop(() => ({
         accept: ItemTypes.AD_OBJECT,
         drop: (item) => {
-            // A ação de 'drop' acontece aqui
-            axios.post('/api/move_object', {
-                object_dn: item.dn,
-                target_ou_dn: node.dn,
-            })
-            .then(response => {
-                if (response.data.success) {
-                    // Atualiza a OU de origem (pai do item movido) e a de destino
-                    const sourceOuDn = item.dn.substring(item.dn.indexOf(',') + 1);
-                    refreshNode(sourceOuDn);
-                    refreshNode(node.dn);
-                } else {
-                    alert('Falha ao mover o objeto: ' + response.data.error);
-                }
-            })
-            .catch(error => {
-                console.error("Erro ao mover objeto:", error);
-                // Exibe a mensagem de erro específica retornada pela API, se disponível
-                const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação ao mover o objeto.';
-                alert(errorMessage);
-            });
+            // Ação de drop agora chama a função centralizada
+            onMoveObject(item, node);
         },
-        canDrop: (item) => item.type !== 'ou', // OUs não podem ser movidas (por enquanto)
+        canDrop: (item) => item.type !== 'ou' && !item.dn.endsWith(node.dn),
         collect: (monitor) => ({
             isOver: !!monitor.isOver(),
             canDrop: !!monitor.canDrop(),
         }),
-    }), [node, refreshNode]); // Dependências do hook
+    }), [node, onMoveObject]);
 
     const handleNodeClick = () => {
-        toggleOpen();
-        fetchAndDisplayMembers();
-    };
-
-    const fetchAndDisplayMembers = useCallback((forceOpen = false) => {
-        if ((forceOpen || !isOpen) && children.length === 0) {
-            axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
-                .then(response => {
-                    const allMembers = response.data;
-                    const ouChildren = allMembers.filter(member => member.type === 'ou');
-                    setChildren(ouChildren);
-                    onNodeClick(node, allMembers);
-                });
-        } else {
-             axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
-                .then(response => {
-                    onNodeClick(node, response.data);
-                });
-        }
-    }, [isOpen, children, node, onNodeClick]);
-
-    const toggleOpen = () => {
         setIsOpen(!isOpen);
+        // A busca de membros agora é tratada no clique se os filhos não estiverem carregados
+        onNodeClick(node, !isOpen);
     };
 
     const getIcon = (type) => {
@@ -136,12 +98,12 @@ const TreeNode = ({ node, onNodeClick, refreshNode }) => {
     return (
         <div ref={drop} className={`tree-node ${isOver && canDrop ? 'drop-target-highlight' : ''}`}>
             <div onClick={handleNodeClick} className="node-label">
-                {getIcon(node.type)} {node.text || node.name}
+                {getIcon('ou')} {node.text}
             </div>
             {isOpen && (
                 <div className="node-children">
                     {children.map(child => (
-                        <TreeNode key={child.dn} node={child} onNodeClick={onNodeClick} refreshNode={refreshNode} />
+                        <TreeNode key={child.dn} node={child} onNodeClick={onNodeClick} onMoveObject={onMoveObject} />
                     ))}
                 </div>
             )}
@@ -156,32 +118,72 @@ const ADExplorerPage = () => {
     const [selectedNode, setSelectedNode] = useState(null);
     const [members, setMembers] = useState([]);
 
-    const fetchRootOUs = () => {
+    // Função recursiva para encontrar e atualizar um nó na árvore
+    const findAndUpdateNode = useCallback((nodes, dn, updateCallback) => {
+        return nodes.map(node => {
+            if (node.dn === dn) {
+                return updateCallback(node);
+            }
+            if (node.nodes) {
+                return { ...node, nodes: findAndUpdateNode(node.nodes, dn, updateCallback) };
+            }
+            return node;
+        });
+    }, []);
+
+    const handleNodeClick = useCallback((node, isOpen) => {
+        setSelectedNode(node);
+        // Busca os membros do nó clicado (OUs e outros objetos)
+        axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
+            .then(response => {
+                setMembers(response.data);
+                // Se o nó foi aberto e ainda não tem filhos OUs carregados, atualiza a árvore
+                if (isOpen && (!node.nodes || node.nodes.length === 0)) {
+                    const ouChildren = response.data.filter(m => m.type === 'ou');
+                    setTreeData(prevTree => findAndUpdateNode(prevTree, node.dn, n => ({ ...n, nodes: ouChildren })));
+                }
+            })
+            .catch(error => console.error(`Erro ao buscar membros para ${node.dn}:`, error));
+    }, [findAndUpdateNode]);
+
+    const handleMoveObject = useCallback((item, targetNode) => {
+        const sourceOuDn = item.dn.substring(item.dn.indexOf(',') + 1);
+
+        // Evita mover para a mesma OU
+        if (sourceOuDn === targetNode.dn) return;
+
+        axios.post('/api/move_object', {
+            object_dn: item.dn,
+            target_ou_dn: targetNode.dn,
+        })
+        .then(response => {
+            if (response.data.success) {
+                // Atualização Otimista da Interface
+                // 1. Remove o membro da lista da OU selecionada (se for a origem)
+                if (selectedNode && selectedNode.dn === sourceOuDn) {
+                    setMembers(prevMembers => prevMembers.filter(m => m.dn !== item.dn));
+                }
+                // 2. Adiciona o membro à lista da OU selecionada (se for o destino)
+                 if (selectedNode && selectedNode.dn === targetNode.dn) {
+                    const newDn = `${item.dn.split(',')[0]},${targetNode.dn}`;
+                    const movedItem = { ...item, dn: newDn };
+                    setMembers(prevMembers => [...prevMembers, movedItem].sort((a, b) => a.name.localeCompare(b.name)));
+                }
+            } else {
+                alert('Falha ao mover o objeto: ' + (response.data.error || 'Erro desconhecido.'));
+            }
+        })
+        .catch(error => {
+            const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
+            alert(errorMessage);
+        });
+    }, [selectedNode]);
+
+    useEffect(() => {
         axios.get('/api/ous')
           .then(response => setTreeData(response.data))
           .catch(error => console.error("Error fetching OUs:", error));
-    };
-
-    useEffect(() => {
-        fetchRootOUs();
     }, []);
-
-    const handleNodeSelection = (node, children) => {
-        setSelectedNode(node);
-        setMembers(children);
-    };
-
-    const refreshNode = useCallback((dn) => {
-      // For now, a simple way to refresh is to refetch everything
-      // A more optimized approach would be to find the node in the state and refetch its children
-      fetchRootOUs();
-      if (selectedNode && (selectedNode.dn === dn || dn.endsWith(selectedNode.dn))) {
-          axios.get(`/api/ou_members/${encodeURIComponent(dn)}`)
-              .then(response => {
-                  setMembers(response.data);
-              });
-      }
-    }, [selectedNode]);
 
     const getIcon = (type) => {
         switch (type) {
@@ -198,7 +200,7 @@ const ADExplorerPage = () => {
                 <div className="panels-container">
                     <div className="tree-panel">
                         {treeData.map(rootNode => (
-                            <TreeNode key={rootNode.dn} node={{...rootNode, type: 'ou'}} onNodeClick={handleNodeSelection} refreshNode={refreshNode}/>
+                            <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} />
                         ))}
                     </div>
                     <ContentPanel selectedNode={selectedNode} members={members} getIcon={getIcon} />
