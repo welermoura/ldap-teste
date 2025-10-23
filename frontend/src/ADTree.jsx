@@ -32,7 +32,7 @@ const DraggableItem = ({ member, getIcon }) => {
 };
 
 // Painel para exibir o conteúdo da OU selecionada
-const ContentPanel = ({ selectedNode, members, getIcon }) => {
+const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick }) => {
     if (!selectedNode) {
         return (
             <div className="content-panel">
@@ -47,15 +47,25 @@ const ContentPanel = ({ selectedNode, members, getIcon }) => {
         <div className="content-panel">
             <h4 className="content-header">Conteúdo de: {selectedNode.text || selectedNode.name}</h4>
             <ul className="member-list">
-                {members.map(member => (
-                    // Renderiza apenas usuários e grupos como arrastáveis
-                    (member.type === 'user' || member.type === 'group')
-                        ? <DraggableItem key={member.dn} member={member} getIcon={getIcon} />
-                        : <li key={member.dn} className="member-item non-draggable">
-                            {getIcon(member.type)}
-                            <span className="member-name">{member.name}</span>
-                          </li>
-                ))}
+                {members.map(member => {
+                    if (member.type === 'user' || member.type === 'group') {
+                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} />;
+                    } else if (member.type === 'ou') {
+                        return (
+                            <li key={member.dn} className="member-item non-draggable" onDoubleClick={() => onOuDoubleClick(member)} style={{ cursor: 'pointer' }}>
+                                {getIcon(member.type)}
+                                <span className="member-name">{member.name}</span>
+                            </li>
+                        );
+                    } else {
+                        return (
+                            <li key={member.dn} className="member-item non-draggable">
+                                {getIcon(member.type)}
+                                <span className="member-name">{member.name}</span>
+                            </li>
+                        );
+                    }
+                })}
             </ul>
         </div>
     );
@@ -142,6 +152,30 @@ const ADExplorerPage = () => {
     const [members, setMembers] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [moveDetails, setMoveDetails] = useState(null);
+
+    // Função para simular o clique em um nó da árvore (para o duplo clique)
+    const handleOuDoubleClick = (ouMember) => {
+        // Encontra o nó correspondente nos dados da árvore para obter o estado completo
+        // Esta é uma busca simples, pode ser otimizada se a árvore for muito grande
+        let targetNode = null;
+        const findNodeRecursive = (nodes, dn) => {
+            for (const node of nodes) {
+                if (node.dn === dn) {
+                    targetNode = node;
+                    return;
+                }
+                if (node.nodes) {
+                    findNodeRecursive(node.nodes, dn);
+                }
+                if (targetNode) return;
+            }
+        };
+        findNodeRecursive(treeData, ouMember.dn);
+
+        if (targetNode) {
+            handleNodeClick(targetNode, true);
+        }
+    };
 
     // Função recursiva para encontrar e atualizar um nó na árvore
     const findAndUpdateNode = useCallback((nodes, dn, updateCallback) => {
@@ -235,7 +269,7 @@ const ADExplorerPage = () => {
                             <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} />
                         ))}
                     </div>
-                    <ContentPanel selectedNode={selectedNode} members={members} getIcon={getIcon} />
+                    <ContentPanel selectedNode={selectedNode} members={members} getIcon={getIcon} onOuDoubleClick={handleOuDoubleClick} />
                 </div>
                 <ConfirmationModal
                     isOpen={isModalOpen}

@@ -70,6 +70,8 @@
 .member-list {
     list-style-type: none;
     padding: 0;
+    max-height: calc(100vh - 250px); /* Ajuste a altura conforme necessário */
+    overflow-y: auto;
 }
 
 .member-item {
