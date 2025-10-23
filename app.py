@@ -1229,6 +1229,41 @@ def api_ou_members(ou_dn):
         logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
         return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
 
+@app.route('/api/move_object', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_move_user')
+def move_object():
+    """Move um objeto (usuário, grupo) para uma nova Unidade Organizacional."""
+    data = request.get_json()
+    object_dn = data.get('object_dn')
+    target_ou_dn = data.get('target_ou_dn')
+
+    if not object_dn or not target_ou_dn:
+        return jsonify({'error': 'DN do objeto e DN da OU de destino são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # O novo RDN (Relative Distinguished Name) será o mesmo, apenas a localização muda.
+        # Extrai o CN do DN original, ex: "CN=John Doe" de "CN=John Doe,OU=Users,DC=corp,DC=com"
+        new_rdn = object_dn.split(',')[0]
+
+        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Objeto movido com sucesso.'})
+        else:
+            logging.error(f"Falha ao mover objeto '{object_dn}': {conn.result['message']}")
+            return jsonify({'error': f"Falha ao mover objeto: {conn.result['message']}"}), 500
+
+    except ldap3.core.exceptions.LDAPInvalidDnError as e:
+        logging.warning(f"Tentativa de mover objeto com DN inválido: {e}")
+        return jsonify({'error': 'DN inválido fornecido.'}), 400
+    except Exception as e:
+        logging.error(f"Erro ao mover objeto '{object_dn}': {e}", exc_info=True)
+        return jsonify({'error': 'Ocorreu um erro interno ao mover o objeto.'}), 500
+
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
