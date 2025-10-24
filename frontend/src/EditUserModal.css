@@ -18,17 +18,11 @@
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    width: 800px; /* Aumenta a largura para acomodar duas colunas */
+    width: 1000px; /* Largura aumentada para garantir que tudo caiba */
     max-width: 95%;
     border: 1px solid var(--border-color); /* Borda sutil */
-    max-height: 90vh; /* Define uma altura máxima */
     display: flex;
     flex-direction: column;
-}
-
-.modal-body {
-    overflow-y: auto; /* Adiciona rolagem se o conteúdo for muito grande */
-    padding-right: 15px; /* Evita que a barra de rolagem sobreponha o conteúdo */
 }
 
 .modal-header {
@@ -55,6 +49,7 @@
 
 .modal-body {
     margin-bottom: 20px;
+    padding-right: 15px; /* Evita que a barra de rolagem sobreponha o conteúdo se ela aparecer */
 }
 
 .modal-footer {
