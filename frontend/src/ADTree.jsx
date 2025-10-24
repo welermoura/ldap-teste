@@ -258,6 +258,7 @@ const ADExplorerPage = () => {
             case 'ou': return <i className="fas fa-folder"></i>;
             case 'user': return <i className="fas fa-user"></i>;
             case 'group': return <i className="fas fa-users"></i>;
+            case 'computer': return <i className="fas fa-desktop"></i>;
             default: return <i className="fas fa-file"></i>;
         }
     };
