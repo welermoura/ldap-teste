@@ -190,8 +190,8 @@
 /* Estilos para o container da busca, agora dentro do tree-panel */
 .search-container {
     padding: 10px;
-    background-color: #fff;
-    border-bottom: 1px solid #dee2e6;
+    background-color: var(--glass-background);
+    border-bottom: 1px solid var(--glass-border-color);
     position: sticky; /* Faz a barra ficar fixa no topo do painel */
     top: 0;
     z-index: 10;
@@ -204,40 +204,36 @@
 }
 
 .search-input {
-    flex-grow: 1; /* Ocupa o espaço disponível */
+    flex-grow: 1;
     padding: 8px 12px;
-    border: 1px solid #ced4da;
+    border: 1px solid var(--input-border-color);
     border-radius: 0.25rem;
     font-size: 1rem;
+    background-color: var(--input-background);
+    color: var(--text-color);
+}
+
+.search-input::placeholder {
+    color: var(--text-muted-color);
 }
 
 .search-button, .clear-button {
-    padding: 8px 15px;
-    border: none;
+    padding: 8px 12px; /* Ajuste no padding para ícones */
+    border: 1px solid transparent;
     border-radius: 0.25rem;
-    color: #fff;
     cursor: pointer;
     font-size: 1rem;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s;
+    background-color: transparent;
+    color: var(--text-muted-color);
 }
 
-.search-button {
-    background-color: #0d6efd; /* Azul do Bootstrap */
-}
-
-.search-button:hover {
-    background-color: #0b5ed7;
+.search-button:hover, .clear-button:hover {
+    background-color: var(--input-background);
+    color: var(--text-highlight-color);
 }
 
 .search-button:disabled {
-    background-color: #6c757d;
+    color: var(--secondary-color);
     cursor: not-allowed;
-}
-
-.clear-button {
-    background-color: #6c757d; /* Cinza do Bootstrap */
-}
-
-.clear-button:hover {
-    background-color: #5c636a;
 }
