@@ -41,6 +41,17 @@
     font-weight: 500;
 }
 
+.member-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.member-ou-path {
+    margin-left: 8px;
+    font-size: 0.8em;
+    color: #6c757d; /* Cinza secundário do Bootstrap */
+}
+
 .node-label {
     cursor: pointer;
     padding: 8px 12px;
@@ -176,18 +187,20 @@
     margin: 0.25rem;
 }
 
-/* Estilos para o container da busca */
+/* Estilos para o container da busca, agora dentro do tree-panel */
 .search-container {
     padding: 10px;
-    background-color: #f8f9fa; /* Cor de fundo suave */
-    border-bottom: 1px solid #dee2e6; /* Linha divisória */
-    margin-bottom: 10px;
+    background-color: #fff;
+    border-bottom: 1px solid #dee2e6;
+    position: sticky; /* Faz a barra ficar fixa no topo do painel */
+    top: 0;
+    z-index: 10;
 }
 
 .search-form {
     display: flex;
     align-items: center;
-    gap: 10px; /* Espaçamento entre os elementos */
+    gap: 5px; /* Reduz o espaçamento */
 }
 
 .search-input {

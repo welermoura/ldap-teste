@@ -26,7 +26,10 @@ const DraggableItem = ({ member, getIcon }) => {
             style={{ opacity: isDragging ? 0.5 : 1 }}
         >
             {getIcon(member.type)}
-            <span className="member-name">{member.name}</span>
+            <div className="member-info">
+                <span className="member-name">{member.name}</span>
+                {member.ou_path && <span className="member-ou-path">{member.ou_path}</span>}
+            </div>
         </li>
     );
 };
@@ -356,27 +359,27 @@ const ADExplorerPage = () => {
     return (
         <DndProvider backend={HTML5Backend}>
             <div className="ad-explorer-container">
-                <div className="search-container">
-                    <form onSubmit={handleSearchSubmit} className="search-form">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar usuário ou computador..."
-                            className="search-input"
-                        />
-                        <button type="submit" className="search-button" disabled={isSearchLoading}>
-                            {isSearchLoading ? 'Buscando...' : 'Buscar'}
-                        </button>
-                        {searchPerformed && (
-                            <button type="button" onClick={clearSearch} className="clear-button">
-                                Limpar
-                            </button>
-                        )}
-                    </form>
-                </div>
                 <div className="panels-container">
                     <div className="tree-panel">
+                        <div className="search-container">
+                            <form onSubmit={handleSearchSubmit} className="search-form">
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Buscar usuário ou computador..."
+                                    className="search-input"
+                                />
+                                <button type="submit" className="search-button" disabled={isSearchLoading}>
+                                    {isSearchLoading ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-search"></i>}
+                                </button>
+                                {searchPerformed && (
+                                    <button type="button" onClick={clearSearch} className="clear-button">
+                                        <i className="fas fa-times"></i>
+                                    </button>
+                                )}
+                            </form>
+                        </div>
                         {treeData.map(rootNode => (
                             <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} />
                         ))}
