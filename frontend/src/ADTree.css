@@ -175,3 +175,56 @@
 .modal-footer > * {
     margin: 0.25rem;
 }
+
+/* Estilos para o container da busca */
+.search-container {
+    padding: 10px;
+    background-color: #f8f9fa; /* Cor de fundo suave */
+    border-bottom: 1px solid #dee2e6; /* Linha divisória */
+    margin-bottom: 10px;
+}
+
+.search-form {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Espaçamento entre os elementos */
+}
+
+.search-input {
+    flex-grow: 1; /* Ocupa o espaço disponível */
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+}
+
+.search-button, .clear-button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 0.25rem;
+    color: #fff;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+.search-button {
+    background-color: #0d6efd; /* Azul do Bootstrap */
+}
+
+.search-button:hover {
+    background-color: #0b5ed7;
+}
+
+.search-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+.clear-button {
+    background-color: #6c757d; /* Cinza do Bootstrap */
+}
+
+.clear-button:hover {
+    background-color: #5c636a;
+}

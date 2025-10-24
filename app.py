@@ -1232,6 +1232,54 @@ def api_ou_members(ou_dn):
         logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
         return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
 
+@app.route('/api/search_ad', methods=['GET'])
+@require_auth
+def api_search_ad():
+    """Busca por usuários e computadores no AD."""
+    query = request.args.get('q', '')
+    if not query or len(query) < 3:
+        return jsonify({'error': 'A busca deve ter no mínimo 3 caracteres.'}), 400
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        # Escapa caracteres especiais para evitar injeção de filtro LDAP
+        safe_query = escape_filter_chars(query)
+
+        # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
+        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
+
+        attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
+
+        conn.search(search_base, search_filter, SUBTREE, attributes=attributes)
+
+        items = []
+        for entry in conn.entries:
+            obj_class = entry.objectClass.values
+            item = {'dn': entry.distinguishedName.value}
+
+            if 'computer' in obj_class:
+                item['type'] = 'computer'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+            elif 'user' in obj_class:
+                item['type'] = 'user'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+                item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
+            else:
+                continue
+
+            items.append(item)
+
+        # Ordena os resultados alfabeticamente pelo nome
+        items.sort(key=lambda x: x['name'].lower())
+
+        return jsonify(items)
+    except Exception as e:
+        logging.error(f"Erro na busca do AD com a query '{query}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao realizar a busca no Active Directory.'}), 500
+
 @app.route('/api/move_object', methods=['POST'])
 @require_auth
 @require_api_permission(action='can_move_user')
