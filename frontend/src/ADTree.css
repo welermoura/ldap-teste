@@ -240,15 +240,13 @@
 
 /* Estilos para o Menu de Contexto */
 .context-menu {
-    position: fixed;
-    z-index: 1000;
+    position: fixed !important; /* Força o posicionamento fixo */
+    z-index: 9999; /* Garante que fique acima de tudo */
     width: 200px;
     background-color: var(--glass-background);
     border: 1px solid var(--glass-border-color);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     padding: 8px 0;
 }
 
