@@ -85,10 +85,28 @@ const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
         },
         canDrop: (item) => item.type !== 'ou' && !item.dn.endsWith(node.dn),
         collect: (monitor) => ({
-            isOver: !!monitor.isOver(),
+            isOver: !!monitor.isOver({ shallow: true }),
             canDrop: !!monitor.canDrop(),
         }),
     }), [node, onMoveObject]);
+
+    useEffect(() => {
+        let timer = null;
+        if (isOver && canDrop && !isOpen) {
+            // Inicia um temporizador para expandir a OU
+            timer = setTimeout(() => {
+                setIsOpen(true);
+                onNodeClick(node, true); // Chama a função para buscar os filhos
+            }, 500); // Atraso de 500ms
+        }
+
+        // Função de limpeza para cancelar o temporizador se o mouse sair
+        return () => {
+            if (timer) {
+                clearTimeout(timer);
+            }
+        };
+    }, [isOver, canDrop, isOpen, onNodeClick, node]);
 
     const handleNodeClick = () => {
         setIsOpen(!isOpen);
