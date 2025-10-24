@@ -120,7 +120,7 @@ const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
             // Ação de drop agora chama a função centralizada
             onMoveObject(item, node);
         },
-        canDrop: (item) => item.type !== 'ou' && !item.dn.endsWith(node.dn),
+        canDrop: (item) => item.type !== 'ou', // Permite dropar em qualquer OU, incluindo a atual
         collect: (monitor) => ({
             isOver: !!monitor.isOver({ shallow: true }),
             canDrop: !!monitor.canDrop(),
