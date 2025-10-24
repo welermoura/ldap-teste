@@ -423,26 +423,34 @@ def search_general_users(conn, query):
         return []
 
 def get_all_ous(conn):
-    """Busca todas as OUs e as retorna em uma estrutura de árvore hierárquica."""
+    """Busca todas as OUs e containers e os retorna em uma estrutura de árvore hierárquica."""
     config = load_config()
     search_base = config.get('AD_SEARCH_BASE')
     if not search_base:
         return []
 
-    conn.search(search_base, '(objectClass=organizationalUnit)', SUBTREE, attributes=['ou', 'distinguishedName'])
+    # Filtro para buscar tanto Unidades Organizacionais quanto Containers padrão.
+    ldap_filter = "(|(objectClass=organizationalUnit)(objectClass=container))"
+    conn.search(search_base, ldap_filter, SUBTREE, attributes=['ou', 'cn', 'distinguishedName', 'objectClass'])
 
     if not conn.entries:
         return []
 
     nodes = {}
-    # First pass: create all node objects and store them in a dictionary by their DN.
-    # The keys 'text' and 'nodes' are chosen for compatibility with common treeview libraries.
+    # Primeira passada: cria todos os objetos de nó e os armazena em um dicionário pelo seu DN.
     for entry in conn.entries:
+        # Pula o container "ForeignSecurityPrincipals" que geralmente não é relevante para gerenciamento.
+        if 'ForeignSecurityPrincipals' in str(entry.cn):
+            continue
+
         dn = str(entry.distinguishedName)
+        # O nome vem do atributo 'ou' para OUs e 'cn' para Containers.
+        node_name = str(entry.ou) if 'organizationalUnit' in entry.objectClass else str(entry.cn)
+
         nodes[dn] = {
-            'text': str(entry.ou),
+            'text': node_name,
             'dn': dn,
-            'nodes': []  # 'nodes' will hold child OUs
+            'nodes': []
         }
 
     tree_roots = []
