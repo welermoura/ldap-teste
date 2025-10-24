@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import EditUserModal from './EditUserModal'; // Importar o novo modal
+import EditUserModal from './EditUserModal';
+import DisableTempModal from './DisableTempModal';
+import ScheduleAbsenceModal from './ScheduleAbsenceModal';
 import './ADTree.css';
 
 // Define os tipos de itens para o drag-and-drop
@@ -36,27 +38,43 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     );
 };
 
-// Componente para o Menu de Contexto (simplificado)
-const ContextMenu = ({ x, y, show, onClose, targetNode, onEdit }) => {
+// Componente para o Menu de Contexto (Reconstruído)
+const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence }) => {
     if (!show || !targetNode) return null;
 
-    const style = {
-        top: y,
-        left: x,
+    const style = { top: y, left: x };
+    const isUser = targetNode.type === 'user';
+    const isComputer = targetNode.type === 'computer';
+
+    const renderMenuItem = (key, icon, text, action, condition) => {
+        if (!condition) return null;
+        return <li key={key} onClick={() => { action(targetNode); onClose(); }}><i className={`fas ${icon} me-2`}></i>{text}</li>;
     };
 
-    const isUser = targetNode.type === 'user';
+    const userActions = [
+        renderMenuItem('edit', 'fa-user-edit', 'Editar', onEdit, permissions.can_edit),
+        renderMenuItem('toggle', 'fa-ban', 'Ativar/Desativar Conta', onToggleStatus, permissions.can_disable),
+        renderMenuItem('reset_password', 'fa-key', 'Resetar Senha', onResetPassword, permissions.can_reset_password),
+        renderMenuItem('disable_temp', 'fa-user-clock', 'Desativar por X dias', onDisableTemp, permissions.can_disable),
+        renderMenuItem('schedule_absence', 'fa-calendar-alt', 'Agendar Ausência', onScheduleAbsence, permissions.can_disable),
+    ];
 
-    // Não renderiza o menu se não for um usuário, pois não há ações
-    if (!isUser) {
-        return null;
-    }
+    const computerActions = [
+        renderMenuItem('delete_computer', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user),
+    ];
+
+    // Filtra ações nulas para a linha separadora
+    const visibleUserActions = userActions.filter(Boolean);
 
     return (
-        <div className="context-menu" style={style} onClick={onClose}>
+        <div className="context-menu" style={style} onMouseLeave={onClose}>
             <ul>
-                {/* A única opção agora é Editar, e apenas para usuários */}
-                <li onClick={() => onEdit(targetNode)}><i className="fas fa-user-edit me-2"></i>Editar</li>
+                {isUser && visibleUserActions}
+                {isComputer && computerActions}
+
+                {/* Separador e Excluir para Usuários */}
+                {isUser && permissions.can_delete_user && visibleUserActions.length > 0 && <li className="separator"></li>}
+                {isUser && renderMenuItem('delete_user', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user)}
             </ul>
         </div>
     );
@@ -234,20 +252,97 @@ const ADExplorerPage = () => {
     const [treeData, setTreeData] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [members, setMembers] = useState([]);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false); // Renomeado
     const [moveDetails, setMoveDetails] = useState(null);
+    const [confirmationAction, setConfirmationAction] = useState({ isOpen: false }); // Novo estado
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearchLoading, setIsSearchLoading] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
     const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, targetNode: null });
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingUser, setEditingUser] = useState(null); // Vai armazenar o SAM do usuário
+    const [editingUser, setEditingUser] = useState(null);
+    const [userPermissions, setUserPermissions] = useState({});
+    const [isDisableTempModalOpen, setIsDisableTempModalOpen] = useState(false);
+    const [isScheduleAbsenceModalOpen, setIsScheduleAbsenceModalOpen] = useState(false);
+    const [actionUser, setActionUser] = useState(null); // Usuário para modais de ação
 
+    useEffect(() => {
+        axios.get('/api/action_permissions')
+            .then(response => setUserPermissions(response.data))
+            .catch(error => console.error("Erro ao buscar permissões:", error));
+    }, []);
+
+    // Handlers para as ações do menu de contexto
     const handleEdit = (node) => {
         if (node.type === 'user' && node.sam) {
-            setEditingUser(node.sam); // Guarda o sAMAccountName
-            setIsEditModalOpen(true); // Abre o modal
+            setEditingUser(node.sam);
+            setIsEditModalOpen(true);
+        }
+    };
+
+    const handleToggleStatus = (node) => {
+        const actionText = node.status === 'Ativo' ? 'Desativar' : 'Ativar';
+        setConfirmationAction({
+            isOpen: true,
+            title: `${actionText} Conta`,
+            message: `Tem certeza que deseja ${actionText.toLowerCase()} a conta de ${node.name}?`,
+            onConfirm: () => {
+                axios.post('/api/toggle_object_status', { dn: node.dn, sam: node.sam })
+                    .then(response => {
+                        // TODO: Atualizar o estado local do nó para refletir a mudança
+                        alert(response.data.message);
+                    })
+                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .finally(() => setConfirmationAction({ isOpen: false }));
+            }
+        });
+    };
+
+    const handleResetPassword = (node) => {
+        setConfirmationAction({
+            isOpen: true,
+            title: 'Resetar Senha',
+            message: `Tem certeza que deseja resetar a senha de ${node.name}? Uma nova senha padrão será definida.`,
+            onConfirm: () => {
+                axios.post(`/api/reset_password/${node.sam}`)
+                    .then(response => {
+                        alert(`${response.data.message} Nova senha: ${response.data.new_password}`);
+                    })
+                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .finally(() => setConfirmationAction({ isOpen: false }));
+            }
+        });
+    };
+
+    const handleDelete = (node) => {
+        setConfirmationAction({
+            isOpen: true,
+            title: 'Excluir Objeto',
+            message: `Atenção! Tem certeza que deseja excluir permanentemente ${node.name}? Esta ação não pode ser desfeita.`,
+            onConfirm: () => {
+                axios.delete('/api/delete_object', { data: { dn: node.dn, name: node.name } })
+                    .then(response => {
+                        // TODO: Remover o nó da UI
+                        alert(response.data.message);
+                    })
+                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .finally(() => setConfirmationAction({ isOpen: false }));
+            }
+        });
+    };
+
+    const handleDisableTemp = (node) => {
+        if (node.type === 'user' && node.sam) {
+            setActionUser(node.sam);
+            setIsDisableTempModalOpen(true);
+        }
+    };
+
+    const handleScheduleAbsence = (node) => {
+        if (node.type === 'user' && node.sam) {
+            setActionUser(node.sam);
+            setIsScheduleAbsenceModalOpen(true);
         }
     };
 
@@ -319,7 +414,7 @@ const ADExplorerPage = () => {
         if (sourceOuDn === targetNode.dn) return;
 
         setMoveDetails({ item, targetNode, sourceOuDn });
-        setIsModalOpen(true);
+        setIsMoveModalOpen(true);
     }, []);
 
     const confirmMove = () => {
@@ -349,7 +444,7 @@ const ADExplorerPage = () => {
             alert(errorMessage);
         })
         .finally(() => {
-            setIsModalOpen(false);
+            setIsMoveModalOpen(false);
             setMoveDetails(null);
         });
     };
@@ -440,9 +535,10 @@ const ADExplorerPage = () => {
                         onContextMenu={handleContextMenu}
                     />
                 </div>
+                {/* Modal de confirmação para a ação de MOVER */}
                 <ConfirmationModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
+                    isOpen={isMoveModalOpen}
+                    onClose={() => setIsMoveModalOpen(false)}
                     onConfirm={confirmMove}
                     title="Confirmar Movimentação"
                 >
@@ -452,18 +548,45 @@ const ADExplorerPage = () => {
                         </p>
                     )}
                 </ConfirmationModal>
+
+                {/* Modal de confirmação GENÉRICO para outras ações */}
+                <ConfirmationModal
+                    isOpen={confirmationAction.isOpen}
+                    onClose={() => setConfirmationAction({ isOpen: false })}
+                    onConfirm={confirmationAction.onConfirm}
+                    title={confirmationAction.title}
+                >
+                    <p>{confirmationAction.message}</p>
+                </ConfirmationModal>
+
                 <ContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
                     show={contextMenu.show}
                     targetNode={contextMenu.targetNode}
                     onClose={() => setContextMenu({ ...contextMenu, show: false })}
+                    permissions={userPermissions}
                     onEdit={handleEdit}
+                    onToggleStatus={handleToggleStatus}
+                    onResetPassword={handleResetPassword}
+                    onDelete={handleDelete}
+                    onDisableTemp={handleDisableTemp}
+                    onScheduleAbsence={handleScheduleAbsence}
                 />
                 <EditUserModal
                     isOpen={isEditModalOpen}
                     onClose={() => setIsEditModalOpen(false)}
                     username={editingUser}
+                />
+                <DisableTempModal
+                    isOpen={isDisableTempModalOpen}
+                    onClose={() => setIsDisableTempModalOpen(false)}
+                    username={actionUser}
+                />
+                <ScheduleAbsenceModal
+                    isOpen={isScheduleAbsenceModalOpen}
+                    onClose={() => setIsScheduleAbsenceModalOpen(false)}
+                    username={actionUser}
                 />
             </div>
         </DndProvider>
