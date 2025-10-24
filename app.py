@@ -1170,6 +1170,94 @@ def api_user_groups(username):
         logging.error(f"Erro na API de grupos do usuário '{username}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/user_details/<username>')
+@require_auth
+@require_api_permission(action='can_edit')
+def api_user_details(username):
+    """Retorna um dicionário com os detalhes de um usuário para edição."""
+    try:
+        conn = get_read_connection()
+        # Lista de atributos que podem ser editados no frontend
+        attributes_to_fetch = [
+            'givenName', 'sn', 'initials', 'displayName', 'description',
+            'physicalDeliveryOfficeName', 'telephoneNumber', 'mail', 'wWWHomePage',
+            'streetAddress', 'postOfficeBox', 'l', 'st', 'postalCode',
+            'homePhone', 'pager', 'mobile', 'facsimileTelephoneNumber',
+            'title', 'department', 'company'
+        ]
+
+        user = get_user_by_samaccountname(conn, username, attributes=attributes_to_fetch)
+
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+        user_details = {attr: get_attr_value(user, attr) for attr in attributes_to_fetch}
+
+        return jsonify(user_details)
+
+    except Exception as e:
+        logging.error(f"Erro ao buscar detalhes para o usuário '{username}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar detalhes do usuário.'}), 500
+
+@app.route('/api/edit_user/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_edit')
+def api_edit_user(username):
+    """Atualiza os detalhes de um usuário com base nos dados recebidos via JSON."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Dados não fornecidos.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['*']) # Pega todos os atributos para comparação
+
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+        changes = {}
+        # Mapeia os nomes dos campos do frontend/JSON para os atributos do AD
+        field_to_attr = {
+            'givenName': 'givenName', 'sn': 'sn', 'initials': 'initials',
+            'displayName': 'displayName', 'description': 'description', 'physicalDeliveryOfficeName': 'physicalDeliveryOfficeName',
+            'telephoneNumber': 'telephoneNumber', 'mail': 'mail', 'wWWHomePage': 'wWWHomePage',
+            'streetAddress': 'streetAddress', 'postOfficeBox': 'postOfficeBox', 'l': 'l',
+            'st': 'st', 'postalCode': 'postalCode', 'homePhone': 'homePhone',
+            'pager': 'pager', 'mobile': 'mobile', 'facsimileTelephoneNumber': 'facsimileTelephoneNumber',
+            'title': 'title', 'department': 'department', 'company': 'company'
+        }
+
+        changes_to_log = []
+        for field, attr_name in field_to_attr.items():
+            # Verifica se o campo foi enviado na requisição
+            if field in data:
+                submitted_value = data[field]
+                # Alguns campos de telefone podem precisar de formatação
+                if attr_name in ['telephoneNumber', 'homePhone', 'pager', 'mobile', 'facsimileTelephoneNumber']:
+                    submitted_value = format_phone_number(submitted_value)
+
+                original_value = get_attr_value(user, attr_name)
+
+                # Adiciona à operação de modificação apenas se o valor mudou
+                if submitted_value != original_value:
+                    changes[attr_name] = [(ldap3.MODIFY_REPLACE, [submitted_value or ''])]
+                    changes_to_log.append(f"{attr_name}: de '{original_value}' para '{submitted_value}'")
+
+        if not changes:
+            return jsonify({'success': True, 'message': 'Nenhuma alteração detectada.'})
+
+        conn.modify(user.distinguishedName.value, changes)
+        if conn.result['description'] == 'success':
+            log_details = "; ".join(changes_to_log)
+            logging.info(f"Usuário '{username}' atualizado via API por '{session.get('user_display_name')}'. Detalhes: {log_details}")
+            return jsonify({'success': True, 'message': 'Usuário atualizado com sucesso!'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+
+    except Exception as e:
+        logging.error(f"Erro ao editar o usuário '{username}' via API: {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao salvar alterações: {e}'}), 500
+
 @app.route('/api/ous')
 @require_auth
 def api_get_ous():
@@ -1335,42 +1423,6 @@ def move_object():
             return jsonify({'error': 'DN inválido fornecido.'}), 400
 
         return jsonify({'error': f"Falha do LDAP: {str(e)}"}), 500
-
-@app.route('/api/toggle_object_status', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_disable')
-def toggle_object_status():
-    data = request.get_json()
-    object_dn = data.get('dn')
-    if not object_dn:
-        return jsonify({'error': 'DN do objeto é obrigatório.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-
-        # Busca o objeto para verificar seu estado atual
-        conn.search(object_dn, '(objectClass=*)', BASE, attributes=['userAccountControl'])
-        if not conn.entries:
-            return jsonify({'error': 'Objeto não encontrado.'}), 404
-
-        entry = conn.entries[0]
-        uac = entry.userAccountControl.value if 'userAccountControl' in entry else 512 # Padrão para conta normal
-
-        is_disabled = uac & 2
-        new_uac = (uac - 2) if is_disabled else (uac + 2)
-        action_message = "ativada" if is_disabled else "desativada"
-
-        conn.modify(object_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
-
-        if conn.result['description'] == 'success':
-            logging.info(f"Conta '{object_dn}' foi {action_message} por '{session.get('user_display_name', session.get('ad_user'))}'.")
-            return jsonify({'success': True, 'message': f'Objeto {action_message} com sucesso.'})
-        else:
-            return jsonify({'error': f"Falha ao alterar o status do objeto: {conn.result['message']}"}), 500
-
-    except Exception as e:
-        logging.error(f"Erro ao alterar o status do objeto '{object_dn}': {e}", exc_info=True)
-        return jsonify({'error': 'Ocorreu uma falha no servidor.'}), 500
 
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth

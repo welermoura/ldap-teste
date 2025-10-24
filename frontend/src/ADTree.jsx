@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import EditUserModal from './EditUserModal'; // Importar o novo modal
 import './ADTree.css';
 
 // Define os tipos de itens para o drag-and-drop
@@ -35,8 +36,8 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     );
 };
 
-// Componente para o Menu de Contexto
-const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onEdit }) => {
+// Componente para o Menu de Contexto (simplificado)
+const ContextMenu = ({ x, y, show, onClose, targetNode, onEdit }) => {
     if (!show || !targetNode) return null;
 
     const style = {
@@ -45,23 +46,17 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onEdit }
     };
 
     const isUser = targetNode.type === 'user';
-    const isComputer = targetNode.type === 'computer';
+
+    // Não renderiza o menu se não for um usuário, pois não há ações
+    if (!isUser) {
+        return null;
+    }
 
     return (
         <div className="context-menu" style={style} onClick={onClose}>
             <ul>
-                <li onClick={() => alert('Mover (a ser implementado)')}><i className="fas fa-arrows-alt me-2"></i>Mover</li>
-                <li onClick={() => alert('Renomear (a ser implementado)')}><i className="fas fa-pencil-alt me-2"></i>Renomear</li>
-
-                {(isUser || isComputer) && <li className="separator"></li>}
-
-                {(isUser || isComputer) && (
-                    <li onClick={() => onToggleStatus(targetNode)}><i className="fas fa-ban me-2"></i>Bloquear/Desbloquear</li>
-                )}
-
-                {isUser && (
-                    <li onClick={() => onEdit(targetNode)}><i className="fas fa-user-edit me-2"></i>Editar</li>
-                )}
+                {/* A única opção agora é Editar, e apenas para usuários */}
+                <li onClick={() => onEdit(targetNode)}><i className="fas fa-user-edit me-2"></i>Editar</li>
             </ul>
         </div>
     );
@@ -246,26 +241,13 @@ const ADExplorerPage = () => {
     const [isSearchLoading, setIsSearchLoading] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
     const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, targetNode: null });
-
-    const handleToggleStatus = (node) => {
-        axios.post('/api/toggle_object_status', { dn: node.dn })
-            .then(response => {
-                if (response.data.success) {
-                    alert(response.data.message);
-                    // Aqui, poderíamos adicionar uma lógica para atualizar o ícone do objeto na UI
-                } else {
-                    alert('Falha: ' + response.data.error);
-                }
-            })
-            .catch(error => {
-                const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
-                alert(errorMessage);
-            });
-    };
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState(null); // Vai armazenar o SAM do usuário
 
     const handleEdit = (node) => {
         if (node.type === 'user' && node.sam) {
-            window.location.href = `/view_user/${node.sam}`;
+            setEditingUser(node.sam); // Guarda o sAMAccountName
+            setIsEditModalOpen(true); // Abre o modal
         }
     };
 
@@ -476,8 +458,12 @@ const ADExplorerPage = () => {
                     show={contextMenu.show}
                     targetNode={contextMenu.targetNode}
                     onClose={() => setContextMenu({ ...contextMenu, show: false })}
-                    onToggleStatus={handleToggleStatus}
                     onEdit={handleEdit}
+                />
+                <EditUserModal
+                    isOpen={isEditModalOpen}
+                    onClose={() => setIsEditModalOpen(false)}
+                    username={editingUser}
                 />
             </div>
         </DndProvider>
