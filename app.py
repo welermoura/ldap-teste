@@ -1258,6 +1258,202 @@ def api_edit_user(username):
         logging.error(f"Erro ao editar o usuário '{username}' via API: {e}", exc_info=True)
         return jsonify({'error': f'Falha ao salvar alterações: {e}'}), 500
 
+@app.route('/api/toggle_object_status', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def api_toggle_object_status():
+    """Ativa ou desativa um objeto (usuário/computador) no AD."""
+    data = request.get_json()
+    dn = data.get('dn')
+    sam = data.get('sam')  # sAMAccountName, para logs e agendamentos
+
+    if not dn:
+        return jsonify({'error': 'DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        entry = get_user_by_dn(conn, dn, attributes=['userAccountControl', 'objectClass'])
+
+        if not entry:
+            return jsonify({'error': 'Objeto não encontrado.'}), 404
+
+        if 'user' not in entry.objectClass and 'computer' not in entry.objectClass:
+            return jsonify({'error': 'Ação aplicável apenas para usuários e computadores.'}), 400
+
+        uac = entry.userAccountControl.value if 'userAccountControl' in entry else 512
+        is_disabled = uac & 2
+
+        new_uac, action_message = (uac - 2, "ativada") if is_disabled else (uac + 2, "desativada")
+
+        conn.modify(dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
+
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        if action_message == "ativada" and sam:
+            schedules = load_schedules()
+            if sam in schedules:
+                del schedules[sam]
+                save_schedules(schedules)
+                logging.info(f"Agendamento de reativação para '{sam}' foi removido devido à reativação manual.")
+
+        logging.info(f"Conta '{sam or dn}' foi {action_message} por '{session.get('user_display_name')}'.")
+
+        new_status = "Ativo" if action_message == "ativada" else "Desativado"
+        return jsonify({'success': True, 'message': f"Conta {action_message} com sucesso.", 'newStatus': new_status})
+
+    except Exception as e:
+        logging.error(f"Erro ao alterar status do objeto '{dn}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao alterar o status: {e}'}), 500
+
+@app.route('/api/reset_password/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_reset_password')
+def api_reset_password(username):
+    """Reseta a senha de um usuário para a padrão e retorna a senha em JSON."""
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+        config = load_config()
+        default_password = config.get('DEFAULT_PASSWORD')
+        if not default_password:
+            return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
+
+        conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
+        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+
+        if conn.result['description'] != 'success':
+             raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        logging.info(f"A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
+
+    except Exception as e:
+        logging.error(f"Erro ao resetar senha para '{username}' via API: {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao resetar a senha: {e}'}), 500
+
+@app.route('/api/delete_object', methods=['DELETE'])
+@require_auth
+@require_api_permission(action='can_delete_user')
+def api_delete_object():
+    """Exclui um objeto do AD a partir do seu DN."""
+    data = request.get_json()
+    dn = data.get('dn')
+    name = data.get('name') # Para logging
+
+    if not dn:
+        return jsonify({'error': 'DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        conn.delete(dn)
+
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        logging.info(f"Objeto '{name or dn}' foi EXCLUÍDO por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
+
+    except Exception as e:
+        logging.error(f"Erro ao excluir objeto '{dn}' via API: {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao excluir o objeto: {e}'}), 500
+
+@app.route('/api/disable_user_temp/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def api_disable_user_temp(username):
+    """Desativa um usuário e agenda sua reativação."""
+    data = request.get_json()
+    days = data.get('days')
+
+    if not isinstance(days, int) or days <= 0:
+        return jsonify({'error': 'O número de dias deve ser um inteiro positivo.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+        uac = user.userAccountControl.value
+        if not (uac & 2): # Se a conta não estiver desativada
+            conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac + 2)])]})
+            if conn.result['description'] != 'success':
+                raise Exception(f"Erro do LDAP ao desativar: {conn.result['message']}")
+
+        schedules = load_schedules()
+        reactivation_date = (date.today() + timedelta(days=days))
+        schedules[username] = reactivation_date.isoformat()
+        save_schedules(schedules)
+
+        logging.info(f"Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
+        return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
+
+    except Exception as e:
+        logging.error(f"Erro em api_disable_user_temp para '{username}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao desativar temporariamente: {e}'}), 500
+
+@app.route('/api/schedule_absence/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def api_schedule_absence(username):
+    """Agenda a desativação e reativação de um usuário."""
+    data = request.get_json()
+    deactivation_date_str = data.get('deactivation_date')
+    reactivation_date_str = data.get('reactivation_date')
+
+    if not deactivation_date_str or not reactivation_date_str:
+        return jsonify({'error': 'Datas de desativação and reativação são obrigatórias.'}), 400
+
+    try:
+        deactivation_date = date.fromisoformat(deactivation_date_str)
+        reactivation_date = date.fromisoformat(reactivation_date_str)
+
+        if deactivation_date >= reactivation_date:
+            return jsonify({'error': 'A data de reativação deve ser posterior à de desativação.'}), 400
+
+        # Salva o agendamento de desativação
+        disable_schedules = load_disable_schedules()
+        disable_schedules[username] = deactivation_date.isoformat()
+        save_disable_schedules(disable_schedules)
+
+        # Salva o agendamento de reativação
+        reactivation_schedules = load_schedules()
+        reactivation_schedules[username] = reactivation_date.isoformat()
+        save_schedules(reactivation_schedules)
+
+        logging.info(f"Ausência para '{username}' agendada via API por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
+        return jsonify({'success': True, 'message': 'Ausência agendada com sucesso.'})
+
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
+    except Exception as e:
+        logging.error(f"Erro em api_schedule_absence para '{username}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao agendar ausência: {e}'}), 500
+
+@app.route('/api/action_permissions')
+@require_auth
+def api_action_permissions():
+    """Retorna as permissões de ação para o usuário logado."""
+    try:
+        actions = [
+            'can_create',
+            'can_disable',
+            'can_reset_password',
+            'can_edit',
+            'can_manage_groups',
+            'can_delete_user',
+            'can_move_user'
+        ]
+        user_permissions = {action: check_permission(action=action) for action in actions}
+        return jsonify(user_permissions)
+    except Exception as e:
+        logging.error(f"Erro ao verificar permissões de API para o usuário '{session.get('user_display_name')}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao obter permissões.'}), 500
+
 @app.route('/api/ous')
 @require_auth
 def api_get_ous():
