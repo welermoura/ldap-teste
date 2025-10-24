@@ -1270,6 +1270,8 @@ def api_search_ad():
             else:
                 continue
 
+            # Adiciona o caminho da OU ao resultado
+            item['ou_path'] = get_ou_path(entry.distinguishedName.value)
             items.append(item)
 
         # Ordena os resultados alfabeticamente pelo nome
