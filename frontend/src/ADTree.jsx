@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -66,7 +67,7 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
     // Filtra ações nulas para a linha separadora
     const visibleUserActions = userActions.filter(Boolean);
 
-    return (
+    return createPortal(
         <div className="context-menu" style={style} onMouseLeave={onClose}>
             <ul>
                 {isUser && visibleUserActions}
@@ -76,7 +77,8 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
                 {isUser && permissions.can_delete_user && visibleUserActions.length > 0 && <li className="separator"></li>}
                 {isUser && renderMenuItem('delete_user', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user)}
             </ul>
-        </div>
+        </div>,
+        document.body
     );
 };
 
