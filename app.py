@@ -1206,14 +1206,14 @@ def api_ou_members(ou_dn):
             elif 'group' in obj_class:
                 item['type'] = 'group'
                 item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+            elif 'computer' in obj_class:
+                item['type'] = 'computer'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
             elif 'user' in obj_class and 'person' in obj_class:
                 item['type'] = 'user'
                 item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
                 item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
                 item['status'] = get_user_status(entry)
-            elif 'computer' in obj_class:
-                item['type'] = 'computer'
-                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
             else:
                 # Pula outros tipos de objeto ou os manipula conforme necessário
                 continue
