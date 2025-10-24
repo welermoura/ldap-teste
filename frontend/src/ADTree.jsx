@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { DndProvider, useDrag } from 'react-dnd'; // useDrop removido
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { ItemTypes } from './dndTypes'; // Importar de arquivo separado
 import EditUserModal from './EditUserModal';
 import DisableTempModal from './DisableTempModal';
 import ScheduleAbsenceModal from './ScheduleAbsenceModal';
+import MoveModal from './MoveModal';
+import TreeNode from './TreeNode';
 import './ADTree.css';
-
-// Define os tipos de itens para o drag-and-drop
-const ItemTypes = {
-  AD_OBJECT: 'ad_object',
-};
 
 // Componente para um item arrastável no painel de conteúdo
 const DraggableItem = ({ member, getIcon, onContextMenu }) => {
@@ -40,7 +38,7 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
 };
 
 // Componente para o Menu de Contexto (Reconstruído)
-const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence }) => {
+const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence, onMove }) => {
     if (!show || !targetNode) return null;
 
     const style = { top: y, left: x };
@@ -53,6 +51,7 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
     };
 
     const userActions = [
+        renderMenuItem('move', 'fa-arrows-alt', 'Mover', onMove, permissions.can_move_user),
         renderMenuItem('edit', 'fa-user-edit', 'Editar', onEdit, permissions.can_edit),
         renderMenuItem('toggle', 'fa-ban', 'Ativar/Desativar Conta', onToggleStatus, permissions.can_disable),
         renderMenuItem('reset_password', 'fa-key', 'Resetar Senha', onResetPassword, permissions.can_reset_password),
@@ -61,6 +60,7 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
     ];
 
     const computerActions = [
+        renderMenuItem('move_computer', 'fa-arrows-alt', 'Mover', onMove, permissions.can_move_user),
         renderMenuItem('delete_computer', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user),
     ];
 
@@ -156,75 +156,6 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
     );
 };
 
-// O componente de nó da árvore, agora com capacidade de 'drop'
-const TreeNode = ({ node, onNodeClick, onMoveObject, onContextMenu }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    // Os filhos agora são passados como prop para permitir o gerenciamento de estado centralizado
-    const children = node.nodes || [];
-
-    const [{ isOver, canDrop }, drop] = useDrop(() => ({
-        accept: ItemTypes.AD_OBJECT,
-        drop: (item) => {
-            // Ação de drop agora chama a função centralizada
-            onMoveObject(item, node);
-        },
-        canDrop: (item) => item.type !== 'ou', // Permite dropar em qualquer OU, incluindo a atual
-        collect: (monitor) => ({
-            isOver: !!monitor.isOver({ shallow: true }),
-            canDrop: !!monitor.canDrop(),
-        }),
-    }), [node, onMoveObject]);
-
-    useEffect(() => {
-        let timer = null;
-        if (isOver && canDrop && !isOpen) {
-            // Inicia um temporizador para expandir a OU
-            timer = setTimeout(() => {
-                setIsOpen(true);
-                onNodeClick(node, true); // Chama a função para buscar os filhos
-            }, 500); // Atraso de 500ms
-        }
-
-        // Função de limpeza para cancelar o temporizador se o mouse sair
-        return () => {
-            if (timer) {
-                clearTimeout(timer);
-            }
-        };
-    }, [isOver, canDrop, isOpen, onNodeClick, node]);
-
-    const handleNodeClick = () => {
-        setIsOpen(!isOpen);
-        // A busca de membros agora é tratada no clique se os filhos não estiverem carregados
-        onNodeClick(node, !isOpen);
-    };
-
-    const getIcon = (type) => {
-        switch (type) {
-            case 'ou': return <i className="fas fa-folder"></i>;
-            case 'user': return <i className="fas fa-user"></i>;
-            case 'group': return <i className="fas fa-users"></i>;
-            case 'computer': return <i className="fas fa-desktop"></i>;
-            default: return <i className="fas fa-file"></i>;
-        }
-    };
-
-    return (
-        <div ref={drop} className={`tree-node ${isOver && canDrop ? 'drop-target-highlight' : ''}`}>
-            <div onClick={handleNodeClick} className="node-label" onContextMenu={(e) => onContextMenu(e, node)}>
-                {getIcon('ou')} {node.text}
-            </div>
-            {isOpen && (
-                <div className="node-children">
-                    {children.map(child => (
-                        <TreeNode key={child.dn} node={child} onNodeClick={onNodeClick} onMoveObject={onMoveObject} onContextMenu={onContextMenu} />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-};
-
 // Componente para o Modal de Confirmação
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
     if (!isOpen) return null;
@@ -268,6 +199,8 @@ const ADExplorerPage = () => {
     const [isDisableTempModalOpen, setIsDisableTempModalOpen] = useState(false);
     const [isScheduleAbsenceModalOpen, setIsScheduleAbsenceModalOpen] = useState(false);
     const [actionUser, setActionUser] = useState(null); // Usuário para modais de ação
+    const [isMoveModalOpenFromContext, setIsMoveModalOpenFromContext] = useState(false);
+    const [objectToMove, setObjectToMove] = useState(null);
 
     useEffect(() => {
         axios.get('/api/action_permissions')
@@ -346,6 +279,11 @@ const ADExplorerPage = () => {
             setActionUser(node.sam);
             setIsScheduleAbsenceModalOpen(true);
         }
+    };
+
+    const handleMove = (node) => {
+        setObjectToMove(node);
+        setIsMoveModalOpenFromContext(true);
     };
 
     const handleContextMenu = (e, node) => {
@@ -574,6 +512,7 @@ const ADExplorerPage = () => {
                     onDelete={handleDelete}
                     onDisableTemp={handleDisableTemp}
                     onScheduleAbsence={handleScheduleAbsence}
+                    onMove={handleMove}
                 />
                 <EditUserModal
                     isOpen={isEditModalOpen}
@@ -589,6 +528,36 @@ const ADExplorerPage = () => {
                     isOpen={isScheduleAbsenceModalOpen}
                     onClose={() => setIsScheduleAbsenceModalOpen(false)}
                     username={actionUser}
+                />
+                <MoveModal
+                    isOpen={isMoveModalOpenFromContext}
+                    onClose={() => setIsMoveModalOpenFromContext(false)}
+                    objectToMove={objectToMove}
+                    onConfirmMove={(targetOu) => {
+                        if (!objectToMove || !targetOu) return;
+
+                        axios.post('/api/move_object', {
+                            object_dn: objectToMove.dn,
+                            target_ou_dn: targetOu.dn,
+                        })
+                        .then(response => {
+                            if (response.data.success) {
+                                alert('Objeto movido com sucesso!');
+                                // Remove o objeto da lista de membros atual para evitar dados obsoletos
+                                setMembers(prev => prev.filter(m => m.dn !== objectToMove.dn));
+                                setSearchResults(prev => prev.filter(r => r.dn !== objectToMove.dn));
+                            } else {
+                                alert(`Falha ao mover: ${response.data.error}`);
+                            }
+                        })
+                        .catch(err => {
+                            alert(`Erro na comunicação: ${err.response?.data?.error || 'Erro desconhecido'}`);
+                        })
+                        .finally(() => {
+                            setIsMoveModalOpenFromContext(false);
+                            setObjectToMove(null);
+                        });
+                    }}
                 />
             </div>
         </DndProvider>
