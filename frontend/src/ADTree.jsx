@@ -36,7 +36,7 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
 };
 
 // Componente para o Menu de Contexto
-const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onDelete }) => {
+const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onEdit }) => {
     if (!show || !targetNode) return null;
 
     const style = {
@@ -44,20 +44,23 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onDelete
         left: x,
     };
 
-    // Ações que só se aplicam a usuários e computadores
-    const canHaveActions = targetNode.type === 'user' || targetNode.type === 'computer';
+    const isUser = targetNode.type === 'user';
+    const isComputer = targetNode.type === 'computer';
 
     return (
         <div className="context-menu" style={style} onClick={onClose}>
             <ul>
                 <li onClick={() => alert('Mover (a ser implementado)')}><i className="fas fa-arrows-alt me-2"></i>Mover</li>
                 <li onClick={() => alert('Renomear (a ser implementado)')}><i className="fas fa-pencil-alt me-2"></i>Renomear</li>
-                {canHaveActions && (
-                    <>
-                        <li className="separator"></li>
-                        <li onClick={() => onToggleStatus(targetNode)}><i className="fas fa-ban me-2"></i>Bloquear/Desbloquear</li>
-                        <li onClick={() => onDelete(targetNode)}><i className="fas fa-trash-alt me-2"></i>Excluir</li>
-                    </>
+
+                {(isUser || isComputer) && <li className="separator"></li>}
+
+                {(isUser || isComputer) && (
+                    <li onClick={() => onToggleStatus(targetNode)}><i className="fas fa-ban me-2"></i>Bloquear/Desbloquear</li>
+                )}
+
+                {isUser && (
+                    <li onClick={() => onEdit(targetNode)}><i className="fas fa-user-edit me-2"></i>Editar</li>
                 )}
             </ul>
         </div>
@@ -260,26 +263,9 @@ const ADExplorerPage = () => {
             });
     };
 
-    const handleDelete = (node) => {
-        if (confirm(`Tem certeza que deseja excluir "${node.name}"? Esta ação não pode ser desfeita.`)) {
-            axios.delete('/api/delete_object', { data: { dn: node.dn } })
-                .then(response => {
-                    if (response.data.success) {
-                        alert(response.data.message);
-                        // Remove o item da visualização atual (seja da busca ou dos membros da OU)
-                        if (searchPerformed) {
-                            setSearchResults(prev => prev.filter(item => item.dn !== node.dn));
-                        } else {
-                            setMembers(prev => prev.filter(item => item.dn !== node.dn));
-                        }
-                    } else {
-                        alert('Falha: ' + response.data.error);
-                    }
-                })
-                .catch(error => {
-                    const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
-                    alert(errorMessage);
-                });
+    const handleEdit = (node) => {
+        if (node.type === 'user' && node.sam) {
+            window.location.href = `/view_user/${node.sam}`;
         }
     };
 
@@ -491,7 +477,7 @@ const ADExplorerPage = () => {
                     targetNode={contextMenu.targetNode}
                     onClose={() => setContextMenu({ ...contextMenu, show: false })}
                     onToggleStatus={handleToggleStatus}
-                    onDelete={handleDelete}
+                    onEdit={handleEdit}
                 />
             </div>
         </DndProvider>
