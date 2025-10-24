@@ -31,9 +31,36 @@ const DraggableItem = ({ member, getIcon }) => {
     );
 };
 
-// Painel para exibir o conteúdo da OU selecionada
-const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick }) => {
-    if (!selectedNode) {
+// Painel para exibir o conteúdo da OU selecionada ou os resultados da busca
+const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode }) => {
+    const hasMembers = members && members.length > 0;
+
+    // Mensagem para quando a busca não retorna resultados
+    if (isSearchMode && !hasMembers) {
+        return (
+            <div className="content-panel">
+                <h4 className="content-header">Resultados da Busca</h4>
+                <div className="content-placeholder">
+                    Nenhum usuário ou computador encontrado.
+                </div>
+            </div>
+        );
+    }
+
+    // Mensagem para quando uma OU é selecionada mas não tem conteúdo
+    if (!isSearchMode && selectedNode && !hasMembers) {
+        return (
+            <div className="content-panel">
+                <h4 className="content-header">Conteúdo de: {selectedNode.text || selectedNode.name}</h4>
+                <div className="content-placeholder">
+                    Esta Unidade Organizacional está vazia.
+                </div>
+            </div>
+        );
+    }
+
+    // Mensagem inicial antes de qualquer seleção ou busca
+    if (!isSearchMode && !selectedNode) {
         return (
             <div className="content-panel">
                 <div className="content-placeholder">
@@ -43,14 +70,21 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick }) => {
         );
     }
 
+    const headerText = isSearchMode ? "Resultados da Busca" : `Conteúdo de: ${selectedNode.text || selectedNode.name}`;
+
     return (
         <div className="content-panel">
-            <h4 className="content-header">Conteúdo de: {selectedNode.text || selectedNode.name}</h4>
+            <h4 className="content-header">{headerText}</h4>
             <ul className="member-list">
                 {members.map(member => {
-                    if (member.type === 'user' || member.type === 'group' || member.type === 'computer') {
+                    // Na busca, todos os itens são arrastáveis (se forem user/computer)
+                    if (isSearchMode && (member.type === 'user' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} />;
-                    } else if (member.type === 'ou') {
+                    }
+                    // Comportamento normal para visualização de OU
+                    if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer')) {
+                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} />;
+                    } else if (!isSearchMode && member.type === 'ou') {
                         return (
                             <li key={member.dn} className="member-item non-draggable" onDoubleClick={() => onOuDoubleClick(member)} style={{ cursor: 'pointer' }}>
                                 {getIcon(member.type)}
@@ -171,6 +205,11 @@ const ADExplorerPage = () => {
     const [members, setMembers] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [moveDetails, setMoveDetails] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearchLoading, setIsSearchLoading] = useState(false);
+    const [searchPerformed, setSearchPerformed] = useState(false);
+
 
     // Função para simular o clique em um nó da árvore (para o duplo clique)
     const handleOuDoubleClick = (ouMember) => {
@@ -265,6 +304,39 @@ const ADExplorerPage = () => {
         });
     };
 
+    const handleSearchSubmit = (e) => {
+        e.preventDefault();
+        if (searchQuery.trim().length < 3) {
+            alert('A busca deve ter no mínimo 3 caracteres.');
+            return;
+        }
+        setIsSearchLoading(true);
+        setSearchPerformed(true);
+        setSelectedNode(null); // Limpa a seleção da OU para focar nos resultados da busca
+        setMembers([]); // Limpa os membros da OU anterior
+        axios.get(`/api/search_ad?q=${encodeURIComponent(searchQuery)}`)
+            .then(response => {
+                setSearchResults(response.data);
+            })
+            .catch(error => {
+                console.error("Erro na busca:", error);
+                const errorMessage = error.response?.data?.error || 'Ocorreu um erro ao realizar a busca.';
+                alert(errorMessage);
+                setSearchResults([]);
+            })
+            .finally(() => {
+                setIsSearchLoading(false);
+            });
+    };
+
+    const clearSearch = () => {
+        setSearchQuery('');
+        setSearchResults([]);
+        setSearchPerformed(false);
+        setSelectedNode(null);
+        setMembers([]);
+    };
+
     useEffect(() => {
         axios.get('/api/ous')
           .then(response => setTreeData(response.data))
@@ -284,13 +356,38 @@ const ADExplorerPage = () => {
     return (
         <DndProvider backend={HTML5Backend}>
             <div className="ad-explorer-container">
+                <div className="search-container">
+                    <form onSubmit={handleSearchSubmit} className="search-form">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Buscar usuário ou computador..."
+                            className="search-input"
+                        />
+                        <button type="submit" className="search-button" disabled={isSearchLoading}>
+                            {isSearchLoading ? 'Buscando...' : 'Buscar'}
+                        </button>
+                        {searchPerformed && (
+                            <button type="button" onClick={clearSearch} className="clear-button">
+                                Limpar
+                            </button>
+                        )}
+                    </form>
+                </div>
                 <div className="panels-container">
                     <div className="tree-panel">
                         {treeData.map(rootNode => (
                             <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} />
                         ))}
                     </div>
-                    <ContentPanel selectedNode={selectedNode} members={members} getIcon={getIcon} onOuDoubleClick={handleOuDoubleClick} />
+                    <ContentPanel
+                        selectedNode={selectedNode}
+                        members={searchPerformed ? searchResults : members}
+                        getIcon={getIcon}
+                        onOuDoubleClick={handleOuDoubleClick}
+                        isSearchMode={searchPerformed}
+                    />
                 </div>
                 <ConfirmationModal
                     isOpen={isModalOpen}
