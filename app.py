@@ -1336,6 +1336,71 @@ def move_object():
 
         return jsonify({'error': f"Falha do LDAP: {str(e)}"}), 500
 
+@app.route('/api/toggle_object_status', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def toggle_object_status():
+    data = request.get_json()
+    object_dn = data.get('dn')
+    if not object_dn:
+        return jsonify({'error': 'DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # Busca o objeto para verificar seu estado atual
+        conn.search(object_dn, '(objectClass=*)', BASE, attributes=['userAccountControl'])
+        if not conn.entries:
+            return jsonify({'error': 'Objeto não encontrado.'}), 404
+
+        entry = conn.entries[0]
+        uac = entry.userAccountControl.value if 'userAccountControl' in entry else 512 # Padrão para conta normal
+
+        is_disabled = uac & 2
+        new_uac = (uac - 2) if is_disabled else (uac + 2)
+        action_message = "ativada" if is_disabled else "desativada"
+
+        conn.modify(object_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
+
+        if conn.result['description'] == 'success':
+            logging.info(f"Conta '{object_dn}' foi {action_message} por '{session.get('user_display_name', session.get('ad_user'))}'.")
+            return jsonify({'success': True, 'message': f'Objeto {action_message} com sucesso.'})
+        else:
+            return jsonify({'error': f"Falha ao alterar o status do objeto: {conn.result['message']}"}), 500
+
+    except Exception as e:
+        logging.error(f"Erro ao alterar o status do objeto '{object_dn}': {e}", exc_info=True)
+        return jsonify({'error': 'Ocorreu uma falha no servidor.'}), 500
+
+@app.route('/api/delete_object', methods=['DELETE'])
+@require_auth
+@require_api_permission(action='can_delete_user')
+def delete_object_api():
+    data = request.get_json()
+    object_dn = data.get('dn')
+    if not object_dn:
+        return jsonify({'error': 'DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # Verifica se o objeto existe antes de tentar deletar
+        conn.search(object_dn, '(objectClass=*)', BASE, attributes=['cn'])
+        if not conn.entries:
+            return jsonify({'error': 'Objeto não encontrado.'}), 404
+
+        conn.delete(object_dn)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"Objeto '{object_dn}' foi EXCLUÍDO por '{session.get('user_display_name', session.get('ad_user'))}'.")
+            return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
+        else:
+            return jsonify({'error': f"Falha ao excluir o objeto: {conn.result['message']}"}), 500
+
+    except Exception as e:
+        logging.error(f"Erro ao excluir o objeto '{object_dn}': {e}", exc_info=True)
+        return jsonify({'error': 'Ocorreu uma falha no servidor ao tentar excluir o objeto.'}), 500
+
 @app.route('/add_member/<group_name>', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_groups')

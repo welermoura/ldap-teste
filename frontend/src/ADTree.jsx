@@ -10,7 +10,7 @@ const ItemTypes = {
 };
 
 // Componente para um item arrastável no painel de conteúdo
-const DraggableItem = ({ member, getIcon }) => {
+const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     const [{ isDragging }, drag] = useDrag(() => ({
         type: ItemTypes.AD_OBJECT,
         item: { dn: member.dn, name: member.name, type: member.type },
@@ -24,6 +24,7 @@ const DraggableItem = ({ member, getIcon }) => {
             ref={drag}
             className="member-item"
             style={{ opacity: isDragging ? 0.5 : 1 }}
+            onContextMenu={(e) => onContextMenu(e, member)}
         >
             {getIcon(member.type)}
             <div className="member-info">
@@ -34,8 +35,37 @@ const DraggableItem = ({ member, getIcon }) => {
     );
 };
 
+// Componente para o Menu de Contexto
+const ContextMenu = ({ x, y, show, onClose, targetNode, onToggleStatus, onDelete }) => {
+    if (!show || !targetNode) return null;
+
+    const style = {
+        top: y,
+        left: x,
+    };
+
+    // Ações que só se aplicam a usuários e computadores
+    const canHaveActions = targetNode.type === 'user' || targetNode.type === 'computer';
+
+    return (
+        <div className="context-menu" style={style} onClick={onClose}>
+            <ul>
+                <li onClick={() => alert('Mover (a ser implementado)')}><i className="fas fa-arrows-alt me-2"></i>Mover</li>
+                <li onClick={() => alert('Renomear (a ser implementado)')}><i className="fas fa-pencil-alt me-2"></i>Renomear</li>
+                {canHaveActions && (
+                    <>
+                        <li className="separator"></li>
+                        <li onClick={() => onToggleStatus(targetNode)}><i className="fas fa-ban me-2"></i>Bloquear/Desbloquear</li>
+                        <li onClick={() => onDelete(targetNode)}><i className="fas fa-trash-alt me-2"></i>Excluir</li>
+                    </>
+                )}
+            </ul>
+        </div>
+    );
+};
+
 // Painel para exibir o conteúdo da OU selecionada ou os resultados da busca
-const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode }) => {
+const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu }) => {
     const hasMembers = members && members.length > 0;
 
     // Mensagem para quando a busca não retorna resultados
@@ -82,14 +112,14 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
                 {members.map(member => {
                     // Na busca, todos os itens são arrastáveis (se forem user/computer)
                     if (isSearchMode && (member.type === 'user' || member.type === 'computer')) {
-                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} />;
+                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     }
                     // Comportamento normal para visualização de OU
                     if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer')) {
-                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} />;
+                        return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     } else if (!isSearchMode && member.type === 'ou') {
                         return (
-                            <li key={member.dn} className="member-item non-draggable" onDoubleClick={() => onOuDoubleClick(member)} style={{ cursor: 'pointer' }}>
+                            <li key={member.dn} className="member-item non-draggable" onDoubleClick={() => onOuDoubleClick(member)} style={{ cursor: 'pointer' }} onContextMenu={(e) => onContextMenu(e, member)}>
                                 {getIcon(member.type)}
                                 <span className="member-name">{member.name}</span>
                             </li>
@@ -109,7 +139,7 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
 };
 
 // O componente de nó da árvore, agora com capacidade de 'drop'
-const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
+const TreeNode = ({ node, onNodeClick, onMoveObject, onContextMenu }) => {
     const [isOpen, setIsOpen] = useState(false);
     // Os filhos agora são passados como prop para permitir o gerenciamento de estado centralizado
     const children = node.nodes || [];
@@ -163,13 +193,13 @@ const TreeNode = ({ node, onNodeClick, onMoveObject }) => {
 
     return (
         <div ref={drop} className={`tree-node ${isOver && canDrop ? 'drop-target-highlight' : ''}`}>
-            <div onClick={handleNodeClick} className="node-label">
+            <div onClick={handleNodeClick} className="node-label" onContextMenu={(e) => onContextMenu(e, node)}>
                 {getIcon('ou')} {node.text}
             </div>
             {isOpen && (
                 <div className="node-children">
                     {children.map(child => (
-                        <TreeNode key={child.dn} node={child} onNodeClick={onNodeClick} onMoveObject={onMoveObject} />
+                        <TreeNode key={child.dn} node={child} onNodeClick={onNodeClick} onMoveObject={onMoveObject} onContextMenu={onContextMenu} />
                     ))}
                 </div>
             )}
@@ -212,7 +242,56 @@ const ADExplorerPage = () => {
     const [searchResults, setSearchResults] = useState([]);
     const [isSearchLoading, setIsSearchLoading] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
+    const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, targetNode: null });
 
+    const handleToggleStatus = (node) => {
+        axios.post('/api/toggle_object_status', { dn: node.dn })
+            .then(response => {
+                if (response.data.success) {
+                    alert(response.data.message);
+                    // Aqui, poderíamos adicionar uma lógica para atualizar o ícone do objeto na UI
+                } else {
+                    alert('Falha: ' + response.data.error);
+                }
+            })
+            .catch(error => {
+                const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
+                alert(errorMessage);
+            });
+    };
+
+    const handleDelete = (node) => {
+        if (confirm(`Tem certeza que deseja excluir "${node.name}"? Esta ação não pode ser desfeita.`)) {
+            axios.delete('/api/delete_object', { data: { dn: node.dn } })
+                .then(response => {
+                    if (response.data.success) {
+                        alert(response.data.message);
+                        // Remove o item da visualização atual (seja da busca ou dos membros da OU)
+                        if (searchPerformed) {
+                            setSearchResults(prev => prev.filter(item => item.dn !== node.dn));
+                        } else {
+                            setMembers(prev => prev.filter(item => item.dn !== node.dn));
+                        }
+                    } else {
+                        alert('Falha: ' + response.data.error);
+                    }
+                })
+                .catch(error => {
+                    const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
+                    alert(errorMessage);
+                });
+        }
+    };
+
+    const handleContextMenu = (e, node) => {
+        e.preventDefault();
+        setContextMenu({
+            show: true,
+            x: e.clientX,
+            y: e.clientY,
+            targetNode: node
+        });
+    };
 
     // Função para simular o clique em um nó da árvore (para o duplo clique)
     const handleOuDoubleClick = (ouMember) => {
@@ -381,7 +460,7 @@ const ADExplorerPage = () => {
                             </form>
                         </div>
                         {treeData.map(rootNode => (
-                            <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} />
+                            <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} onContextMenu={handleContextMenu} />
                         ))}
                     </div>
                     <ContentPanel
@@ -390,6 +469,7 @@ const ADExplorerPage = () => {
                         getIcon={getIcon}
                         onOuDoubleClick={handleOuDoubleClick}
                         isSearchMode={searchPerformed}
+                        onContextMenu={handleContextMenu}
                     />
                 </div>
                 <ConfirmationModal
@@ -404,6 +484,15 @@ const ADExplorerPage = () => {
                         </p>
                     )}
                 </ConfirmationModal>
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    show={contextMenu.show}
+                    targetNode={contextMenu.targetNode}
+                    onClose={() => setContextMenu({ ...contextMenu, show: false })}
+                    onToggleStatus={handleToggleStatus}
+                    onDelete={handleDelete}
+                />
             </div>
         </DndProvider>
     );
