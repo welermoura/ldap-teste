@@ -56,14 +56,20 @@
     cursor: pointer;
     padding: 8px 12px;
     border-radius: 6px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     display: flex;
     align-items: center;
     margin-bottom: 4px; /* Aumenta o espaçamento vertical */
 }
 
 .node-label:hover {
-    background-color: var(--glass-hover-bg);
+    background-color: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translateX(4px);
+}
+.node-label:hover i {
+    color: #fff;
 }
 
 .node-children {
@@ -90,12 +96,20 @@
     align-items: center;
     padding: 10px;
     border-radius: 6px;
-    transition: background-color 0.2s;
+    transition: background-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     margin-bottom: 5px; /* Espaçamento entre itens */
 }
 
 .member-item:hover {
-    background-color: var(--glass-hover-bg-light);
+    background-color: var(--primary-color);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translateX(4px);
+}
+
+.member-item:hover i,
+.member-item:hover .member-ou-path {
+    color: #fff;
 }
 
 .member-name {

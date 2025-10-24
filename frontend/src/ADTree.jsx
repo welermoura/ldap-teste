@@ -8,6 +8,7 @@ import EditUserModal from './EditUserModal';
 import DisableTempModal from './DisableTempModal';
 import ScheduleAbsenceModal from './ScheduleAbsenceModal';
 import MoveModal from './MoveModal';
+import NotificationModal from './NotificationModal'; // Importar o modal de notificação
 import TreeNode from './TreeNode';
 import './ADTree.css';
 
@@ -201,6 +202,7 @@ const ADExplorerPage = () => {
     const [actionUser, setActionUser] = useState(null); // Usuário para modais de ação
     const [isMoveModalOpenFromContext, setIsMoveModalOpenFromContext] = useState(false);
     const [objectToMove, setObjectToMove] = useState(null);
+    const [notification, setNotification] = useState({ isOpen: false, title: '', message: '' });
 
     useEffect(() => {
         axios.get('/api/action_permissions')
@@ -225,10 +227,10 @@ const ADExplorerPage = () => {
             onConfirm: () => {
                 axios.post('/api/toggle_object_status', { dn: node.dn, sam: node.sam })
                     .then(response => {
+                        setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
                         // TODO: Atualizar o estado local do nó para refletir a mudança
-                        alert(response.data.message);
                     })
-                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .catch(error => setNotification({ isOpen: true, title: 'Erro', message: error.response?.data?.error || 'Erro desconhecido' }))
                     .finally(() => setConfirmationAction({ isOpen: false }));
             }
         });
@@ -242,9 +244,9 @@ const ADExplorerPage = () => {
             onConfirm: () => {
                 axios.post(`/api/reset_password/${node.sam}`)
                     .then(response => {
-                        alert(`${response.data.message} Nova senha: ${response.data.new_password}`);
+                        setNotification({ isOpen: true, title: 'Sucesso', message: `${response.data.message} Nova senha: ${response.data.new_password}` });
                     })
-                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .catch(error => setNotification({ isOpen: true, title: 'Erro', message: error.response?.data?.error || 'Erro desconhecido' }))
                     .finally(() => setConfirmationAction({ isOpen: false }));
             }
         });
@@ -258,10 +260,12 @@ const ADExplorerPage = () => {
             onConfirm: () => {
                 axios.delete('/api/delete_object', { data: { dn: node.dn, name: node.name } })
                     .then(response => {
-                        // TODO: Remover o nó da UI
-                        alert(response.data.message);
+                        setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
+                        // Remover o objeto da UI
+                        setMembers(prev => prev.filter(m => m.dn !== node.dn));
+                        setSearchResults(prev => prev.filter(r => r.dn !== node.dn));
                     })
-                    .catch(error => alert(error.response?.data?.error || 'Erro desconhecido'))
+                    .catch(error => setNotification({ isOpen: true, title: 'Erro', message: error.response?.data?.error || 'Erro desconhecido' }))
                     .finally(() => setConfirmationAction({ isOpen: false }));
             }
         });
@@ -367,6 +371,7 @@ const ADExplorerPage = () => {
         })
         .then(response => {
             if (response.data.success) {
+                setNotification({ isOpen: true, title: 'Sucesso', message: 'Objeto movido com sucesso!' });
                 if (selectedNode && selectedNode.dn === sourceOuDn) {
                     setMembers(prevMembers => prevMembers.filter(m => m.dn !== item.dn));
                 }
@@ -376,12 +381,12 @@ const ADExplorerPage = () => {
                     setMembers(prevMembers => [...prevMembers, movedItem].sort((a, b) => a.name.localeCompare(b.name)));
                 }
             } else {
-                alert('Falha ao mover o objeto: ' + (response.data.error || 'Erro desconhecido.'));
+                setNotification({ isOpen: true, title: 'Erro', message: `Falha ao mover o objeto: ${response.data.error || 'Erro desconhecido.'}` });
             }
         })
         .catch(error => {
             const errorMessage = error.response?.data?.error || 'Ocorreu um erro de comunicação.';
-            alert(errorMessage);
+            setNotification({ isOpen: true, title: 'Erro', message: errorMessage });
         })
         .finally(() => {
             setIsMoveModalOpen(false);
@@ -392,7 +397,7 @@ const ADExplorerPage = () => {
     const handleSearchSubmit = (e) => {
         e.preventDefault();
         if (searchQuery.trim().length < 3) {
-            alert('A busca deve ter no mínimo 3 caracteres.');
+            setNotification({ isOpen: true, title: 'Atenção', message: 'A busca deve ter no mínimo 3 caracteres.' });
             return;
         }
         setIsSearchLoading(true);
@@ -406,7 +411,7 @@ const ADExplorerPage = () => {
             .catch(error => {
                 console.error("Erro na busca:", error);
                 const errorMessage = error.response?.data?.error || 'Ocorreu um erro ao realizar a busca.';
-                alert(errorMessage);
+                setNotification({ isOpen: true, title: 'Erro na Busca', message: errorMessage });
                 setSearchResults([]);
             })
             .finally(() => {
@@ -542,22 +547,28 @@ const ADExplorerPage = () => {
                         })
                         .then(response => {
                             if (response.data.success) {
-                                alert('Objeto movido com sucesso!');
+                                setNotification({ isOpen: true, title: 'Sucesso', message: 'Objeto movido com sucesso!' });
                                 // Remove o objeto da lista de membros atual para evitar dados obsoletos
                                 setMembers(prev => prev.filter(m => m.dn !== objectToMove.dn));
                                 setSearchResults(prev => prev.filter(r => r.dn !== objectToMove.dn));
                             } else {
-                                alert(`Falha ao mover: ${response.data.error}`);
+                                setNotification({ isOpen: true, title: 'Erro', message: `Falha ao mover: ${response.data.error}` });
                             }
                         })
                         .catch(err => {
-                            alert(`Erro na comunicação: ${err.response?.data?.error || 'Erro desconhecido'}`);
+                            setNotification({ isOpen: true, title: 'Erro', message: `Erro na comunicação: ${err.response?.data?.error || 'Erro desconhecido'}` });
                         })
                         .finally(() => {
                             setIsMoveModalOpenFromContext(false);
                             setObjectToMove(null);
                         });
                     }}
+                />
+                <NotificationModal
+                    isOpen={notification.isOpen}
+                    onClose={() => setNotification({ ...notification, isOpen: false })}
+                    title={notification.title}
+                    message={notification.message}
                 />
             </div>
         </DndProvider>
