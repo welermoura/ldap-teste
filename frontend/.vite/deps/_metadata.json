@@ -1,0 +1,46 @@
+{
+  "hash": "002dcee5",
+  "configHash": "afd69ef5",
+  "lockfileHash": "e57ce274",
+  "browserHash": "6cccfc68",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "23c02244",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "e70f2e32",
+      "needsInterop": true
+    },
+    "axios": {
+      "src": "../../node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "199464c9",
+      "needsInterop": false
+    },
+    "react-dnd": {
+      "src": "../../node_modules/react-dnd/dist/index.js",
+      "file": "react-dnd.js",
+      "fileHash": "9b2a90fb",
+      "needsInterop": false
+    },
+    "react-dnd-html5-backend": {
+      "src": "../../node_modules/react-dnd-html5-backend/dist/index.js",
+      "file": "react-dnd-html5-backend.js",
+      "fileHash": "4b26477a",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-4BPZ7PBZ": {
+      "file": "chunk-4BPZ7PBZ.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
+    }
+  }
+}
