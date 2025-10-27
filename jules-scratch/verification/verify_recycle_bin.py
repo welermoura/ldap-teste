@@ -12,12 +12,18 @@ def run(playwright):
     page.click('input[type="submit"]')
     page.wait_for_url("http://localhost:5000/dashboard")
 
-    # 2. Navegar para a lixeira
-    page.click('button:has-text("Ferramentas")')
-    page.click('a:has-text("Lixeira do AD")')
-    page.wait_for_url("http://localhost:5000/recycle_bin")
+    # 2. Navegar para a árvore do AD
+    page.goto("http://localhost:5000/ad-tree")
 
-    # 3. Tirar screenshot
+    # 3. Clicar no nó da lixeira
+    # Usamos um seletor que encontra o nó da árvore pelo texto "Lixeira"
+    page.click('span.node-text:has-text("Lixeira")')
+
+    # 4. Aguardar a atualização do painel de conteúdo
+    # (Adicione uma espera explícita se a chamada de API for lenta)
+    page.wait_for_timeout(2000) # Espera 2 segundos para a API carregar
+
+    # 5. Tirar screenshot
     page.screenshot(path="jules-scratch/verification/verification.png")
 
     browser.close()
