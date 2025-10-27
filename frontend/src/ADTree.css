@@ -295,6 +295,66 @@
     background-color: var(--glass-border-color); /* Impede a mudança de cor no hover */
 }
 
+.content-header-with-search {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--glass-border-color);
+    margin-bottom: 20px;
+}
+
+.content-header-with-search h4 {
+    margin: 0;
+}
+
+.content-header-with-search .search-input {
+    max-width: 300px; /* Ajuste a largura conforme necessário */
+}
+
+.recycle-bin-item {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.recycle-bin-item:hover {
+    background-color: var(--hover-background);
+}
+
+.recycle-bin-item-row1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+}
+
+.recycle-bin-item-row1 .member-name {
+    font-weight: 500;
+}
+
+.recycle-bin-item-row1 .member-title {
+    color: var(--text-color-muted);
+    font-style: italic;
+}
+
+.recycle-bin-item-row1 .member-date {
+    margin-left: auto;
+    font-size: 0.9em;
+    color: var(--text-color-muted);
+    white-space: nowrap;
+}
+
+.recycle-bin-item-row2 {
+    padding-left: 34px; /* Alinha com o texto da primeira linha (ícone + gap) */
+    font-size: 0.9em;
+    color: var(--text-color-muted);
+    text-align: left;
+}
+
 .recycle-bin-item {
     display: flex;
     flex-direction: column;
