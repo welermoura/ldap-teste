@@ -294,3 +294,43 @@
 .context-menu ul li.separator:hover {
     background-color: var(--glass-border-color); /* Impede a mudança de cor no hover */
 }
+
+.recycle-bin-item {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.recycle-bin-item:hover {
+    background-color: var(--hover-background);
+}
+
+.recycle-bin-item-row1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.recycle-bin-item-row1 .member-name {
+    font-weight: 500;
+}
+
+.recycle-bin-item-row1 .member-title {
+    color: var(--text-color-muted);
+    font-style: italic;
+}
+
+.recycle-bin-item-row1 .member-date {
+    margin-left: auto;
+    font-size: 0.9em;
+    color: var(--text-color-muted);
+}
+
+.recycle-bin-item-row2 {
+    padding-left: 34px; /* Alinha com o texto da primeira linha (ícone + gap) */
+    font-size: 0.9em;
+    color: var(--text-color-muted);
+}
