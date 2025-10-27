@@ -107,32 +107,26 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
         );
     }
 
-    // Tabela para a lixeira
     if (isRecycleBin) {
         return (
             <div className="content-panel">
                 <h4 className="content-header"><i className="fas fa-recycle me-2"></i>Lixeira</h4>
                 {hasMembers ? (
-                    <table className="table table-hover table-sm">
-                        <thead>
-                            <tr>
-                                <th>Nome</th>
-                                <th>Cargo</th>
-                                <th>OU Original</th>
-                                <th>Data da Exclusão</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {members.map(member => (
-                                <tr key={member.dn} onContextMenu={(e) => onContextMenu(e, member)}>
-                                    <td>{getIcon(member.type, true)} {member.name}</td>
-                                    <td>{member.title}</td>
-                                    <td>{member.originalOU}</td>
-                                    <td>{member.deletedDate}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <ul className="member-list">
+                        {members.map(member => (
+                            <li key={member.dn} className="member-item recycle-bin-item" onContextMenu={(e) => onContextMenu(e, member)}>
+                                <div className="recycle-bin-item-row1">
+                                    {getIcon(member.type, true)}
+                                    <span className="member-name">{member.name}</span>
+                                    <span className="member-title">{member.title}</span>
+                                    <span className="member-date">{member.deletedDate}</span>
+                                </div>
+                                <div className="recycle-bin-item-row2">
+                                    <span className="member-ou-path">OU: {member.originalOU}</span>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 ) : (
                     <div className="content-placeholder">A lixeira está vazia.</div>
                 )}
