@@ -103,15 +103,21 @@ def is_recycle_bin_enabled(conn):
     if not conn or not conn.bound:
         return False
     try:
-        # O DN da funcionalidade da lixeira é construído a partir do sufixo do domínio (rootDSE)
-        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
+        # A informação sobre features opcionais como a lixeira fica no "Configuration Naming Context"
         config_dn = conn.server.info.other.get('configurationNamingContext')[0]
+        if not config_dn:
+            logging.warning("Não foi possível determinar o 'configurationNamingContext' do servidor AD.")
+            return False
 
+        # O objeto que representa a funcionalidade da lixeira tem um DN e atributos específicos
         search_base = f"CN=Optional Features,CN=Directory Service,CN=Windows NT,CN=Services,{config_dn}"
-        search_filter = "(cn=Recycle Bin Feature)"
+        # O atributo msDS-EnabledFeature aponta para o DN da feature habilitada.
+        # O GUID '766ddcd8-acd0-445e-f3b9-a7f9b6744f2a' é o well-known GUID para a Lixeira.
+        search_filter = "(&(objectClass=msDS-OptionalFeature)(msDS-EnabledFeature=CN=Recycle Bin Feature,CN=Optional Features,CN=Directory Service,CN=Windows NT,CN=Services," + config_dn + "))"
 
         conn.search(search_base, search_filter, attributes=['cn'])
 
+        # Se a busca retornar alguma entrada, a funcionalidade está habilitada.
         return bool(conn.entries)
     except Exception as e:
         logging.error(f"Erro ao verificar o status da Lixeira do AD: {e}")
