@@ -1,15 +1,94 @@
-
-.modal-content.large {
-    max-width: 800px;
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1050;
 }
 
-/* Garante que o dropdown de busca apareça sobre outros elementos */
-.search-results-dropdown {
-    position: absolute;
-    z-index: 1055; /* Maior que o z-index do modal-backdrop */
-    width: calc(100% - 2rem); /* Ajusta a largura para o padding do modal-body */
-    max-height: 200px;
-    overflow-y: auto;
-    border-top: none;
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+.modal-content {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 900px; /* Largura ajustada para o layout de abas */
+    max-width: 95%;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-bottom: 0; /* Removido para juntar com as abas */
+}
+
+.modal-title {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.btn-close {
+    background: transparent;
+    border: 0;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.modal-body {
+    padding-top: 0;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+
+/* Estilos para o sistema de Abas */
+.nav-tabs {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.nav-tabs .nav-item {
+    margin-bottom: -1px; /* Alinha o link ativo com a borda */
+}
+
+.nav-tabs .nav-link {
+    background: transparent;
+    border: 1px solid transparent;
+    border-top-left-radius: .25rem;
+    border-top-right-radius: .25rem;
+    color: var(--text-muted-color);
+    transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out;
+}
+
+.nav-tabs .nav-link:hover, .nav-tabs .nav-link:focus {
+    border-color: #495057 #495057 var(--border-color);
+    isolation: isolate;
+}
+
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-item.show .nav-link {
+    color: var(--text-color);
+    background-color: var(--background-color);
+    border-color: var(--border-color) var(--border-color) var(--background-color);
+}
+
+.tab-content {
+    min-height: 250px; /* Altura mínima para evitar que o modal "pule" ao carregar */
 }
