@@ -17,7 +17,7 @@ import secrets
 import io
 import csv
 import base64
-from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, filetime_to_datetime
+from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, filetime_to_datetime, is_recycle_bin_enabled
 
 # ==============================================================================
 # Configuração Base
@@ -188,8 +188,16 @@ def require_api_permission(action=None):
 # ==============================================================================
 @app.before_request
 def before_request_func():
-    if not load_user() and request.endpoint not in ['admin_register', 'static']:
-        return redirect(url_for('admin_register'))
+    # A verificação de usuário admin foi removida daqui para corrigir o loop de login.
+    # A proteção individual em cada rota de admin já é suficiente.
+
+    # Adiciona a verificação da lixeira à sessão para evitar checagens repetidas
+    if 'recycle_bin_enabled' not in session and is_authenticated():
+        try:
+            conn = get_read_connection()
+            session['recycle_bin_enabled'] = is_recycle_bin_enabled(conn)
+        except Exception:
+            session['recycle_bin_enabled'] = False
 
 def is_authenticated():
     return 'ad_user' in session
@@ -1573,6 +1581,89 @@ def api_search_ad():
     except Exception as e:
         logging.error(f"Erro na busca do AD com a query '{query}': {e}", exc_info=True)
         return jsonify({'error': 'Falha ao realizar a busca no Active Directory.'}), 500
+
+@app.route('/api/restore_object', methods=['POST'])
+@require_auth
+def restore_object():
+    """Restaura um objeto da lixeira do AD."""
+    if not session.get('recycle_bin_enabled'):
+        return jsonify({'error': 'A lixeira não está habilitada ou a sessão é inválida.'}), 403
+
+    data = request.get_json()
+    object_dn = data.get('dn')
+    if not object_dn:
+        return jsonify({'error': 'O DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # Busca o objeto para obter seu 'lastKnownParent' e o RDN
+        conn.search(object_dn, '(objectClass=*)', BASE,
+                    attributes=['lastKnownParent', 'cn'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        if not conn.entries:
+            return jsonify({'error': 'Objeto não encontrado na lixeira.'}), 404
+
+        entry = conn.entries[0]
+        target_ou_dn = entry.lastKnownParent.value
+        new_rdn = f"CN={entry.cn.value}"
+
+        # Restaura o objeto (movendo-o para sua antiga OU)
+        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
+
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        # Reativa a conta (remove o estado de desativado, se houver)
+        uac_entry = get_user_by_dn(conn, f"{new_rdn},{target_ou_dn}", attributes=['userAccountControl'])
+        if uac_entry and 'userAccountControl' in uac_entry:
+            uac = uac_entry.userAccountControl.value
+            if uac & 2: # Se estiver desativado
+                conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
+
+        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
+
+    except Exception as e:
+        logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
+
+@app.route('/recycle_bin')
+@require_auth
+def recycle_bin():
+    """Exibe a lixeira do Active Directory, se habilitada."""
+    try:
+        conn = get_read_connection()
+
+        if not is_recycle_bin_enabled(conn):
+            flash("A lixeira do Active Directory não está habilitada.", "warning")
+            return render_template('recycle_bin.html', recycle_bin_enabled=False, deleted_objects=[])
+
+        config = load_config()
+        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
+        deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
+
+        # O controle LDAP_SERVER_SHOW_DELETED_OID é necessário para ver objetos excluídos
+        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
+                    attributes=['lastKnownParent', 'whenChanged', 'cn'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        objects = []
+        for entry in conn.entries:
+            objects.append({
+                'cn': entry.cn.value,
+                'last_known_parent': get_ou_path(entry.lastKnownParent.value),
+                'when_changed': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M:%S'),
+                'dn': entry.entry_dn
+            })
+
+        return render_template('recycle_bin.html', recycle_bin_enabled=True, deleted_objects=objects)
+
+    except Exception as e:
+        flash(f"Erro ao acessar a lixeira: {e}", "error")
+        logging.error(f"Erro ao carregar a lixeira: {e}", exc_info=True)
+        return redirect(url_for('dashboard'))
 
 @app.route('/api/move_object', methods=['POST'])
 @require_auth

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Lixeira do Active Directory{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="fas fa-trash-alt me-2"></i>Lixeira do Active Directory</h2>
+
+    <div id="flash-container">
+        {% include '_flashes.html' %}
+    </div>
+
+    {% if not recycle_bin_enabled %}
+        <div class="alert alert-warning" role="alert">
+            <h4 class="alert-heading">Lixeira Desabilitada</h4>
+            <p>A funcionalidade da Lixeira do Active Directory não está habilitada no seu domínio. Para visualizar e restaurar objetos excluídos, é necessário habilitar este recurso no nível da floresta do AD.</p>
+            <hr>
+            <p class="mb-0">Uma vez habilitada, a lixeira não pode ser desabilitada.</p>
+        </div>
+    {% else %}
+        <div class="card glass-card">
+            <div class="card-header">
+                Objetos Excluídos
+            </div>
+            <div class="card-body">
+                {% if deleted_objects %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome (CN)</th>
+                                    <th>Última Localização Conhecida</th>
+                                    <th>Data da Exclusão</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for obj in deleted_objects %}
+                                <tr id="row-{{ loop.index }}">
+                                    <td>{{ obj.cn }}</td>
+                                    <td>{{ obj.last_known_parent }}</td>
+                                    <td>{{ obj.when_changed }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary restore-btn"
+                                                data-dn="{{ obj.dn }}"
+                                                data-row-id="row-{{ loop.index }}">
+                                            <i class="fas fa-undo me-1"></i>Restaurar
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-center text-muted" id="empty-message">A lixeira está vazia.</p>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const restoreButtons = document.querySelectorAll('.restore-btn');
+
+    restoreButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const objectDn = this.dataset.dn;
+            const rowId = this.dataset.rowId;
+            const row = document.getElementById(rowId);
+
+            if (!confirm(`Tem certeza que deseja restaurar o objeto "${objectDn}"?`)) {
+                return;
+            }
+
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Restaurando...';
+
+            fetch('/api/restore_object', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}' // Se você usar CSRF
+                },
+                body: JSON.stringify({ dn: objectDn })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFlash(data.message, 'success');
+                    row.style.transition = 'opacity 0.5s';
+                    row.style.opacity = '0';
+                    setTimeout(() => {
+                        row.remove();
+                        if (document.querySelectorAll('.restore-btn').length === 0) {
+                            const emptyMessage = document.getElementById('empty-message');
+                            if(emptyMessage) emptyMessage.style.display = 'block';
+                        }
+                    }, 500);
+                } else {
+                    showFlash(`Erro: ${data.error}`, 'danger');
+                    this.disabled = false;
+                    this.innerHTML = '<i class="fas fa-undo me-1"></i>Restaurar';
+                }
+            })
+            .catch(error => {
+                showFlash(`Erro de rede: ${error}`, 'danger');
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-undo me-1"></i>Restaurar';
+            });
+        });
+    });
+
+    function showFlash(message, category) {
+        const flashContainer = document.getElementById('flash-container');
+        const alert = `
+            <div class="alert alert-${category} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>`;
+        flashContainer.innerHTML = alert;
+    }
+});
+</script>
+{% endblock %}
