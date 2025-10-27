@@ -1483,26 +1483,27 @@ def api_recycle_bin():
         domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
         deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
 
-        # Busca atributos adicionais para uma exibição mais rica
-        conn.search(deleted_objects_container, '(objectClass=*)', SUBTREE,
+        # Filtro para buscar apenas usuários, grupos e computadores
+        search_filter = '(|(objectClass=user)(objectClass=group)(objectClass=computer))'
+        conn.search(deleted_objects_container, search_filter, SUBTREE,
                     attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'title', 'whenChanged'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
 
         logging.info(f"Busca na lixeira encontrou {len(conn.entries)} objetos no total.")
 
+        processed_dns = set()
         items = []
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
         for entry in conn.entries:
-            if not entry.cn.value:
+            dn = entry.distinguishedName.value
+            if not entry.cn.value or dn in processed_dns:
                 continue
 
-            # Filtra por data (objetos excluídos na última semana)
             when_changed = entry.whenChanged.value
             if not when_changed or when_changed < seven_days_ago:
                 continue
 
-            # Aprimora a limpeza do nome
             clean_name = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', entry.cn.value)
 
             obj_class = entry.objectClass.values
@@ -1512,7 +1513,7 @@ def api_recycle_bin():
             elif 'computer' in obj_class: obj_type = 'computer'
 
             items.append({
-                'dn': entry.distinguishedName.value,
+                'dn': dn,
                 'name': clean_name,
                 'type': obj_type,
                 'status': 'Excluído',
@@ -1520,6 +1521,7 @@ def api_recycle_bin():
                 'originalOU': get_ou_path(entry.lastKnownParent.value) if 'lastKnownParent' in entry and entry.lastKnownParent.value else 'N/A',
                 'deletedDate': when_changed.strftime('%d/%m/%Y %H:%M')
             })
+            processed_dns.add(dn)
 
         # Ordena por nome
         items.sort(key=lambda x: x['name'].lower())
