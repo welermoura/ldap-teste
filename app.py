@@ -1492,6 +1492,10 @@ def api_recycle_bin():
 
         items = []
         for entry in conn.entries:
+            # Pula objetos sem nome (cn), que podem causar erros
+            if not entry.cn.value:
+                continue
+
             # Determina o tipo do objeto para o frontend
             obj_class = entry.objectClass.values
             obj_type = 'object' # Padrão
