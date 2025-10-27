@@ -39,10 +39,24 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
 };
 
 // Componente para o Menu de Contexto (Reconstruído)
-const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence, onMove }) => {
+const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence, onMove, isRecycleBin, onRestore }) => {
     if (!show || !targetNode) return null;
 
     const style = { top: y, left: x };
+
+    if (isRecycleBin) {
+        return createPortal(
+            <div className="context-menu" style={style} onMouseLeave={onClose}>
+                <ul>
+                    <li onClick={() => { onRestore(targetNode); onClose(); }}>
+                        <i className="fas fa-trash-restore me-2"></i>Restaurar Objeto
+                    </li>
+                </ul>
+            </div>,
+            document.body
+        );
+    }
+
     const isUser = targetNode.type === 'user';
     const isComputer = targetNode.type === 'computer';
 
@@ -84,73 +98,92 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
 };
 
 // Painel para exibir o conteúdo da OU selecionada ou os resultados da busca
-const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu }) => {
+const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu, isRecycleBinMode }) => {
     const hasMembers = members && members.length > 0;
 
-    // Mensagem para quando a busca não retorna resultados
+    // Mensagem para lixeira vazia
+    if (isRecycleBinMode && !hasMembers) {
+        return (
+            <div className="content-panel">
+                <h4 className="content-header">Lixeira</h4>
+                <div className="content-placeholder">A lixeira está vazia.</div>
+            </div>
+        );
+    }
+
+    // Mensagem para busca sem resultados
     if (isSearchMode && !hasMembers) {
         return (
             <div className="content-panel">
                 <h4 className="content-header">Resultados da Busca</h4>
-                <div className="content-placeholder">
-                    Nenhum usuário ou computador encontrado.
-                </div>
+                <div className="content-placeholder">Nenhum usuário ou computador encontrado.</div>
             </div>
         );
     }
 
-    // Mensagem para quando uma OU é selecionada mas não tem conteúdo
-    if (!isSearchMode && selectedNode && !hasMembers) {
+    // Mensagem para OU vazia
+    if (!isSearchMode && !isRecycleBinMode && selectedNode && !hasMembers) {
         return (
             <div className="content-panel">
                 <h4 className="content-header">Conteúdo de: {selectedNode.text || selectedNode.name}</h4>
-                <div className="content-placeholder">
-                    Esta Unidade Organizacional está vazia.
-                </div>
+                <div className="content-placeholder">Esta Unidade Organizacional está vazia.</div>
             </div>
         );
     }
 
-    // Mensagem inicial antes de qualquer seleção ou busca
-    if (!isSearchMode && !selectedNode) {
+    // Mensagem inicial
+    if (!isSearchMode && !isRecycleBinMode && !selectedNode) {
         return (
             <div className="content-panel">
-                <div className="content-placeholder">
-                    Selecione uma Unidade Organizacional na árvore para ver seu conteúdo.
-                </div>
+                <div className="content-placeholder">Selecione um item na árvore para ver seu conteúdo.</div>
             </div>
         );
     }
 
-    const headerText = isSearchMode ? "Resultados da Busca" : `Conteúdo de: ${selectedNode.text || selectedNode.name}`;
+    const headerText = isRecycleBinMode
+        ? "Lixeira"
+        : isSearchMode
+        ? "Resultados da Busca"
+        : `Conteúdo de: ${selectedNode.text || selectedNode.name}`;
 
     return (
         <div className="content-panel">
             <h4 className="content-header">{headerText}</h4>
             <ul className="member-list">
                 {members.map(member => {
-                    // Na busca, todos os itens são arrastáveis (se forem user/computer)
+                    // Itens da lixeira são especiais
+                    if (isRecycleBinMode) {
+                        return (
+                            <li key={member.dn} className="member-item non-draggable" onContextMenu={(e) => onContextMenu(e, member)}>
+                                {getIcon(member.type)}
+                                <div className="member-info">
+                                    <span className="member-name">{member.name}</span>
+                                    <span className="member-ou-path">Excluído em: {member.deleted_date}</span>
+                                    <span className="member-ou-path">Localização anterior: {member.last_known_parent}</span>
+                                </div>
+                            </li>
+                        );
+                    }
+                    // Comportamento de busca
                     if (isSearchMode && (member.type === 'user' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     }
-                    // Comportamento normal para visualização de OU
+                    // Comportamento normal de OU
                     if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     } else if (!isSearchMode && member.type === 'ou') {
                         return (
                             <li key={member.dn} className="member-item non-draggable" onDoubleClick={() => onOuDoubleClick(member)} style={{ cursor: 'pointer' }} onContextMenu={(e) => onContextMenu(e, member)}>
-                                {getIcon(member.type)}
-                                <span className="member-name">{member.name}</span>
-                            </li>
-                        );
-                    } else {
-                        return (
-                            <li key={member.dn} className="member-item non-draggable">
-                                {getIcon(member.type)}
-                                <span className="member-name">{member.name}</span>
+                                {getIcon(member.type)} <span className="member-name">{member.name}</span>
                             </li>
                         );
                     }
+                    // Fallback para outros tipos de itens em OUs
+                    return (
+                        <li key={member.dn} className="member-item non-draggable">
+                            {getIcon(member.type)} <span className="member-name">{member.name}</span>
+                        </li>
+                    );
                 })}
             </ul>
         </div>
@@ -193,6 +226,8 @@ const ADExplorerPage = () => {
     const [searchResults, setSearchResults] = useState([]);
     const [isSearchLoading, setIsSearchLoading] = useState(false);
     const [searchPerformed, setSearchPerformed] = useState(false);
+    const [isRecycleBinMode, setIsRecycleBinMode] = useState(false);
+    const [recycleBinItems, setRecycleBinItems] = useState([]);
     const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, targetNode: null });
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
@@ -290,13 +325,36 @@ const ADExplorerPage = () => {
         setIsMoveModalOpenFromContext(true);
     };
 
+    const handleRestore = (node) => {
+        setConfirmationAction({
+            isOpen: true,
+            title: 'Restaurar Objeto',
+            message: `Tem certeza que deseja restaurar o objeto '${node.name}' para sua localização original?`,
+            onConfirm: () => {
+                axios.post('/api/restore_object', { dn: node.dn, last_known_parent: node.last_known_parent })
+                    .then(response => {
+                        setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
+                        // Remove o item da lista da lixeira na UI
+                        setRecycleBinItems(prevItems => prevItems.filter(item => item.dn !== node.dn));
+                    })
+                    .catch(error => {
+                        const message = error.response?.data?.error || "Erro desconhecido ao restaurar.";
+                        setNotification({ isOpen: true, title: 'Erro', message });
+                    })
+                    .finally(() => setConfirmationAction({ isOpen: false }));
+            }
+        });
+    };
+
     const handleContextMenu = (e, node) => {
         e.preventDefault();
+        // Adiciona a flag isRecycleBin ao estado do menu de contexto
+        const targetNodeWithContext = { ...node, isRecycleBin: isRecycleBinMode };
         setContextMenu({
             show: true,
             x: e.clientX,
             y: e.clientY,
-            targetNode: node
+            targetNode: targetNodeWithContext
         });
     };
 
@@ -337,12 +395,28 @@ const ADExplorerPage = () => {
         });
     }, []);
 
+    const handleRecycleBinClick = () => {
+        setIsRecycleBinMode(true);
+        setSearchPerformed(false); // Garante que a busca seja desativada
+        setSelectedNode(null); // Desseleciona qualquer nó da árvore
+        setMembers([]);
+        axios.get('/api/recycle_bin')
+            .then(response => {
+                setRecycleBinItems(response.data);
+            })
+            .catch(error => {
+                const message = error.response?.data?.error || "Erro ao buscar itens da lixeira.";
+                setNotification({ isOpen: true, title: 'Erro', message });
+            });
+    };
+
     const handleNodeClick = useCallback((node, isOpen) => {
+        setIsRecycleBinMode(false); // Desativa o modo lixeira
+        setSearchPerformed(false);
         setSelectedNode(node);
         // Busca os membros do nó clicado (OUs e outros objetos)
         axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
             .then(response => {
-                console.log("Dados recebidos da API:", response.data); // Log de Depuração
                 setMembers(response.data);
                 // Se o nó foi aberto e ainda não tem filhos OUs carregados, atualiza a árvore
                 if (isOpen && (!node.nodes || node.nodes.length === 0)) {
@@ -400,10 +474,11 @@ const ADExplorerPage = () => {
             setNotification({ isOpen: true, title: 'Atenção', message: 'A busca deve ter no mínimo 3 caracteres.' });
             return;
         }
+        setIsRecycleBinMode(false); // Desativa o modo lixeira
         setIsSearchLoading(true);
         setSearchPerformed(true);
-        setSelectedNode(null); // Limpa a seleção da OU para focar nos resultados da busca
-        setMembers([]); // Limpa os membros da OU anterior
+        setSelectedNode(null);
+        setMembers([]);
         axios.get(`/api/search_ad?q=${encodeURIComponent(searchQuery)}`)
             .then(response => {
                 setSearchResults(response.data);
@@ -425,6 +500,7 @@ const ADExplorerPage = () => {
         setSearchPerformed(false);
         setSelectedNode(null);
         setMembers([]);
+        setIsRecycleBinMode(false); // Garante a saída do modo lixeira
     };
 
     useEffect(() => {
@@ -467,16 +543,22 @@ const ADExplorerPage = () => {
                                 )}
                             </form>
                         </div>
+                        <div className="recycle-bin-container" onClick={handleRecycleBinClick}>
+                            <div className="node-label">
+                                <i className="fas fa-trash-restore"></i>
+                                Lixeira
+                            </div>
+                        </div>
                         {treeData.map(rootNode => (
                             <TreeNode key={rootNode.dn} node={rootNode} onNodeClick={handleNodeClick} onMoveObject={handleMoveObject} onContextMenu={handleContextMenu} />
                         ))}
                     </div>
                     <ContentPanel
                         selectedNode={selectedNode}
-                        members={searchPerformed ? searchResults : members}
+                        members={searchPerformed ? searchResults : (isRecycleBinMode ? recycleBinItems : members)}
                         getIcon={getIcon}
                         onOuDoubleClick={handleOuDoubleClick}
-                        isSearchMode={searchPerformed}
+                        isSearchMode={searchPerformed || isRecycleBinMode}
                         onContextMenu={handleContextMenu}
                     />
                 </div>
@@ -518,6 +600,8 @@ const ADExplorerPage = () => {
                     onDisableTemp={handleDisableTemp}
                     onScheduleAbsence={handleScheduleAbsence}
                     onMove={handleMove}
+                    isRecycleBin={contextMenu.targetNode?.isRecycleBin}
+                    onRestore={handleRestore}
                 />
                 <EditUserModal
                     isOpen={isEditModalOpen}

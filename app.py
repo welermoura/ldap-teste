@@ -1524,6 +1524,198 @@ def api_ou_members(ou_dn):
         logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
         return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
 
+@app.route('/api/recycle_bin')
+@require_auth
+@require_api_permission(action='can_delete_user') # Reutiliza a permissão de exclusão
+def api_recycle_bin():
+    """Busca e retorna objetos da lixeira do Active Directory."""
+    try:
+        conn = get_read_connection()
+        config = load_config()
+
+        # Deriva a base do domínio (ex: DC=corp,DC=com) da base de busca
+        domain_base = ','.join([part for part in config.get('AD_SEARCH_BASE', '').split(',') if part.strip().upper().startswith('DC=')])
+        if not domain_base:
+            return jsonify({'error': 'Não foi possível determinar a base do domínio a partir da configuração.'}), 500
+
+        deleted_objects_container = f"CN=Deleted Objects,{domain_base}"
+
+        # Este controle é essencial para que o AD retorne os objetos excluídos
+        conn.search(search_base=deleted_objects_container,
+                    search_filter='(isDeleted=TRUE)',
+                    search_scope=SUBTREE,
+                    attributes=['cn', 'lastKnownParent', 'whenDeleted', 'distinguishedName', 'objectClass'],
+                    controls=[('2.16.840.1.113730.3.4.2', True, None)])
+
+        items = []
+        for entry in conn.entries:
+            # Determina o tipo do objeto
+            obj_class = entry.objectClass.values
+            obj_type = 'desconhecido'
+            if 'user' in obj_class: obj_type = 'user'
+            elif 'computer' in obj_class: obj_type = 'computer'
+            elif 'group' in obj_class: obj_type = 'group'
+            elif 'organizationalUnit' in obj_class: obj_type = 'ou'
+
+            items.append({
+                'dn': entry.distinguishedName.value,
+                'name': entry.cn.value if 'cn' in entry else 'Nome indisponível',
+                'last_known_parent': entry.lastKnownParent.value if 'lastKnownParent' in entry else 'N/A',
+                'deleted_date': entry.whenDeleted.value.strftime('%Y-%m-%d %H:%M:%S') if 'whenDeleted' in entry else 'N/A',
+                'type': obj_type
+            })
+
+        # Ordena os itens pela data de exclusão, do mais recente para o mais antigo
+        items.sort(key=lambda x: x['deleted_date'], reverse=True)
+
+        return jsonify(items)
+
+    except ldap3.core.exceptions.LDAPInvalidDnError:
+        return jsonify({'error': 'A lixeira do Active Directory pode não estar habilitada ou acessível.'}), 404
+    except Exception as e:
+        logging.error(f"Erro ao acessar a lixeira do AD: {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar objetos da lixeira.'}), 500
+
+@app.route('/api/restore_object', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_delete_user')
+def api_restore_object():
+    """Restaura um objeto excluído da lixeira do AD."""
+    data = request.get_json()
+    dn = data.get('dn')
+    last_known_parent = data.get('last_known_parent')
+
+    if not dn or not last_known_parent:
+        return jsonify({'error': 'DN do objeto e local original são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # 1. Remove o atributo 'isDeleted' para "undelete" o objeto.
+        conn.modify(dn, {'isDeleted': [(ldap3.MODIFY_DELETE, [])]})
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro ao redefinir o estado 'isDeleted': {conn.result['message']}")
+
+        # 2. Renomeia/Move o objeto de volta para seu local original.
+        # O novo RDN (Relative Distinguished Name) é a primeira parte do DN (ex: 'CN=Nome do Objeto').
+        new_rdn = dn.split(',')[0]
+        conn.modify_dn(dn, new_rdn, new_superior=last_known_parent)
+        if conn.result['description'] != 'success':
+            # Se a movimentação falhar, tenta reverter a remoção de 'isDeleted'
+            conn.modify(dn, {'isDeleted': [(ldap3.MODIFY_REPLACE, ['TRUE'])]})
+            raise Exception(f"Erro ao mover o objeto para o local original: {conn.result['message']}")
+
+        logging.info(f"Objeto '{dn}' foi RESTAURADO para '{last_known_parent}' por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
+
+    except Exception as e:
+        logging.error(f"Falha ao restaurar o objeto '{dn}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
+
+@app.route('/api/search_groups', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_search_groups():
+    """Busca por grupos no AD, excluindo aqueles dos quais um usuário já é membro."""
+    query = request.args.get('q', '')
+    username = request.args.get('username', '') # Recebe o usuário para exclusão
+    if not query or len(query) < 3:
+        return jsonify([])
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        # Pega a lista de grupos do usuário para poder excluí-los da busca
+        user_groups = set()
+        if username:
+            user = get_user_by_samaccountname(conn, username, attributes=['memberOf'])
+            if user and 'memberOf' in user:
+                user_groups = {g.lower() for g in user.memberOf.values}
+
+        safe_query = escape_filter_chars(query)
+        search_filter = f"(&(objectClass=group)(cn=*{safe_query}*))"
+        conn.search(search_base, search_filter, SUBTREE, attributes=['cn', 'description', 'distinguishedName'])
+
+        groups = []
+        for entry in conn.entries:
+            # Adiciona o grupo apenas se o usuário NÃO for membro
+            if entry.distinguishedName.value.lower() not in user_groups:
+                groups.append({
+                    'cn': entry.cn.value,
+                    'description': entry.description.value if 'description' in entry else ''
+                })
+
+        groups.sort(key=lambda x: x['cn'].lower())
+        return jsonify(groups)
+
+    except Exception as e:
+        logging.error(f"Erro na API de busca de grupos: {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar grupos.'}), 500
+
+@app.route('/api/add_user_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def add_user_to_group():
+    """Adiciona um usuário a um grupo."""
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups(user.distinguishedName.value, group.distinguishedName.value)
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        logging.info(f"Usuário '{username}' adicionado ao grupo '{group_name}' via API por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
+
+    except Exception as e:
+        logging.error(f"Erro ao adicionar '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao adicionar ao grupo: {e}'}), 500
+
+@app.route('/api/remove_user_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def remove_user_from_group():
+    """Remove um usuário de um grupo."""
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.remove_members_from_groups(user.distinguishedName.value, group.distinguishedName.value)
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        logging.info(f"Usuário '{username}' removido do grupo '{group_name}' via API por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
+
+    except Exception as e:
+        logging.error(f"Erro ao remover '{username}' do grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao remover do grupo: {e}'}), 500
+
 @app.route('/api/search_ad', methods=['GET'])
 @require_auth
 def api_search_ad():
