@@ -1535,7 +1535,14 @@ def api_recycle_bin():
             if not entry.cn.value or dn in processed_dns:
                 continue
 
-            clean_name = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', entry.cn.value)
+            original_cn = entry.cn.value
+            del_marker_pos = original_cn.find('\nDEL:')
+            if del_marker_pos != -1:
+                clean_name = original_cn[:del_marker_pos]
+            else:
+                clean_name = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', original_cn)
+
+            clean_name = clean_name.strip()
 
             obj_class = entry.objectClass.values
             obj_type = 'object'
@@ -1662,8 +1669,18 @@ def restore_object():
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
 
-        # Limpa o nome do objeto para remover o sufixo "DEL:..." antes de restaurar
-        clean_cn = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', entry.cn.value)
+        # Limpa o nome do objeto para remover o sufixo "\nDEL:..." que causa o erro
+        original_cn = entry.cn.value
+        del_marker_pos = original_cn.find('\nDEL:')
+
+        if del_marker_pos != -1:
+            clean_cn = original_cn[:del_marker_pos]
+        else:
+            # Fallback para o método antigo se o marcador exato não for encontrado
+            clean_cn = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', original_cn)
+
+        # Remove quaisquer espaços ou quebras de linha restantes no final do nome
+        clean_cn = clean_cn.strip()
         new_rdn = f"CN={clean_cn}"
 
         # Restaura o objeto (movendo-o para sua antiga OU)
