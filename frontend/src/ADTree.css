@@ -329,6 +329,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    justify-content: flex-start; /* Garante o alinhamento à esquerda */
     text-align: left;
 }
 

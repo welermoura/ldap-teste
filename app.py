@@ -1545,7 +1545,7 @@ def api_get_ous():
                 'text': 'Lixeira',
                 'dn': 'recycle_bin',  # Identificador especial para o frontend
                 'nodes': [],
-                'icon': 'fas fa-recycle' # Ícone atualizado para o frontend
+                'icon': 'fas fa-trash-alt' # Ícone de lixeira mais claro
             }
             ous.insert(0, recycle_bin_node)
 
