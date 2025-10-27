@@ -98,6 +98,25 @@ def get_ldap_connection(user=None, password=None):
         server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
         return Connection(server, user=service_user, password=service_password, auto_bind=True)
 
+def is_recycle_bin_enabled(conn):
+    """Verifica se a Lixeira do Active Directory está habilitada."""
+    if not conn or not conn.bound:
+        return False
+    try:
+        # O DN da funcionalidade da lixeira é construído a partir do sufixo do domínio (rootDSE)
+        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
+        config_dn = conn.server.info.other.get('configurationNamingContext')[0]
+
+        search_base = f"CN=Optional Features,CN=Directory Service,CN=Windows NT,CN=Services,{config_dn}"
+        search_filter = "(cn=Recycle Bin Feature)"
+
+        conn.search(search_base, search_filter, attributes=['cn'])
+
+        return bool(conn.entries)
+    except Exception as e:
+        logging.error(f"Erro ao verificar o status da Lixeira do AD: {e}")
+        return False
+
 def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
     if attributes is None:
         attributes = ALL
