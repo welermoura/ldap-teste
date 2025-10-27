@@ -1483,31 +1483,35 @@ def api_recycle_bin():
         domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
         deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
 
-        # Usando um filtro mais genérico para garantir que todos os objetos sejam retornados
+        # Busca atributos adicionais para uma exibição mais rica
         conn.search(deleted_objects_container, '(objectClass=*)', SUBTREE,
-                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'isDeleted'],
+                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'title', 'whenChanged'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
 
         logging.info(f"Busca na lixeira encontrou {len(conn.entries)} objetos.")
 
         items = []
         for entry in conn.entries:
-            # Pula objetos sem nome (cn), que podem causar erros
             if not entry.cn.value:
                 continue
 
-            # Determina o tipo do objeto para o frontend
+            # Limpa o nome para remover o sufixo "DEL:..."
+            clean_name = entry.cn.value.split('\nDEL:')[0]
+
             obj_class = entry.objectClass.values
-            obj_type = 'object' # Padrão
+            obj_type = 'object'
             if 'user' in obj_class: obj_type = 'user'
-            if 'group' in obj_class: obj_type = 'group'
-            if 'computer' in obj_class: obj_type = 'computer'
+            elif 'group' in obj_class: obj_type = 'group'
+            elif 'computer' in obj_class: obj_type = 'computer'
 
             items.append({
                 'dn': entry.distinguishedName.value,
-                'name': entry.cn.value,
+                'name': clean_name,
                 'type': obj_type,
-                'status': 'Excluído'
+                'status': 'Excluído',
+                'title': entry.title.value if 'title' in entry and entry.title.value else 'N/A',
+                'originalOU': get_ou_path(entry.lastKnownParent.value) if 'lastKnownParent' in entry and entry.lastKnownParent.value else 'N/A',
+                'deletedDate': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M') if 'whenChanged' in entry and entry.whenChanged.value else 'N/A'
             })
 
         # Ordena por nome
