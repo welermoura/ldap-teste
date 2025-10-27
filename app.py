@@ -1536,7 +1536,7 @@ def api_recycle_bin():
                 continue
 
             original_cn = entry.cn.value
-            clean_name = re.split(r'\0A|\n', original_cn)[0].strip()
+            clean_name = original_cn.split('\n')[0].strip()
 
             obj_class = entry.objectClass.values
             obj_type = 'object'
@@ -1665,7 +1665,7 @@ def restore_object():
 
         # Divide o nome no caractere de nova linha para isolar o nome real
         original_cn = entry.cn.value
-        clean_cn = re.split(r'\0A|\n', original_cn)[0].strip()
+        clean_cn = original_cn.split('\n')[0].strip()
         new_rdn = f"CN={clean_cn}"
 
         # Restaura o objeto (movendo-o para sua antiga OU)
