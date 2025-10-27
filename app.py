@@ -1486,22 +1486,16 @@ def api_recycle_bin():
         # Filtro para buscar apenas usuários, grupos e computadores
         search_filter = '(|(objectClass=user)(objectClass=group)(objectClass=computer))'
         conn.search(deleted_objects_container, search_filter, SUBTREE,
-                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'title', 'whenChanged'],
+                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'title', 'whenChanged', 'sAMAccountName'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
 
         logging.info(f"Busca na lixeira encontrou {len(conn.entries)} objetos no total.")
 
         processed_dns = set()
         items = []
-        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-
         for entry in conn.entries:
             dn = entry.distinguishedName.value
             if not entry.cn.value or dn in processed_dns:
-                continue
-
-            when_changed = entry.whenChanged.value
-            if not when_changed or when_changed < seven_days_ago:
                 continue
 
             clean_name = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', entry.cn.value)
@@ -1519,7 +1513,8 @@ def api_recycle_bin():
                 'status': 'Excluído',
                 'title': entry.title.value if 'title' in entry and entry.title.value else 'N/A',
                 'originalOU': get_ou_path(entry.lastKnownParent.value) if 'lastKnownParent' in entry and entry.lastKnownParent.value else 'N/A',
-                'deletedDate': when_changed.strftime('%d/%m/%Y %H:%M')
+                'deletedDate': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M') if 'whenChanged' in entry and entry.whenChanged.value else 'N/A',
+                'sam': entry.sAMAccountName.value if 'sAMAccountName' in entry and entry.sAMAccountName.value else ''
             })
             processed_dns.add(dn)
 

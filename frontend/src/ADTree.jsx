@@ -32,7 +32,7 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
             }}
             onContextMenu={(e) => onContextMenu(e, member)}
         >
-            {getIcon(member.type, member.status === 'Excluído')}
+            {getIcon(member.type)}
             <div className="member-info">
                 <span className="member-name">{member.name}</span>
                 {member.ou_path && <span className="member-ou-path">{member.ou_path}</span>}
@@ -96,6 +96,7 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
 
 const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu }) => {
     const [recycleBinSearch, setRecycleBinSearch] = useState('');
+    const [showAll, setShowAll] = useState(false);
     const hasMembers = members && members.length > 0;
     const isRecycleBin = selectedNode && selectedNode.dn === 'recycle_bin';
 
@@ -109,23 +110,49 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
     }
 
     if (isRecycleBin) {
-        const filteredMembers = members.filter(member =>
-            member.name.toLowerCase().includes(recycleBinSearch.toLowerCase()) ||
-            member.title.toLowerCase().includes(recycleBinSearch.toLowerCase()) ||
-            member.originalOU.toLowerCase().includes(recycleBinSearch.toLowerCase())
-        );
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const filteredMembers = members.filter(member => {
+            const searchMatch = (
+                (member.name && member.name.toLowerCase().includes(recycleBinSearch.toLowerCase())) ||
+                (member.title && member.title.toLowerCase().includes(recycleBinSearch.toLowerCase())) ||
+                (member.originalOU && member.originalOU.toLowerCase().includes(recycleBinSearch.toLowerCase())) ||
+                (member.sam && member.sam.toLowerCase().includes(recycleBinSearch.toLowerCase()))
+            );
+
+            if (recycleBinSearch.trim() !== '') {
+                return searchMatch;
+            }
+
+            if (showAll) {
+                return true;
+            }
+
+            const [day, month, yearTime] = member.deletedDate.split('/');
+            const [year, time] = yearTime.split(' ');
+            const [hour, minute] = time.split(':');
+            const deletedDate = new Date(year, month - 1, day, hour, minute);
+
+            return deletedDate > sevenDaysAgo;
+        });
 
         return (
             <div className="content-panel">
                 <div className="content-header-with-search">
-                    <h4><i className="fas fa-recycle me-2"></i>Lixeira (Últimos 7 dias)</h4>
-                    <input
-                        type="text"
-                        placeholder="Filtrar na lixeira..."
-                        className="search-input"
-                        value={recycleBinSearch}
-                        onChange={(e) => setRecycleBinSearch(e.target.value)}
-                    />
+                    <h4><i className="fas fa-trash-alt me-2"></i>Lixeira</h4>
+                    <div className="recycle-bin-controls">
+                        <input
+                            type="text"
+                            placeholder="Filtrar na lixeira..."
+                            className="search-input"
+                            value={recycleBinSearch}
+                            onChange={(e) => setRecycleBinSearch(e.target.value)}
+                        />
+                        <button onClick={() => setShowAll(!showAll)} className="btn btn-sm btn-outline-secondary">
+                            {showAll ? 'Mostrar últimos 7 dias' : 'Mostrar Todos'}
+                        </button>
+                    </div>
                 </div>
                 {filteredMembers.length > 0 ? (
                     <ul className="member-list">
@@ -484,14 +511,16 @@ const ADExplorerPage = () => {
     }, []);
 
     const getIcon = (type, isDeleted = false) => {
-        if (isDeleted) return <i className="fas fa-trash-restore me-2"></i>;
-        switch (type) {
-            case 'ou': return <i className="fas fa-folder me-2"></i>;
-            case 'user': return <i className="fas fa-user me-2"></i>;
-            case 'group': return <i className="fas fa-users me-2"></i>;
-            case 'computer': return <i className="fas fa-desktop me-2"></i>;
-            default: return <i className="fas fa-file me-2"></i>;
-        }
+        const iconClasses = {
+            ou: "fas fa-folder",
+            user: "fas fa-user",
+            group: "fas fa-users",
+            computer: "fas fa-desktop",
+            default: "fas fa-file"
+        };
+        const iconClass = iconClasses[type] || iconClasses.default;
+        const finalClass = `me-2 ${iconClass} ${isDeleted ? 'icon-deleted' : ''}`;
+        return <i className={finalClass}></i>;
     };
 
     return (

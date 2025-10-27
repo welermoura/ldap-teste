@@ -49,7 +49,7 @@
 .member-ou-path {
     margin-left: 8px;
     font-size: 0.8em;
-    color: #6c757d; /* Cinza secundário do Bootstrap */
+    color: #6c757d;
 }
 
 .node-label {
@@ -59,7 +59,7 @@
     transition: background-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
     display: flex;
     align-items: center;
-    margin-bottom: 4px; /* Aumenta o espaçamento vertical */
+    margin-bottom: 4px;
 }
 
 .node-label:hover {
@@ -80,14 +80,14 @@
 
 .node-label i, .member-item i {
     margin-right: 12px;
-    color: #ffc107; /* Amarelo Bootstrap */
-    font-size: 1.1em; /* Ligeiramente maior para melhor visibilidade */
+    color: #ffc107;
+    font-size: 1.1em;
 }
 
 .member-list {
     list-style-type: none;
     padding: 0;
-    max-height: calc(100vh - 250px); /* Ajuste a altura conforme necessário */
+    max-height: calc(100vh - 250px);
     overflow-y: auto;
 }
 
@@ -97,7 +97,7 @@
     padding: 10px;
     border-radius: 6px;
     transition: background-color 0.2s, color 0.2s, transform 0.2s, box-shadow 0.2s;
-    margin-bottom: 5px; /* Espaçamento entre itens */
+    margin-bottom: 5px;
 }
 
 .member-item:hover {
@@ -117,20 +117,19 @@
 }
 
 .drop-target-highlight > .node-label {
-    background-color: #007bff; /* Azul primário Bootstrap */
+    background-color: #007bff;
     color: white;
     border: 1px solid #0056b3;
 }
 .drop-target-highlight > .node-label i {
-    color: white; /* Garante que o ícone também fique branco */
+    color: white;
 }
 
 
 .member-item:not(.non-draggable) {
-    cursor: move; /* Cursor de movimento para itens arrastáveis */
+    cursor: move;
 }
 
-/* Estilos para o Modal de Confirmação */
 .modal-backdrop {
     position: fixed;
     top: 0;
@@ -201,12 +200,11 @@
     margin: 0.25rem;
 }
 
-/* Estilos para o container da busca, agora dentro do tree-panel */
 .search-container {
     padding: 10px;
     background-color: var(--glass-background);
     border-bottom: 1px solid var(--glass-border-color);
-    position: sticky; /* Faz a barra ficar fixa no topo do painel */
+    position: sticky;
     top: 0;
     z-index: 10;
 }
@@ -214,7 +212,7 @@
 .search-form {
     display: flex;
     align-items: center;
-    gap: 5px; /* Reduz o espaçamento */
+    gap: 5px;
 }
 
 .search-input {
@@ -232,7 +230,7 @@
 }
 
 .search-button, .clear-button {
-    padding: 8px 12px; /* Ajuste no padding para ícones */
+    padding: 8px 12px;
     border: 1px solid transparent;
     border-radius: 0.25rem;
     cursor: pointer;
@@ -252,10 +250,9 @@
     cursor: not-allowed;
 }
 
-/* Estilos para o Menu de Contexto */
 .context-menu {
-    position: fixed !important; /* Força o posicionamento fixo */
-    z-index: 9999; /* Garante que fique acima de tudo */
+    position: fixed !important;
+    z-index: 9999;
     width: 200px;
     background-color: var(--glass-background);
     border: 1px solid var(--glass-border-color);
@@ -292,7 +289,7 @@
 }
 
 .context-menu ul li.separator:hover {
-    background-color: var(--glass-border-color); /* Impede a mudança de cor no hover */
+    background-color: var(--glass-border-color);
 }
 
 .content-header-with-search {
@@ -308,8 +305,9 @@
     margin: 0;
 }
 
-.content-header-with-search .search-input {
-    max-width: 300px; /* Ajuste a largura conforme necessário */
+.content-header-with-search .recycle-bin-controls {
+    display: flex;
+    gap: 10px;
 }
 
 .recycle-bin-item {
@@ -329,8 +327,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    justify-content: flex-start; /* Garante o alinhamento à esquerda */
+    justify-content: flex-start;
     text-align: left;
+    width: 100%;
 }
 
 .recycle-bin-item-row1 .member-name {
@@ -350,48 +349,12 @@
 }
 
 .recycle-bin-item-row2 {
-    padding-left: 34px; /* Alinha com o texto da primeira linha (ícone + gap) */
+    padding-left: 34px;
     font-size: 0.9em;
     color: var(--text-color-muted);
     text-align: left;
 }
 
-.recycle-bin-item {
-    display: flex;
-    flex-direction: column;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-color);
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.recycle-bin-item:hover {
-    background-color: var(--hover-background);
-}
-
-.recycle-bin-item-row1 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.recycle-bin-item-row1 .member-name {
-    font-weight: 500;
-}
-
-.recycle-bin-item-row1 .member-title {
-    color: var(--text-color-muted);
-    font-style: italic;
-}
-
-.recycle-bin-item-row1 .member-date {
-    margin-left: auto;
-    font-size: 0.9em;
-    color: var(--text-color-muted);
-}
-
-.recycle-bin-item-row2 {
-    padding-left: 34px; /* Alinha com o texto da primeira linha (ícone + gap) */
-    font-size: 0.9em;
-    color: var(--text-color-muted);
+.icon-deleted {
+    color: var(--text-color-muted) !important;
 }

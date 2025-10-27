@@ -45,14 +45,12 @@ const TreeNode = ({ node, onNodeClick, onMoveObject, onContextMenu }) => {
         }
     };
 
-    const getIcon = (type) => {
-        switch (type) {
-            case 'ou': return <i className="fas fa-folder"></i>;
-            case 'user': return <i className="fas fa-user"></i>;
-            case 'group': return <i className="fas fa-users"></i>;
-            case 'computer': return <i className="fas fa-desktop"></i>;
-            default: return <i className="fas fa-file"></i>;
+    const getIcon = (node) => {
+        if (node.icon) {
+            return <i className={node.icon}></i>;
         }
+        // O tipo 'ou' é implícito para todos os nós da árvore, então o ícone padrão é a pasta
+        return <i className="fas fa-folder"></i>;
     };
 
     // Adiciona a classe 'selected' se o nó estiver selecionado
@@ -65,7 +63,7 @@ const TreeNode = ({ node, onNodeClick, onMoveObject, onContextMenu }) => {
                 className={`node-label ${isSelected ? 'selected' : ''}`}
                 onContextMenu={onContextMenu ? (e) => onContextMenu(e, node) : null}
             >
-                {getIcon('ou')} {node.text}
+                {getIcon(node)} {node.text}
             </div>
             {isOpen && (
                 <div className="node-children">
