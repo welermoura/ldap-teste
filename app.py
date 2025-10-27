@@ -1483,9 +1483,12 @@ def api_recycle_bin():
         domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
         deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
 
-        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
-                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass'],
+        # Usando um filtro mais genérico para garantir que todos os objetos sejam retornados
+        conn.search(deleted_objects_container, '(objectClass=*)', SUBTREE,
+                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'isDeleted'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        logging.info(f"Busca na lixeira encontrou {len(conn.entries)} objetos.")
 
         items = []
         for entry in conn.entries:
@@ -1525,7 +1528,7 @@ def api_get_ous():
                 'text': 'Lixeira',
                 'dn': 'recycle_bin',  # Identificador especial para o frontend
                 'nodes': [],
-                'icon': 'fas fa-trash-alt' # Ícone para o frontend
+                'icon': 'fas fa-recycle' # Ícone atualizado para o frontend
             }
             ous.insert(0, recycle_bin_node)
 
