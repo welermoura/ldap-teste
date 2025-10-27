@@ -95,6 +95,7 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
 };
 
 const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu }) => {
+    const [recycleBinSearch, setRecycleBinSearch] = useState('');
     const hasMembers = members && members.length > 0;
     const isRecycleBin = selectedNode && selectedNode.dn === 'recycle_bin';
 
@@ -108,12 +109,27 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
     }
 
     if (isRecycleBin) {
+        const filteredMembers = members.filter(member =>
+            member.name.toLowerCase().includes(recycleBinSearch.toLowerCase()) ||
+            member.title.toLowerCase().includes(recycleBinSearch.toLowerCase()) ||
+            member.originalOU.toLowerCase().includes(recycleBinSearch.toLowerCase())
+        );
+
         return (
             <div className="content-panel">
-                <h4 className="content-header"><i className="fas fa-recycle me-2"></i>Lixeira</h4>
-                {hasMembers ? (
+                <div className="content-header-with-search">
+                    <h4><i className="fas fa-recycle me-2"></i>Lixeira (Últimos 7 dias)</h4>
+                    <input
+                        type="text"
+                        placeholder="Filtrar na lixeira..."
+                        className="search-input"
+                        value={recycleBinSearch}
+                        onChange={(e) => setRecycleBinSearch(e.target.value)}
+                    />
+                </div>
+                {filteredMembers.length > 0 ? (
                     <ul className="member-list">
-                        {members.map(member => (
+                        {filteredMembers.map(member => (
                             <li key={member.dn} className="member-item recycle-bin-item" onContextMenu={(e) => onContextMenu(e, member)}>
                                 <div className="recycle-bin-item-row1">
                                     {getIcon(member.type, true)}
@@ -128,7 +144,7 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
                         ))}
                     </ul>
                 ) : (
-                    <div className="content-placeholder">A lixeira está vazia.</div>
+                    <div className="content-placeholder">Nenhum item encontrado na lixeira para o filtro atual.</div>
                 )}
             </div>
         );
