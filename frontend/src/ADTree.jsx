@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
-import { DndProvider, useDrag } from 'react-dnd'; // useDrop removido
+import { DndProvider, useDrag } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { ItemTypes } from './dndTypes'; // Importar de arquivo separado
+import { ItemTypes } from './dndTypes';
 import EditUserModal from './EditUserModal';
 import DisableTempModal from './DisableTempModal';
 import ScheduleAbsenceModal from './ScheduleAbsenceModal';
 import MoveModal from './MoveModal';
-import NotificationModal from './NotificationModal'; // Importar o modal de notificação
+import NotificationModal from './NotificationModal';
 import TreeNode from './TreeNode';
 import './ADTree.css';
 
-// Componente para um item arrastável no painel de conteúdo
 const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     const [{ isDragging }, drag] = useDrag(() => ({
         type: ItemTypes.AD_OBJECT,
@@ -20,16 +19,21 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
         collect: (monitor) => ({
             isDragging: !!monitor.isDragging(),
         }),
+        // Itens da lixeira não podem ser arrastados
+        canDrag: member.status !== 'Excluído',
     }));
 
     return (
         <li
-            ref={drag}
+            ref={member.status !== 'Excluído' ? drag : null}
             className="member-item"
-            style={{ opacity: isDragging ? 0.5 : 1 }}
+            style={{
+                opacity: isDragging ? 0.5 : 1,
+                cursor: member.status === 'Excluído' ? 'default' : 'move'
+            }}
             onContextMenu={(e) => onContextMenu(e, member)}
         >
-            {getIcon(member.type)}
+            {getIcon(member.type, member.status === 'Excluído')}
             <div className="member-info">
                 <span className="member-name">{member.name}</span>
                 {member.ou_path && <span className="member-ou-path">{member.ou_path}</span>}
@@ -38,18 +42,31 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     );
 };
 
-// Componente para o Menu de Contexto (Reconstruído)
-const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence, onMove }) => {
+const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onToggleStatus, onResetPassword, onDelete, onDisableTemp, onScheduleAbsence, onMove, onRestore }) => {
     if (!show || !targetNode) return null;
 
     const style = { top: y, left: x };
     const isUser = targetNode.type === 'user';
     const isComputer = targetNode.type === 'computer';
+    const isDeleted = targetNode.status === 'Excluído';
 
     const renderMenuItem = (key, icon, text, action, condition) => {
         if (!condition) return null;
         return <li key={key} onClick={() => { action(targetNode); onClose(); }}><i className={`fas ${icon} me-2`}></i>{text}</li>;
     };
+
+    // Ação específica para a lixeira
+    if (isDeleted) {
+        return createPortal(
+            <div className="context-menu" style={style} onMouseLeave={onClose}>
+                <ul>
+                    {renderMenuItem('restore', 'fa-undo', 'Restaurar', onRestore, true)}
+                </ul>
+            </div>,
+            document.body
+        );
+    }
+
 
     const userActions = [
         renderMenuItem('move', 'fa-arrows-alt', 'Mover', onMove, permissions.can_move_user),
@@ -65,7 +82,6 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
         renderMenuItem('delete_computer', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user),
     ];
 
-    // Filtra ações nulas para a linha separadora
     const visibleUserActions = userActions.filter(Boolean);
 
     return createPortal(
@@ -74,7 +90,6 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
                 {isUser && visibleUserActions}
                 {isComputer && computerActions}
 
-                {/* Separador e Excluir para Usuários */}
                 {isUser && permissions.can_delete_user && visibleUserActions.length > 0 && <li className="separator"></li>}
                 {isUser && renderMenuItem('delete_user', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user)}
             </ul>
@@ -83,41 +98,41 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
     );
 };
 
-// Painel para exibir o conteúdo da OU selecionada ou os resultados da busca
 const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearchMode, onContextMenu }) => {
     const hasMembers = members && members.length > 0;
+    const isRecycleBin = selectedNode && selectedNode.dn === 'recycle_bin';
 
-    // Mensagem para quando a busca não retorna resultados
     if (isSearchMode && !hasMembers) {
         return (
             <div className="content-panel">
                 <h4 className="content-header">Resultados da Busca</h4>
-                <div className="content-placeholder">
-                    Nenhum usuário ou computador encontrado.
-                </div>
+                <div className="content-placeholder">Nenhum usuário ou computador encontrado.</div>
             </div>
         );
     }
 
-    // Mensagem para quando uma OU é selecionada mas não tem conteúdo
+    if (isRecycleBin && !hasMembers) {
+        return (
+            <div className="content-panel">
+                <h4 className="content-header">Lixeira</h4>
+                <div className="content-placeholder">A lixeira está vazia.</div>
+            </div>
+        );
+    }
+
     if (!isSearchMode && selectedNode && !hasMembers) {
         return (
             <div className="content-panel">
                 <h4 className="content-header">Conteúdo de: {selectedNode.text || selectedNode.name}</h4>
-                <div className="content-placeholder">
-                    Esta Unidade Organizacional está vazia.
-                </div>
+                <div className="content-placeholder">Esta Unidade Organizacional está vazia.</div>
             </div>
         );
     }
 
-    // Mensagem inicial antes de qualquer seleção ou busca
     if (!isSearchMode && !selectedNode) {
         return (
             <div className="content-panel">
-                <div className="content-placeholder">
-                    Selecione uma Unidade Organizacional na árvore para ver seu conteúdo.
-                </div>
+                <div className="content-placeholder">Selecione uma Unidade Organizacional na árvore para ver seu conteúdo.</div>
             </div>
         );
     }
@@ -129,12 +144,10 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
             <h4 className="content-header">{headerText}</h4>
             <ul className="member-list">
                 {members.map(member => {
-                    // Na busca, todos os itens são arrastáveis (se forem user/computer)
                     if (isSearchMode && (member.type === 'user' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     }
-                    // Comportamento normal para visualização de OU
-                    if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer')) {
+                    if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer' || member.status === 'Excluído')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     } else if (!isSearchMode && member.type === 'ou') {
                         return (
@@ -157,7 +170,6 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
     );
 };
 
-// Componente para o Modal de Confirmação
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
     if (!isOpen) return null;
 
@@ -168,9 +180,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
                     <h5 className="modal-title">{title}</h5>
                     <button type="button" className="btn-close" onClick={onClose}></button>
                 </div>
-                <div className="modal-body">
-                    {children}
-                </div>
+                <div className="modal-body">{children}</div>
                 <div className="modal-footer">
                     <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
                     <button type="button" className="btn btn-primary" onClick={onConfirm}>Confirmar</button>
@@ -180,15 +190,13 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
     );
 };
 
-
-// Componente principal da página
 const ADExplorerPage = () => {
     const [treeData, setTreeData] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [members, setMembers] = useState([]);
-    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false); // Renomeado
+    const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
     const [moveDetails, setMoveDetails] = useState(null);
-    const [confirmationAction, setConfirmationAction] = useState({ isOpen: false }); // Novo estado
+    const [confirmationAction, setConfirmationAction] = useState({ isOpen: false });
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearchLoading, setIsSearchLoading] = useState(false);
@@ -199,7 +207,7 @@ const ADExplorerPage = () => {
     const [userPermissions, setUserPermissions] = useState({});
     const [isDisableTempModalOpen, setIsDisableTempModalOpen] = useState(false);
     const [isScheduleAbsenceModalOpen, setIsScheduleAbsenceModalOpen] = useState(false);
-    const [actionUser, setActionUser] = useState(null); // Usuário para modais de ação
+    const [actionUser, setActionUser] = useState(null);
     const [isMoveModalOpenFromContext, setIsMoveModalOpenFromContext] = useState(false);
     const [objectToMove, setObjectToMove] = useState(null);
     const [notification, setNotification] = useState({ isOpen: false, title: '', message: '' });
@@ -210,7 +218,23 @@ const ADExplorerPage = () => {
             .catch(error => console.error("Erro ao buscar permissões:", error));
     }, []);
 
-    // Handlers para as ações do menu de contexto
+    const handleRestore = (node) => {
+        setConfirmationAction({
+            isOpen: true,
+            title: 'Restaurar Objeto',
+            message: `Tem certeza que deseja restaurar o objeto "${node.name}"?`,
+            onConfirm: () => {
+                axios.post('/api/restore_object', { dn: node.dn })
+                    .then(response => {
+                        setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
+                        setMembers(prev => prev.filter(m => m.dn !== node.dn));
+                    })
+                    .catch(error => setNotification({ isOpen: true, title: 'Erro', message: error.response?.data?.error || 'Erro desconhecido' }))
+                    .finally(() => setConfirmationAction({ isOpen: false }));
+            }
+        });
+    };
+
     const handleEdit = (node) => {
         if (node.type === 'user' && node.sam) {
             setEditingUser(node.sam);
@@ -228,7 +252,6 @@ const ADExplorerPage = () => {
                 axios.post('/api/toggle_object_status', { dn: node.dn, sam: node.sam })
                     .then(response => {
                         setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
-                        // TODO: Atualizar o estado local do nó para refletir a mudança
                     })
                     .catch(error => setNotification({ isOpen: true, title: 'Erro', message: error.response?.data?.error || 'Erro desconhecido' }))
                     .finally(() => setConfirmationAction({ isOpen: false }));
@@ -261,7 +284,6 @@ const ADExplorerPage = () => {
                 axios.delete('/api/delete_object', { data: { dn: node.dn, name: node.name } })
                     .then(response => {
                         setNotification({ isOpen: true, title: 'Sucesso', message: response.data.message });
-                        // Remover o objeto da UI
                         setMembers(prev => prev.filter(m => m.dn !== node.dn));
                         setSearchResults(prev => prev.filter(r => r.dn !== node.dn));
                     })
@@ -292,6 +314,7 @@ const ADExplorerPage = () => {
 
     const handleContextMenu = (e, node) => {
         e.preventDefault();
+        e.stopPropagation();
         setContextMenu({
             show: true,
             x: e.clientX,
@@ -300,10 +323,7 @@ const ADExplorerPage = () => {
         });
     };
 
-    // Função para simular o clique em um nó da árvore (para o duplo clique)
     const handleOuDoubleClick = (ouMember) => {
-        // Encontra o nó correspondente nos dados da árvore para obter o estado completo
-        // Esta é uma busca simples, pode ser otimizada se a árvore for muito grande
         let targetNode = null;
         const findNodeRecursive = (nodes, dn) => {
             for (const node of nodes) {
@@ -311,20 +331,15 @@ const ADExplorerPage = () => {
                     targetNode = node;
                     return;
                 }
-                if (node.nodes) {
-                    findNodeRecursive(node.nodes, dn);
-                }
+                if (node.nodes) findNodeRecursive(node.nodes, dn);
                 if (targetNode) return;
             }
         };
         findNodeRecursive(treeData, ouMember.dn);
 
-        if (targetNode) {
-            handleNodeClick(targetNode, true);
-        }
+        if (targetNode) handleNodeClick(targetNode, true);
     };
 
-    // Função recursiva para encontrar e atualizar um nó na árvore
     const findAndUpdateNode = useCallback((nodes, dn, updateCallback) => {
         return nodes.map(node => {
             if (node.dn === dn) {
@@ -339,18 +354,22 @@ const ADExplorerPage = () => {
 
     const handleNodeClick = useCallback((node, isOpen) => {
         setSelectedNode(node);
-        // Busca os membros do nó clicado (OUs e outros objetos)
-        axios.get(`/api/ou_members/${encodeURIComponent(node.dn)}`)
+        setSearchPerformed(false);
+        setSearchQuery('');
+
+        const apiUrl = node.dn === 'recycle_bin'
+            ? '/api/recycle_bin'
+            : `/api/ou_members/${encodeURIComponent(node.dn)}`;
+
+        axios.get(apiUrl)
             .then(response => {
-                console.log("Dados recebidos da API:", response.data); // Log de Depuração
                 setMembers(response.data);
-                // Se o nó foi aberto e ainda não tem filhos OUs carregados, atualiza a árvore
-                if (isOpen && (!node.nodes || node.nodes.length === 0)) {
+                if (isOpen && node.dn !== 'recycle_bin' && (!node.nodes || node.nodes.length === 0)) {
                     const ouChildren = response.data.filter(m => m.type === 'ou');
                     setTreeData(prevTree => findAndUpdateNode(prevTree, node.dn, n => ({ ...n, nodes: ouChildren })));
                 }
             })
-            .catch(error => console.error(`Erro ao buscar membros para ${node.dn}:`, error));
+            .catch(error => console.error(`Erro ao buscar membros para ${node.text}:`, error));
     }, [findAndUpdateNode]);
 
     const handleMoveObject = useCallback((item, targetNode) => {
@@ -402,8 +421,8 @@ const ADExplorerPage = () => {
         }
         setIsSearchLoading(true);
         setSearchPerformed(true);
-        setSelectedNode(null); // Limpa a seleção da OU para focar nos resultados da busca
-        setMembers([]); // Limpa os membros da OU anterior
+        setSelectedNode(null);
+        setMembers([]);
         axios.get(`/api/search_ad?q=${encodeURIComponent(searchQuery)}`)
             .then(response => {
                 setSearchResults(response.data);
@@ -433,7 +452,8 @@ const ADExplorerPage = () => {
           .catch(error => console.error("Error fetching OUs:", error));
     }, []);
 
-    const getIcon = (type) => {
+    const getIcon = (type, isDeleted = false) => {
+        if (isDeleted) return <i className="fas fa-trash-restore"></i>;
         switch (type) {
             case 'ou': return <i className="fas fa-folder"></i>;
             case 'user': return <i className="fas fa-user"></i>;
@@ -445,7 +465,7 @@ const ADExplorerPage = () => {
 
     return (
         <DndProvider backend={HTML5Backend}>
-            <div className="ad-explorer-container">
+            <div className="ad-explorer-container" onClick={() => setContextMenu({ ...contextMenu, show: false })}>
                 <div className="panels-container">
                     <div className="tree-panel">
                         <div className="search-container">
@@ -480,7 +500,6 @@ const ADExplorerPage = () => {
                         onContextMenu={handleContextMenu}
                     />
                 </div>
-                {/* Modal de confirmação para a ação de MOVER */}
                 <ConfirmationModal
                     isOpen={isMoveModalOpen}
                     onClose={() => setIsMoveModalOpen(false)}
@@ -493,8 +512,6 @@ const ADExplorerPage = () => {
                         </p>
                     )}
                 </ConfirmationModal>
-
-                {/* Modal de confirmação GENÉRICO para outras ações */}
                 <ConfirmationModal
                     isOpen={confirmationAction.isOpen}
                     onClose={() => setConfirmationAction({ isOpen: false })}
@@ -503,7 +520,6 @@ const ADExplorerPage = () => {
                 >
                     <p>{confirmationAction.message}</p>
                 </ConfirmationModal>
-
                 <ContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
@@ -518,22 +534,11 @@ const ADExplorerPage = () => {
                     onDisableTemp={handleDisableTemp}
                     onScheduleAbsence={handleScheduleAbsence}
                     onMove={handleMove}
+                    onRestore={handleRestore}
                 />
-                <EditUserModal
-                    isOpen={isEditModalOpen}
-                    onClose={() => setIsEditModalOpen(false)}
-                    username={editingUser}
-                />
-                <DisableTempModal
-                    isOpen={isDisableTempModalOpen}
-                    onClose={() => setIsDisableTempModalOpen(false)}
-                    username={actionUser}
-                />
-                <ScheduleAbsenceModal
-                    isOpen={isScheduleAbsenceModalOpen}
-                    onClose={() => setIsScheduleAbsenceModalOpen(false)}
-                    username={actionUser}
-                />
+                <EditUserModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} username={editingUser} />
+                <DisableTempModal isOpen={isDisableTempModalOpen} onClose={() => setIsDisableTempModalOpen(false)} username={actionUser} />
+                <ScheduleAbsenceModal isOpen={isScheduleAbsenceModalOpen} onClose={() => setIsScheduleAbsenceModalOpen(false)} username={actionUser} />
                 <MoveModal
                     isOpen={isMoveModalOpenFromContext}
                     onClose={() => setIsMoveModalOpenFromContext(false)}
@@ -548,7 +553,6 @@ const ADExplorerPage = () => {
                         .then(response => {
                             if (response.data.success) {
                                 setNotification({ isOpen: true, title: 'Sucesso', message: 'Objeto movido com sucesso!' });
-                                // Remove o objeto da lista de membros atual para evitar dados obsoletos
                                 setMembers(prev => prev.filter(m => m.dn !== objectToMove.dn));
                                 setSearchResults(prev => prev.filter(r => r.dn !== objectToMove.dn));
                             } else {

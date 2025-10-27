@@ -1470,6 +1470,47 @@ def api_action_permissions():
         logging.error(f"Erro ao verificar permissões de API para o usuário '{session.get('user_display_name')}': {e}", exc_info=True)
         return jsonify({'error': 'Falha ao obter permissões.'}), 500
 
+@app.route('/api/recycle_bin')
+@require_auth
+def api_recycle_bin():
+    """Retorna os objetos da lixeira do AD."""
+    if not session.get('recycle_bin_enabled'):
+        return jsonify({'error': 'A lixeira não está habilitada.'}), 403
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
+        deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
+
+        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
+                    attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        items = []
+        for entry in conn.entries:
+            # Determina o tipo do objeto para o frontend
+            obj_class = entry.objectClass.values
+            obj_type = 'object' # Padrão
+            if 'user' in obj_class: obj_type = 'user'
+            if 'group' in obj_class: obj_type = 'group'
+            if 'computer' in obj_class: obj_type = 'computer'
+
+            items.append({
+                'dn': entry.distinguishedName.value,
+                'name': entry.cn.value,
+                'type': obj_type,
+                'status': 'Excluído'
+            })
+
+        # Ordena por nome
+        items.sort(key=lambda x: x['name'].lower())
+
+        return jsonify(items)
+    except Exception as e:
+        logging.error(f"Erro ao buscar itens da lixeira via API: {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar itens da lixeira.'}), 500
+
 @app.route('/api/ous')
 @require_auth
 def api_get_ous():
@@ -1477,6 +1518,17 @@ def api_get_ous():
     try:
         conn = get_read_connection()
         ous = get_all_ous(conn)
+
+        # Se a lixeira do AD estiver habilitada, adiciona um nó para ela na árvore
+        if session.get('recycle_bin_enabled'):
+            recycle_bin_node = {
+                'text': 'Lixeira',
+                'dn': 'recycle_bin',  # Identificador especial para o frontend
+                'nodes': [],
+                'icon': 'fas fa-trash-alt' # Ícone para o frontend
+            }
+            ous.insert(0, recycle_bin_node)
+
         return jsonify(ous)
     except Exception as e:
         logging.error(f"Erro ao buscar OUs via API: {e}", exc_info=True)
@@ -1629,41 +1681,6 @@ def restore_object():
         logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
 
-@app.route('/recycle_bin')
-@require_auth
-def recycle_bin():
-    """Exibe a lixeira do Active Directory, se habilitada."""
-    try:
-        conn = get_read_connection()
-
-        if not is_recycle_bin_enabled(conn):
-            flash("A lixeira do Active Directory não está habilitada.", "warning")
-            return render_template('recycle_bin.html', recycle_bin_enabled=False, deleted_objects=[])
-
-        config = load_config()
-        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
-        deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
-
-        # O controle LDAP_SERVER_SHOW_DELETED_OID é necessário para ver objetos excluídos
-        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
-                    attributes=['lastKnownParent', 'whenChanged', 'cn'],
-                    controls=[('1.2.840.113556.1.4.417', True, None)])
-
-        objects = []
-        for entry in conn.entries:
-            objects.append({
-                'cn': entry.cn.value,
-                'last_known_parent': get_ou_path(entry.lastKnownParent.value),
-                'when_changed': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M:%S'),
-                'dn': entry.entry_dn
-            })
-
-        return render_template('recycle_bin.html', recycle_bin_enabled=True, deleted_objects=objects)
-
-    except Exception as e:
-        flash(f"Erro ao acessar a lixeira: {e}", "error")
-        logging.error(f"Erro ao carregar a lixeira: {e}", exc_info=True)
-        return redirect(url_for('dashboard'))
 
 @app.route('/api/move_object', methods=['POST'])
 @require_auth
