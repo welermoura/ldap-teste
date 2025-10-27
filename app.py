@@ -196,7 +196,12 @@ def before_request_func():
         try:
             conn = get_read_connection()
             session['recycle_bin_enabled'] = is_recycle_bin_enabled(conn)
-        except Exception:
+            if session['recycle_bin_enabled']:
+                logging.info("Lixeira do AD está habilitada para esta sessão.")
+            else:
+                logging.info("Lixeira do AD não está habilitada para esta sessão.")
+        except Exception as e:
+            logging.error(f"Falha ao verificar o status da lixeira do AD: {e}")
             session['recycle_bin_enabled'] = False
 
 def is_authenticated():
@@ -815,6 +820,38 @@ def ad_tree():
 def ad_tree_assets(filename):
     """Serve os assets da aplicação React."""
     return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
+
+@app.route('/recycle_bin')
+@require_auth
+def recycle_bin():
+    if not session.get('recycle_bin_enabled'):
+        flash('A lixeira do Active Directory não está habilitada ou acessível.', 'warning')
+        return redirect(url_for('dashboard'))
+
+    items = []
+    try:
+        conn = get_read_connection()
+        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
+        deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
+
+        # Este controle é essencial para buscar objetos excluídos
+        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
+                    attributes=['lastKnownParent', 'cn', 'whenChanged'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        for entry in conn.entries:
+            items.append({
+                'dn': entry.distinguishedName.value,
+                'name': entry.cn.value,
+                'original_ou': get_ou_path(entry.lastKnownParent.value),
+                'deleted_date': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M')
+            })
+        items.sort(key=lambda x: x['name'].lower())
+    except Exception as e:
+        flash(f'Erro ao ler a lixeira: {e}', 'danger')
+        logging.error(f"Erro ao acessar a lixeira do AD: {e}", exc_info=True)
+
+    return render_template('recycle_bin.html', items=items)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
@@ -1599,56 +1636,6 @@ def api_ou_members(ou_dn):
         logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
         return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
 
-@app.route('/api/search_ad', methods=['GET'])
-@require_auth
-def api_search_ad():
-    """Busca por usuários e computadores no AD."""
-    query = request.args.get('q', '')
-    if not query or len(query) < 3:
-        return jsonify({'error': 'A busca deve ter no mínimo 3 caracteres.'}), 400
-
-    try:
-        conn = get_read_connection()
-        config = load_config()
-        search_base = config.get('AD_SEARCH_BASE')
-
-        # Escapa caracteres especiais para evitar injeção de filtro LDAP
-        safe_query = escape_filter_chars(query)
-
-        # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
-        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
-
-        attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
-
-        conn.search(search_base, search_filter, SUBTREE, attributes=attributes)
-
-        items = []
-        for entry in conn.entries:
-            obj_class = entry.objectClass.values
-            item = {'dn': entry.distinguishedName.value}
-
-            if 'computer' in obj_class:
-                item['type'] = 'computer'
-                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
-            elif 'user' in obj_class:
-                item['type'] = 'user'
-                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
-                item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
-            else:
-                continue
-
-            # Adiciona o caminho da OU ao resultado
-            item['ou_path'] = get_ou_path(entry.distinguishedName.value)
-            items.append(item)
-
-        # Ordena os resultados alfabeticamente pelo nome
-        items.sort(key=lambda x: x['name'].lower())
-
-        return jsonify(items)
-    except Exception as e:
-        logging.error(f"Erro na busca do AD com a query '{query}': {e}", exc_info=True)
-        return jsonify({'error': 'Falha ao realizar a busca no Active Directory.'}), 500
-
 @app.route('/api/restore_object', methods=['POST'])
 @require_auth
 def restore_object():
@@ -1698,6 +1685,56 @@ def restore_object():
     except Exception as e:
         logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
+
+@app.route('/api/search_ad', methods=['GET'])
+@require_auth
+def api_search_ad():
+    """Busca por usuários e computadores no AD."""
+    query = request.args.get('q', '')
+    if not query or len(query) < 3:
+        return jsonify({'error': 'A busca deve ter no mínimo 3 caracteres.'}), 400
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        # Escapa caracteres especiais para evitar injeção de filtro LDAP
+        safe_query = escape_filter_chars(query)
+
+        # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
+        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
+
+        attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
+
+        conn.search(search_base, search_filter, SUBTREE, attributes=attributes)
+
+        items = []
+        for entry in conn.entries:
+            obj_class = entry.objectClass.values
+            item = {'dn': entry.distinguishedName.value}
+
+            if 'computer' in obj_class:
+                item['type'] = 'computer'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+            elif 'user' in obj_class:
+                item['type'] = 'user'
+                item['name'] = entry.cn.value if 'cn' in entry else entry.name.value
+                item['sam'] = entry.sAMAccountName.value if 'sAMAccountName' in entry else ''
+            else:
+                continue
+
+            # Adiciona o caminho da OU ao resultado
+            item['ou_path'] = get_ou_path(entry.distinguishedName.value)
+            items.append(item)
+
+        # Ordena os resultados alfabeticamente pelo nome
+        items.sort(key=lambda x: x['name'].lower())
+
+        return jsonify(items)
+    except Exception as e:
+        logging.error(f"Erro na busca do AD com a query '{query}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao realizar a busca no Active Directory.'}), 500
 
 
 @app.route('/api/move_object', methods=['POST'])
