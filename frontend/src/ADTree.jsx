@@ -19,7 +19,6 @@ const DraggableItem = ({ member, getIcon, onContextMenu }) => {
         collect: (monitor) => ({
             isDragging: !!monitor.isDragging(),
         }),
-        // Itens da lixeira não podem ser arrastados
         canDrag: member.status !== 'Excluído',
     }));
 
@@ -55,7 +54,6 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
         return <li key={key} onClick={() => { action(targetNode); onClose(); }}><i className={`fas ${icon} me-2`}></i>{text}</li>;
     };
 
-    // Ação específica para a lixeira
     if (isDeleted) {
         return createPortal(
             <div className="context-menu" style={style} onMouseLeave={onClose}>
@@ -66,7 +64,6 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
             document.body
         );
     }
-
 
     const userActions = [
         renderMenuItem('move', 'fa-arrows-alt', 'Mover', onMove, permissions.can_move_user),
@@ -89,7 +86,6 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
             <ul>
                 {isUser && visibleUserActions}
                 {isComputer && computerActions}
-
                 {isUser && permissions.can_delete_user && visibleUserActions.length > 0 && <li className="separator"></li>}
                 {isUser && renderMenuItem('delete_user', 'fa-trash-alt', 'Excluir', onDelete, permissions.can_delete_user)}
             </ul>
@@ -111,11 +107,35 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
         );
     }
 
-    if (isRecycleBin && !hasMembers) {
+    // Tabela para a lixeira
+    if (isRecycleBin) {
         return (
             <div className="content-panel">
-                <h4 className="content-header">Lixeira</h4>
-                <div className="content-placeholder">A lixeira está vazia.</div>
+                <h4 className="content-header"><i className="fas fa-recycle me-2"></i>Lixeira</h4>
+                {hasMembers ? (
+                    <table className="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Cargo</th>
+                                <th>OU Original</th>
+                                <th>Data da Exclusão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {members.map(member => (
+                                <tr key={member.dn} onContextMenu={(e) => onContextMenu(e, member)}>
+                                    <td>{getIcon(member.type, true)} {member.name}</td>
+                                    <td>{member.title}</td>
+                                    <td>{member.originalOU}</td>
+                                    <td>{member.deletedDate}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <div className="content-placeholder">A lixeira está vazia.</div>
+                )}
             </div>
         );
     }
@@ -147,7 +167,7 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
                     if (isSearchMode && (member.type === 'user' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     }
-                    if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer' || member.status === 'Excluído')) {
+                    if (!isSearchMode && (member.type === 'user' || member.type === 'group' || member.type === 'computer')) {
                         return <DraggableItem key={member.dn} member={member} getIcon={getIcon} onContextMenu={onContextMenu} />;
                     } else if (!isSearchMode && member.type === 'ou') {
                         return (
@@ -169,6 +189,7 @@ const ContentPanel = ({ selectedNode, members, getIcon, onOuDoubleClick, isSearc
         </div>
     );
 };
+
 
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
     if (!isOpen) return null;
@@ -453,13 +474,13 @@ const ADExplorerPage = () => {
     }, []);
 
     const getIcon = (type, isDeleted = false) => {
-        if (isDeleted) return <i className="fas fa-trash-restore"></i>;
+        if (isDeleted) return <i className="fas fa-trash-restore me-2"></i>;
         switch (type) {
-            case 'ou': return <i className="fas fa-folder"></i>;
-            case 'user': return <i className="fas fa-user"></i>;
-            case 'group': return <i className="fas fa-users"></i>;
-            case 'computer': return <i className="fas fa-desktop"></i>;
-            default: return <i className="fas fa-file"></i>;
+            case 'ou': return <i className="fas fa-folder me-2"></i>;
+            case 'user': return <i className="fas fa-user me-2"></i>;
+            case 'group': return <i className="fas fa-users me-2"></i>;
+            case 'computer': return <i className="fas fa-desktop me-2"></i>;
+            default: return <i className="fas fa-file me-2"></i>;
         }
     };
 
