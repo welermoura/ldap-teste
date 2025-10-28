@@ -196,12 +196,7 @@ def before_request_func():
         try:
             conn = get_read_connection()
             session['recycle_bin_enabled'] = is_recycle_bin_enabled(conn)
-            if session['recycle_bin_enabled']:
-                logging.info("Lixeira do AD está habilitada para esta sessão.")
-            else:
-                logging.info("Lixeira do AD não está habilitada para esta sessão.")
-        except Exception as e:
-            logging.error(f"Falha ao verificar o status da lixeira do AD: {e}")
+        except Exception:
             session['recycle_bin_enabled'] = False
 
 def is_authenticated():
@@ -820,7 +815,6 @@ def ad_tree():
 def ad_tree_assets(filename):
     """Serve os assets da aplicação React."""
     return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
-
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
@@ -1504,8 +1498,7 @@ def api_recycle_bin():
             if not entry.cn.value or dn in processed_dns:
                 continue
 
-            original_cn = entry.cn.value
-            clean_name = re.split(r'\0A|\n', original_cn)[0].strip()
+            clean_name = re.sub(r'\s*DEL:[a-fA-F0-9-]+$', '', entry.cn.value)
 
             obj_class = entry.objectClass.values
             obj_type = 'object'
@@ -1606,59 +1599,6 @@ def api_ou_members(ou_dn):
         logging.error(f"Erro ao buscar membros da OU '{ou_dn}': {e}", exc_info=True)
         return jsonify({'error': f"Falha ao buscar membros da OU '{ou_dn}'."}), 500
 
-@app.route('/api/restore_object', methods=['POST'])
-@require_auth
-def restore_object():
-    """Restaura um objeto da lixeira do AD."""
-    if not session.get('recycle_bin_enabled'):
-        return jsonify({'error': 'A lixeira não está habilitada ou a sessão é inválida.'}), 403
-
-    data = request.get_json()
-    object_dn = data.get('dn')
-    if not object_dn:
-        return jsonify({'error': 'O DN do objeto é obrigatório.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-
-        # Busca o objeto para obter seu 'lastKnownParent' e o RDN
-        conn.search(object_dn, '(objectClass=*)', BASE,
-                    attributes=['lastKnownParent', 'cn'],
-                    controls=[('1.2.840.113556.1.4.417', True, None)])
-
-        if not conn.entries:
-            return jsonify({'error': 'Objeto não encontrado na lixeira.'}), 404
-
-        entry = conn.entries[0]
-        target_ou_dn = entry.lastKnownParent.value
-
-        # O CN de um objeto excluído contém um caractere de nova linha (\n), que pode
-        # ser representado como \0A em logs. Precisamos dividir por esse caractere
-        # para obter o nome original, removendo o sufixo "DEL:..." que o AD adiciona.
-        original_cn = entry.cn.value
-        clean_cn = original_cn.split('\n')[0]
-        new_rdn = f"CN={clean_cn}"
-
-        # Restaura o objeto (movendo-o para sua antiga OU)
-        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
-
-        if conn.result['description'] != 'success':
-            raise Exception(f"Erro do LDAP: {conn.result['message']}")
-
-        # Reativa a conta (remove o estado de desativado, se houver)
-        uac_entry = get_user_by_dn(conn, f"{new_rdn},{target_ou_dn}", attributes=['userAccountControl'])
-        if uac_entry and 'userAccountControl' in uac_entry:
-            uac = uac_entry.userAccountControl.value
-            if uac & 2: # Se estiver desativado
-                conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
-
-        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
-        return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
-
-    except Exception as e:
-        logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
-
 @app.route('/api/search_ad', methods=['GET'])
 @require_auth
 def api_search_ad():
@@ -1708,6 +1648,53 @@ def api_search_ad():
     except Exception as e:
         logging.error(f"Erro na busca do AD com a query '{query}': {e}", exc_info=True)
         return jsonify({'error': 'Falha ao realizar a busca no Active Directory.'}), 500
+
+@app.route('/api/restore_object', methods=['POST'])
+@require_auth
+def restore_object():
+    """Restaura um objeto da lixeira do AD."""
+    if not session.get('recycle_bin_enabled'):
+        return jsonify({'error': 'A lixeira não está habilitada ou a sessão é inválida.'}), 403
+
+    data = request.get_json()
+    object_dn = data.get('dn')
+    if not object_dn:
+        return jsonify({'error': 'O DN do objeto é obrigatório.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+
+        # Busca o objeto para obter seu 'lastKnownParent' e o RDN
+        conn.search(object_dn, '(objectClass=*)', BASE,
+                    attributes=['lastKnownParent', 'cn'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
+
+        if not conn.entries:
+            return jsonify({'error': 'Objeto não encontrado na lixeira.'}), 404
+
+        entry = conn.entries[0]
+        target_ou_dn = entry.lastKnownParent.value
+        new_rdn = f"CN={entry.cn.value}"
+
+        # Restaura o objeto (movendo-o para sua antiga OU)
+        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
+
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+
+        # Reativa a conta (remove o estado de desativado, se houver)
+        uac_entry = get_user_by_dn(conn, f"{new_rdn},{target_ou_dn}", attributes=['userAccountControl'])
+        if uac_entry and 'userAccountControl' in uac_entry:
+            uac = uac_entry.userAccountControl.value
+            if uac & 2: # Se estiver desativado
+                conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
+
+        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
+
+    except Exception as e:
+        logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
 
 
 @app.route('/api/move_object', methods=['POST'])
