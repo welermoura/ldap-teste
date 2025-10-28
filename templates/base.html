@@ -34,16 +34,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('ad_tree') }}"><i class="fas fa-sitemap me-2"></i>AD Explorer</a>
                     </li>
-                    {% if session.get('recycle_bin_enabled') %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownTools" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-tools me-2"></i>Ferramentas
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="navbarDropdownTools">
-                            <li><a class="dropdown-item" href="{{ url_for('recycle_bin') }}"><i class="fas fa-trash-alt me-2"></i>Lixeira</a></li>
-                        </ul>
-                    </li>
-                    {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto">
                      <li class="nav-item">

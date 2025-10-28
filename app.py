@@ -821,37 +821,6 @@ def ad_tree_assets(filename):
     """Serve os assets da aplicação React."""
     return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
 
-@app.route('/recycle_bin')
-@require_auth
-def recycle_bin():
-    if not session.get('recycle_bin_enabled'):
-        flash('A lixeira do Active Directory não está habilitada ou acessível.', 'warning')
-        return redirect(url_for('dashboard'))
-
-    items = []
-    try:
-        conn = get_read_connection()
-        domain_dn = conn.server.info.other.get('defaultNamingContext')[0]
-        deleted_objects_container = f"CN=Deleted Objects,{domain_dn}"
-
-        # Este controle é essencial para buscar objetos excluídos
-        conn.search(deleted_objects_container, '(isDeleted=TRUE)', SUBTREE,
-                    attributes=['lastKnownParent', 'cn', 'whenChanged'],
-                    controls=[('1.2.840.113556.1.4.417', True, None)])
-
-        for entry in conn.entries:
-            items.append({
-                'dn': entry.distinguishedName.value,
-                'name': entry.cn.value,
-                'original_ou': get_ou_path(entry.lastKnownParent.value),
-                'deleted_date': entry.whenChanged.value.strftime('%d/%m/%Y %H:%M')
-            })
-        items.sort(key=lambda x: x['name'].lower())
-    except Exception as e:
-        flash(f'Erro ao ler a lixeira: {e}', 'danger')
-        logging.error(f"Erro ao acessar a lixeira do AD: {e}", exc_info=True)
-
-    return render_template('recycle_bin.html', items=items)
 
 @app.route('/manage_users', methods=['GET', 'POST'])
 @require_auth
@@ -1663,19 +1632,15 @@ def restore_object():
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
 
-        # Divide o nome no caractere de nova linha para isolar o nome real
+        # O CN de um objeto excluído contém um caractere de nova linha (\n), que pode
+        # ser representado como \0A em logs. Precisamos dividir por esse caractere
+        # para obter o nome original, removendo o sufixo "DEL:..." que o AD adiciona.
         original_cn = entry.cn.value
-        clean_cn = re.split(r'\0A|\n', original_cn)[0].strip()
+        clean_cn = original_cn.split('\n')[0]
         new_rdn = f"CN={clean_cn}"
 
         # Restaura o objeto (movendo-o para sua antiga OU)
-        # O AD adiciona um caractere de nova linha (\n) ao CN de objetos excluídos.
-        # A operação modify_dn falha se esse caractere não for tratado, retornando NO_OBJECT.
-        # A busca funciona, mas a modificação não. A solução, conforme a memória do projeto,
-        # é remover ("strip") o caractere de nova linha do DN antes de passá-lo para modify_dn.
-        # Embora pareça que o DN ficaria incorreto, este é um workaround conhecido para essa peculiaridade do AD.
-        cleaned_object_dn = object_dn.replace('\n', '')
-        conn.modify_dn(cleaned_object_dn, new_rdn, new_superior=target_ou_dn)
+        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
 
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
