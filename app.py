@@ -1671,9 +1671,8 @@ def restore_object():
         # Restaura o objeto (movendo-o para sua antiga OU)
         # O AD adiciona um caractere de nova linha (\n) ao CN de objetos excluídos.
         # A operação modify_dn falha se esse caractere não for tratado, retornando NO_OBJECT.
-        # A busca funciona, mas a modificação não. A solução, conforme a memória do projeto,
-        # é remover ("strip") o caractere de nova linha do DN antes de passá-lo para modify_dn.
-        # Embora pareça que o DN ficaria incorreto, este é um workaround conhecido para essa peculiaridade do AD.
+        # A busca funciona, mas a modificação não. A solução é remover o caractere
+        # de nova linha do DN antes de passá-lo para modify_dn.
         cleaned_object_dn = object_dn.replace('\n', '')
         conn.modify_dn(cleaned_object_dn, new_rdn, new_superior=target_ou_dn)
 
