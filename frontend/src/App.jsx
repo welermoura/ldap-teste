@@ -1,5 +1,5 @@
 import React from 'react';
-import ADTree from './ADTree';
+import ADTree from './components/ADTree';
 
 function App() {
   return (

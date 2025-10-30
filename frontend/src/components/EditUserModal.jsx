@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import './EditUserModal.css';
+import '../styles/EditUserModal.css';
 
 const EditUserModal = ({ isOpen, onClose, username }) => {
     const [formData, setFormData] = useState({});
