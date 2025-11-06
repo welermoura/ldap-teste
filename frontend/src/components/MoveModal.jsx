@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import TreeNode from './TreeNode';
-import './MoveModal.css';
+import '../styles/MoveModal.css';
 
 const MoveModal = ({ isOpen, onClose, onConfirmMove, objectToMove }) => {
     const [treeData, setTreeData] = useState([]);

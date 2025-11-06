@@ -3,14 +3,14 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { DndProvider, useDrag } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { ItemTypes } from './dndTypes';
+import { ItemTypes } from '../dndTypes';
 import EditUserModal from './EditUserModal';
 import DisableTempModal from './DisableTempModal';
 import ScheduleAbsenceModal from './ScheduleAbsenceModal';
 import MoveModal from './MoveModal';
 import NotificationModal from './NotificationModal';
 import TreeNode from './TreeNode';
-import './ADTree.css';
+import '../styles/ADTree.css';
 
 const DraggableItem = ({ member, getIcon, onContextMenu }) => {
     const [{ isDragging }, drag] = useDrag(() => ({
