@@ -1186,6 +1186,135 @@ def api_user_groups(username):
         logging.error(f"Erro na API de grupos do usuário '{username}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/search_groups', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_search_groups():
+    query = request.args.get('q', '')
+    if not query or len(query) < 2:
+        return jsonify([])
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+        safe_query = escape_filter_chars(query)
+        search_filter = f"(&(objectClass=group)(cn=*{safe_query}*))"
+        conn.search(search_base, search_filter, attributes=['cn', 'description'])
+
+        groups = [{'cn': g.cn.value, 'description': g.description.value if 'description' in g else ''} for g in conn.entries]
+        return jsonify(groups)
+    except Exception as e:
+        logging.error(f"Erro na busca de grupos com a query '{query}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar grupos.'}), 500
+
+@app.route('/api/add_user_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups(user.distinguishedName.value, group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            logging.info(f"Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao adicionar usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao adicionar ao grupo: {e}'}), 500
+
+@app.route('/api/remove_user_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_user_from_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.remove_members_from_groups(user.distinguishedName.value, group.distinguishedName.value)
+        if conn.result['description'] == 'success' or 'no such value' in conn.result.get('message', '').lower():
+            logging.info(f"Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao remover usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao remover do grupo: {e}'}), 500
+
+@app.route('/api/add_user_to_group_temp', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group_temp():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+    days = data.get('days')
+
+    if not username or not group_name or not days:
+        return jsonify({'error': 'Todos os campos (usuário, grupo, dias) são obrigatórios.'}), 400
+
+    try:
+        days = int(days)
+        if days <= 0:
+            return jsonify({'error': 'O número de dias deve ser positivo.'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'O número de dias deve ser um inteiro válido.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups(user.distinguishedName.value, group.distinguishedName.value)
+
+        if conn.result['description'] == 'success':
+            schedules = load_group_schedules()
+            revert_date = (date.today() + timedelta(days=days)).isoformat()
+            schedule_entry = {
+                'user_sam': username,
+                'group_name': group_name,
+                'revert_action': 'remove',
+                'revert_date': revert_date
+            }
+            schedules.append(schedule_entry)
+            save_group_schedules(schedules)
+
+            logging.info(f"Usuário '{username}' adicionado temporariamente ao grupo '{group_name}' por '{session.get('user_display_name')}'. Remoção em {revert_date}.")
+            return jsonify({'success': True, 'message': f'Usuário adicionado por {days} dias.'})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao adicionar temporariamente usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha na adição temporária: {e}'}), 500
+
 @app.route('/api/user_details/<username>')
 @require_auth
 @require_api_permission(action='can_edit')
