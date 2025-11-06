@@ -1674,7 +1674,11 @@ def restore_object():
 
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
-        new_rdn = f"CN={entry.cn.value}"
+
+        # Limpa o CN removendo o sufixo '\nDEL:...' para criar um RDN válido.
+        # Ex: "John Doe\nDEL:guid..." se torna "John Doe".
+        clean_cn = entry.cn.value.split('\n')[0]
+        new_rdn = f"CN={clean_cn}"
 
         # Restaura o objeto (movendo-o para sua antiga OU)
         conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
