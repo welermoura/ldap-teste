@@ -227,7 +227,6 @@
                         </button>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item remove-group-btn" href="#" data-group-name="${group.cn}">Remover</a></li>
-                            <li><a class="dropdown-item temp-add-group-btn" href="#" data-group-name="${group.cn}" data-bs-toggle="modal" data-bs-target="#addTempGroupModal">Adicionar por tempo</a></li>
                         </ul>
                     </div>
                 `;
@@ -306,13 +305,21 @@
                 div.appendChild(br);
                 div.appendChild(small);
 
-                const button = document.createElement('button');
-                button.className = 'btn btn-sm btn-success add-group-action-btn';
-                button.textContent = 'Adicionar';
-                button.dataset.groupName = group.cn;
+                const actionContainer = document.createElement('div');
+                actionContainer.innerHTML = `
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Adicionar
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item add-group-action-btn" href="#" data-group-name="${group.cn}">Permanentemente</a></li>
+                            <li><a class="dropdown-item temp-add-group-btn" href="#" data-group-name="${group.cn}" data-bs-toggle="modal" data-bs-target="#addTempGroupModal">Por tempo</a></li>
+                        </ul>
+                    </div>
+                `;
 
                 listItem.appendChild(div);
-                listItem.appendChild(button);
+                listItem.appendChild(actionContainer);
                 list.appendChild(listItem);
             });
             groupSearchResultsContainer.appendChild(list);
@@ -321,8 +328,11 @@
         groupSearchInputModal.addEventListener('input', () => searchGroups(groupSearchInputModal.value));
 
         groupSearchResultsContainer.addEventListener('click', async function(e) {
-            if (e.target.classList.contains('add-group-action-btn')) {
-                const groupName = e.target.dataset.groupName;
+            e.preventDefault();
+            const target = e.target;
+
+            if (target.classList.contains('add-group-action-btn')) {
+                const groupName = target.dataset.groupName;
                 try {
                     const response = await fetch('/api/add_user_to_group', {
                         method: 'POST',
@@ -341,6 +351,10 @@
                     console.error('Erro ao adicionar grupo:', error);
                     alert('Falha na comunicação com o servidor.');
                 }
+            } else if (target.classList.contains('temp-add-group-btn')) {
+                // Prepara o modal de adição temporária, que já é aberto via atributos data-bs
+                const groupName = target.dataset.groupName;
+                document.getElementById('temp-group-name').textContent = groupName;
             }
         });
 
