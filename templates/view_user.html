@@ -130,16 +130,11 @@
                     </div>
                     {% if check_permission(action='can_manage_groups') %}
                     <div class="tab-pane fade" id="memberof" role="tabpanel" aria-labelledby="memberof-tab">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">Grupos</h5>
-                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
-                                <i class="fas fa-plus me-2"></i>Adicionar Grupo
-                            </button>
+                        <div class="d-flex justify-content-end mb-2">
+                            <input type="text" id="group-membership-search" class="form-control form-control-sm w-50" placeholder="Filtrar grupos...">
                         </div>
-                        <input type="text" id="group-membership-search" class="form-control form-control-sm mb-2" placeholder="Filtrar grupos atuais...">
-                        <div id="memberof-list-container" class="table-responsive" style="min-height: 200px; max-height: 500px; overflow-y: auto;">
-                            <!-- O conteúdo será carregado via JavaScript -->
-                        </div>
+                        <div id="memberof-list-container" class="table-responsive" style="min-height: 150px;">
+                            </div>
                     </div>
                     {% endif %}
                 </div>
@@ -209,27 +204,16 @@
             groups.forEach(group => {
                 const row = tbody.insertRow();
 
+                // Célula 1: Nome do Grupo (Link) - Criado de forma segura
                 const cell1 = row.insertCell();
                 const link = document.createElement('a');
                 link.href = `/view_group/${encodeURIComponent(group.cn)}`;
-                link.textContent = group.cn;
+                link.textContent = group.cn; // SEGURO: textContent previne injeção de HTML
                 cell1.appendChild(link);
 
+                // Célula 2: Descrição - Criado de forma segura
                 const cell2 = row.insertCell();
-                cell2.textContent = group.description || 'N/A';
-
-                const cell3 = row.insertCell();
-                cell3.className = 'text-end';
-                cell3.innerHTML = `
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Ações
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item remove-group-btn" href="#" data-group-name="${group.cn}">Remover</a></li>
-                        </ul>
-                    </div>
-                `;
+                cell2.textContent = group.description || 'N/A'; // SEGURO: textContent previne injeção de HTML
             });
             memberOfContainer.appendChild(table);
         }
@@ -261,159 +245,6 @@
                        (group.description && group.description.toLowerCase().includes(query));
             });
             renderGroups(filteredGroups);
-        });
-
-        // Lógica para o modal de Adicionar Grupo
-        const addGroupModal = document.getElementById('addGroupModal');
-        const groupSearchInputModal = document.getElementById('group-search-input');
-        const groupSearchResultsContainer = document.getElementById('group-search-results');
-
-        async function searchGroups(query) {
-            if (query.length < 2) {
-                groupSearchResultsContainer.innerHTML = '';
-                return;
-            }
-            try {
-                const response = await fetch(`/api/search_groups?q=${encodeURIComponent(query)}`);
-                const groups = await response.json();
-                renderSearchResults(groups);
-            } catch (error) {
-                console.error('Erro ao buscar grupos:', error);
-                groupSearchResultsContainer.innerHTML = '<div class="alert alert-danger">Erro ao buscar.</div>';
-            }
-        }
-
-        function renderSearchResults(groups) {
-            groupSearchResultsContainer.innerHTML = '';
-            if (groups.length === 0) {
-                groupSearchResultsContainer.innerHTML = '<p>Nenhum grupo encontrado.</p>';
-                return;
-            }
-            const list = document.createElement('ul');
-            list.className = 'list-group';
-            groups.forEach(group => {
-                const listItem = document.createElement('li');
-                listItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-
-                const div = document.createElement('div');
-                const strong = document.createElement('strong');
-                strong.textContent = group.cn;
-                const br = document.createElement('br');
-                const small = document.createElement('small');
-                small.textContent = group.description || 'Sem descrição';
-                div.appendChild(strong);
-                div.appendChild(br);
-                div.appendChild(small);
-
-                const actionContainer = document.createElement('div');
-                actionContainer.innerHTML = `
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            Adicionar
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item add-group-action-btn" href="#" data-group-name="${group.cn}">Permanentemente</a></li>
-                            <li><a class="dropdown-item temp-add-group-btn" href="#" data-group-name="${group.cn}" data-bs-toggle="modal" data-bs-target="#addTempGroupModal">Por tempo</a></li>
-                        </ul>
-                    </div>
-                `;
-
-                listItem.appendChild(div);
-                listItem.appendChild(actionContainer);
-                list.appendChild(listItem);
-            });
-            groupSearchResultsContainer.appendChild(list);
-        }
-
-        groupSearchInputModal.addEventListener('input', () => searchGroups(groupSearchInputModal.value));
-
-        groupSearchResultsContainer.addEventListener('click', async function(e) {
-            e.preventDefault();
-            const target = e.target;
-
-            if (target.classList.contains('add-group-action-btn')) {
-                const groupName = target.dataset.groupName;
-                try {
-                    const response = await fetch('/api/add_user_to_group', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ username, group_name: groupName })
-                    });
-                    const result = await response.json();
-                    if (result.success) {
-                        fetchUserGroups(); // Recarrega a lista
-                        var modal = bootstrap.Modal.getInstance(addGroupModal);
-                        modal.hide();
-                    } else {
-                        alert('Erro: ' + result.error);
-                    }
-                } catch (error) {
-                    console.error('Erro ao adicionar grupo:', error);
-                    alert('Falha na comunicação com o servidor.');
-                }
-            } else if (target.classList.contains('temp-add-group-btn')) {
-                // Prepara o modal de adição temporária, que já é aberto via atributos data-bs
-                const groupName = target.dataset.groupName;
-                document.getElementById('temp-group-name').textContent = groupName;
-            }
-        });
-
-        // Lógica para Remover e Adicionar Temporariamente
-        memberOfContainer.addEventListener('click', async function(e) {
-            e.preventDefault();
-            const target = e.target;
-
-            if (target.classList.contains('remove-group-btn')) {
-                const groupName = target.dataset.groupName;
-                if (confirm(`Tem certeza que deseja remover o usuário do grupo "${groupName}"?`)) {
-                    try {
-                        const response = await fetch('/api/remove_user_from_group', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({ username, group_name: groupName })
-                        });
-                        const result = await response.json();
-                        if (result.success) {
-                            fetchUserGroups(); // Recarrega a lista
-                        } else {
-                            alert('Erro: ' + result.error);
-                        }
-                    } catch (error) {
-                        alert('Falha na comunicação com o servidor.');
-                    }
-                }
-            }
-        });
-
-        const addTempGroupModal = document.getElementById('addTempGroupModal');
-        const confirmTempAddBtn = document.getElementById('confirm-temp-add-btn');
-        let tempGroupName = '';
-
-        addTempGroupModal.addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            tempGroupName = button.getAttribute('data-group-name');
-            document.getElementById('temp-group-name').textContent = tempGroupName;
-        });
-
-        confirmTempAddBtn.addEventListener('click', async function() {
-            const days = document.getElementById('temp-days-input').value;
-            try {
-                const response = await fetch('/api/add_user_to_group_temp', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ username, group_name: tempGroupName, days: parseInt(days) })
-                });
-                const result = await response.json();
-                if (result.success) {
-                    fetchUserGroups();
-                    var modal = bootstrap.Modal.getInstance(addTempGroupModal);
-                    modal.hide();
-                } else {
-                    alert('Erro: ' + result.error);
-                }
-            } catch (error) {
-                alert('Falha na comunicação com o servidor.');
-            }
         });
     });
 </script>
@@ -475,50 +306,5 @@
   </div>
 </div>
 {% endif %}
-
-<!-- Modal para Adicionar Grupo -->
-<div class="modal fade" id="addGroupModal" tabindex="-1" aria-labelledby="addGroupModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addGroupModalLabel">Adicionar Usuário ao Grupo</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="group-search-input" class="form-label">Buscar grupo por nome:</label>
-                    <input type="text" id="group-search-input" class="form-control" placeholder="Digite o nome do grupo...">
-                </div>
-                <div id="group-search-results" style="max-height: 300px; overflow-y: auto;"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para Adicionar Grupo Temporariamente -->
-<div class="modal fade" id="addTempGroupModal" tabindex="-1" aria-labelledby="addTempGroupModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addTempGroupModalLabel">Adicionar Membro Temporariamente</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p>Adicionar <strong class="text-white">{{ get_attr_value(user, 'displayName') }}</strong> ao grupo <strong id="temp-group-name" class="text-white"></strong> por:</p>
-                <div class="mb-3">
-                    <label for="temp-days-input" class="form-label">Número de dias:</label>
-                    <input type="number" id="temp-days-input" class="form-control" min="1" value="7">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" id="confirm-temp-add-btn" class="btn btn-primary">Confirmar</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 {% endblock %}
