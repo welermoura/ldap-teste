@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDrop } from 'react-dnd';
-import { ItemTypes } from './dndTypes'; // Importar de arquivo separado
+import { ItemTypes } from '../dndTypes'; // Importar de arquivo separado
 
 // O componente de nó da árvore, agora em seu próprio arquivo
 const TreeNode = ({ node, onNodeClick, onMoveObject, onContextMenu }) => {
