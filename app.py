@@ -205,8 +205,9 @@ def is_authenticated():
 def require_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'ad_user' not in session:
-            return redirect(url_for('login', next=request.url))
+        if not is_authenticated():
+            flash("Sua sessão expirou. Por favor, faça login novamente.", "error")
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -1663,58 +1664,37 @@ def restore_object():
     try:
         conn = get_service_account_connection()
 
-        # Busca o objeto na lixeira para obter lastKnownParent
-        conn.search(
-            search_base=object_dn,
-            search_filter='(objectClass=*)',
-            search_scope=BASE,
-            attributes=['lastKnownParent', 'cn'],
-            controls=[('1.2.840.113556.1.4.417', True, None)]
-        )
+        # Busca o objeto para obter seu 'lastKnownParent' e o RDN
+        conn.search(object_dn, '(objectClass=*)', BASE,
+                    attributes=['lastKnownParent', 'cn'],
+                    controls=[('1.2.840.113556.1.4.417', True, None)])
 
         if not conn.entries:
             return jsonify({'error': 'Objeto não encontrado na lixeira.'}), 404
 
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
-        new_rdn = f"CN={entry.cn.value}"  # Remove \0ADEL:<GUID>
+        new_rdn = f"CN={entry.cn.value}"
 
-        # Verifica se a OU original existe, senão usa uma OU fallback
-        if not ou_exists(conn, target_ou_dn):
-            logging.warning(f"OU original '{target_ou_dn}' não existe. Usando OU de recuperação.")
-            target_ou_dn = "OU=Recuperados,DC=grupocomolatti,DC=corp"
-
-        # Restaura com controle de restauração
-        conn.modify_dn(
-            object_dn,
-            new_rdn,
-            new_superior=target_ou_dn,
-            controls=[('1.2.840.113556.1.4.417', True, None)]
-        )
+        # Restaura o objeto (movendo-o para sua antiga OU)
+        conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
 
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        # Ajusta atributos pós-restauração (reativar conta se necessário)
-        final_dn = f"{new_rdn},{target_ou_dn}"
-        uac_entry = get_user_by_dn(conn, final_dn, attributes=['userAccountControl'])
+        # Reativa a conta (remove o estado de desativado, se houver)
+        uac_entry = get_user_by_dn(conn, f"{new_rdn},{target_ou_dn}", attributes=['userAccountControl'])
         if uac_entry and 'userAccountControl' in uac_entry:
             uac = uac_entry.userAccountControl.value
-            if uac & 2:  # Conta desativada
-                conn.modify(final_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
+            if uac & 2: # Se estiver desativado
+                conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
 
-        logging.info(f"Objeto '{object_dn}' restaurado para '{final_dn}' por '{session.get('user_display_name')}'.")
+        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
 
     except Exception as e:
         logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
-
-
-def ou_exists(conn, ou_dn):
-    """Verifica se a OU existe no AD."""
-    conn.search(search_base=ou_dn, search_filter='(objectClass=organizationalUnit)', search_scope=BASE)
-    return bool(conn.entries)
 
 
 @app.route('/api/move_object', methods=['POST'])
@@ -2621,162 +2601,6 @@ def export_ad_data():
         logging.error(f"Erro na exportação de dados: {e}", exc_info=True)
         flash("Erro ao gerar exportação. Verifique os logs.", "error")
         return redirect(url_for('dashboard'))
-
-# ==============================================================================
-# Novas Rotas de API para Gerenciamento de Grupos
-# ==============================================================================
-@app.route('/api/search_groups', methods=['GET'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_search_groups():
-    query = request.args.get('q', '').strip()
-    if len(query) < 2:
-        return jsonify([])
-
-    try:
-        conn = get_read_connection()
-        config = load_config()
-        search_base = config.get('AD_SEARCH_BASE')
-        safe_query = escape_filter_chars(query)
-        search_filter = f"(&(objectClass=group)(cn=*{safe_query}*))"
-        conn.search(search_base, search_filter, attributes=['cn', 'description'])
-
-        groups = [{
-            'cn': get_attr_value(g, 'cn'),
-            'description': get_attr_value(g, 'description')
-        } for g in conn.entries]
-
-        return jsonify(groups)
-    except Exception as e:
-        logging.error(f"Erro na API de busca de grupos com query '{query}': {e}", exc_info=True)
-        return jsonify({'error': 'Falha ao buscar grupos.'}), 500
-
-@app.route('/api/add_user_to_group', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_add_user_to_group():
-    data = request.get_json()
-    username = data.get('username')
-    group_name = data.get('group_name')
-
-    if not username or not group_name:
-        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        group = get_group_by_name(conn, group_name, ['distinguishedName'])
-
-        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
-        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
-
-        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
-        if conn.result['description'] == 'success':
-            logging.info(f"Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
-            return jsonify({'success': True})
-        else:
-            raise Exception(f"Erro do LDAP: {conn.result['message']}")
-    except Exception as e:
-        logging.error(f"Erro ao adicionar usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/remove_user_from_group', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_remove_user_from_group():
-    data = request.get_json()
-    username = data.get('username')
-    group_name = data.get('group_name')
-
-    if not username or not group_name:
-        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        group = get_group_by_name(conn, group_name, ['distinguishedName'])
-
-        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
-        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
-
-        conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
-        if conn.result['description'] == 'success':
-            logging.info(f"Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
-            return jsonify({'success': True})
-        else:
-            raise Exception(f"Erro do LDAP: {conn.result['message']}")
-    except Exception as e:
-        logging.error(f"Erro ao remover usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/schedule_group_membership', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_schedule_group_membership():
-    data = request.get_json()
-    username = data.get('username')
-    group_name = data.get('group_name')
-    start_date_str = data.get('start_date')
-    end_date_str = data.get('end_date')
-
-    if not all([username, group_name, start_date_str, end_date_str]):
-        return jsonify({'error': 'Usuário, grupo, data de início e data de fim são obrigatórios.'}), 400
-
-    try:
-        start_date = date.fromisoformat(start_date_str)
-        end_date = date.fromisoformat(end_date_str)
-        today = date.today()
-
-        if start_date < today:
-            return jsonify({'error': 'A data de início não pode ser no passado.'}), 400
-        if end_date <= start_date:
-            return jsonify({'error': 'A data de fim deve ser posterior à data de início.'}), 400
-
-        # Valida se usuário e grupo existem antes de agendar
-        conn = get_read_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        group = get_group_by_name(conn, group_name, ['distinguishedName'])
-        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
-        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
-
-        schedules = load_group_schedules()
-
-        # Agendamento para adicionar o usuário ao grupo
-        add_schedule = {
-            'user_sam': username,
-            'group_name': group_name,
-            'action': 'add',
-            'execution_date': start_date.isoformat()
-        }
-        schedules.append(add_schedule)
-
-        # Agendamento para remover o usuário do grupo
-        remove_schedule = {
-            'user_sam': username,
-            'group_name': group_name,
-            'action': 'remove',
-            'execution_date': end_date.isoformat()
-        }
-        schedules.append(remove_schedule)
-
-        save_group_schedules(schedules)
-
-        logging.info(
-            f"Acesso ao grupo '{group_name}' agendado para o usuário '{username}' por "
-            f"'{session.get('user_display_name')}'. Início em: {start_date_str}, Fim em: {end_date_str}."
-        )
-
-        return jsonify({
-            'success': True,
-            'message': f"Acesso ao grupo agendado de {start_date.strftime('%d/%m/%Y')} até {end_date.strftime('%d/%m/%Y')}."
-        })
-
-    except ValueError:
-        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
-    except Exception as e:
-        logging.error(f"Erro ao agendar acesso para '{username}' ao grupo '{group_name}': {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao agendar acesso ao grupo: {e}'}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
