@@ -55,14 +55,8 @@ const ContextMenu = ({ x, y, show, onClose, targetNode, permissions, onEdit, onT
     };
 
     if (isDeleted) {
-        return createPortal(
-            <div className="context-menu" style={style} onMouseLeave={onClose}>
-                <ul>
-                    {renderMenuItem('restore', 'fa-undo', 'Restaurar', onRestore, true)}
-                </ul>
-            </div>,
-            document.body
-        );
+        // A lixeira agora é somente leitura, então o menu de contexto fica vazio para itens excluídos.
+        return null;
     }
 
     const userActions = [

@@ -63,13 +63,9 @@
 }
 
 .node-label:hover {
-    background-color: var(--primary-color);
-    color: #fff;
+    outline: 1px solid var(--primary-color);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     transform: translateX(4px);
-}
-.node-label:hover i {
-    color: #fff;
 }
 
 .node-children {
@@ -101,15 +97,9 @@
 }
 
 .member-item:hover {
-    background-color: var(--primary-color);
-    color: #fff;
+    outline: 1px solid var(--primary-color);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     transform: translateX(4px);
-}
-
-.member-item:hover i,
-.member-item:hover .member-ou-path {
-    color: #fff;
 }
 
 .member-name {
