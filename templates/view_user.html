@@ -147,6 +147,34 @@
     </div>
 </div>
 
+<!-- Modal para Agendar Acesso a Grupo -->
+<div class="modal fade" id="scheduleGroupModal" tabindex="-1" aria-labelledby="scheduleGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="scheduleGroupModalLabel">Agendar Acesso ao Grupo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="schedule-group-name">
+                <p>Agendando acesso para o usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> ao grupo <strong id="schedule-group-name-display"></strong>.</p>
+                <div class="mb-3">
+                    <label for="start-date" class="form-label">Data de Início:</label>
+                    <input type="date" id="start-date" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label for="end-date" class="form-label">Data de Fim:</label>
+                    <input type="date" id="end-date" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirm-schedule-btn">Confirmar Agendamento</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal para Agendar Ausência -->
 <div class="modal fade" id="scheduleAbsenceModal" tabindex="-1" aria-labelledby="scheduleAbsenceModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -293,31 +321,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Ação: Adicionar usuário ao grupo (permanente ou temporário)
-        async function handleAddGroup(groupName, days = null) {
-            const isTemp = days && days > 0;
-            const url = isTemp ? '/api/add_user_to_group_temp' : '/api/add_user_to_group';
-            const body = { username, group_name: groupName };
-            if (isTemp) body.days = parseInt(days, 10);
-
+        // Ação: Adicionar usuário ao grupo (permanente)
+        async function handleAddGroup(groupName) {
             try {
-                const response = await fetch(url, {
+                const response = await fetch('/api/add_user_to_group', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({ username, group_name: groupName })
                 });
                 const result = await response.json();
                 if (!response.ok || result.error) throw new Error(result.error || 'Erro desconhecido');
-
-                const successMsg = isTemp
-                    ? `Usuário adicionado ao grupo "${groupName}" por ${days} dias.`
-                    : `Usuário adicionado ao grupo "${groupName}" com sucesso!`;
-                showAlert(successMsg, 'success');
-
+                showAlert(`Usuário adicionado ao grupo "${groupName}" com sucesso!`, 'success');
                 bootstrap.Modal.getInstance(document.getElementById('addGroupModal')).hide();
                 memberOfTab.dispatchEvent(new CustomEvent('shown.bs.tab', { detail: { force: true } }));
             } catch (error) {
                 showAlert(`Erro ao adicionar ao grupo: ${error.message}`, 'danger');
+            }
+        }
+
+        // Ação: Abrir o modal de agendamento
+        function openScheduleModal(groupName) {
+            document.getElementById('schedule-group-name').value = groupName;
+            document.getElementById('schedule-group-name-display').textContent = groupName;
+            const scheduleModal = new bootstrap.Modal(document.getElementById('scheduleGroupModal'));
+            scheduleModal.show();
+        }
+
+        // Ação: Agendar acesso ao grupo
+        async function handleScheduleGroupAccess() {
+            const groupName = document.getElementById('schedule-group-name').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+
+            if (!startDate || !endDate) {
+                showAlert('As datas de início e fim são obrigatórias.', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/schedule_group_membership', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ username, group_name: groupName, start_date: startDate, end_date: endDate })
+                });
+                const result = await response.json();
+                if (!response.ok || result.error) throw new Error(result.error || 'Erro desconhecido');
+
+                showAlert(result.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('scheduleGroupModal')).hide();
+                bootstrap.Modal.getInstance(document.getElementById('addGroupModal')).hide();
+            } catch (error) {
+                showAlert(`Erro ao agendar acesso: ${error.message}`, 'danger');
             }
         }
 
@@ -362,24 +416,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <small class="text-muted">${escapeHtml(group.description) || 'Sem descrição'}</small>
                     </div>
                     <div>
-                        <button class="btn btn-primary btn-sm me-2">Adicionar</button>
-                        <button class="btn btn-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            Temp
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" data-days="1">Por 1 dia</a></li>
-                            <li><a class="dropdown-item" href="#" data-days="7">Por 7 dias</a></li>
-                            <li><a class="dropdown-item" href="#" data-days="30">Por 30 dias</a></li>
-                        </ul>
+                        <button class="btn btn-primary btn-sm me-2" data-action="add">Adicionar</button>
+                        <button class="btn btn-info btn-sm" data-action="schedule">Agendar Acesso</button>
                     </div>
                 `;
-                item.querySelector('.btn-primary').addEventListener('click', () => handleAddGroup(group.cn));
-                item.querySelectorAll('.dropdown-item').forEach(link => {
-                    link.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        handleAddGroup(group.cn, e.target.dataset.days);
-                    });
-                });
+                item.querySelector('[data-action="add"]').addEventListener('click', () => handleAddGroup(group.cn));
+                item.querySelector('[data-action="schedule"]').addEventListener('click', () => openScheduleModal(group.cn));
                 newGroupResultsContainer.appendChild(item);
             });
         }
@@ -405,6 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
             );
             renderUserGroups(filtered);
         });
+        document.getElementById('confirm-schedule-btn').addEventListener('click', handleScheduleGroupAccess);
     }
     // === FIM LÓGICA DA ABA "MEMBRO DE" ===
 });
