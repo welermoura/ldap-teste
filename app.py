@@ -1663,23 +1663,28 @@ def restore_object():
     try:
         conn = get_service_account_connection()
 
-        # 1. Busca o objeto para obter seu 'lastKnownParent' e 'cn'
-        conn.search(object_dn, '(objectClass=*)', BASE,
-                    attributes=['lastKnownParent', 'cn'],
-                    controls=[('1.2.840.113556.1.4.417', True, None)])
+        # Busca o objeto na lixeira para obter lastKnownParent
+        conn.search(
+            search_base=object_dn,
+            search_filter='(objectClass=*)',
+            search_scope=BASE,
+            attributes=['lastKnownParent', 'cn'],
+            controls=[('1.2.840.113556.1.4.417', True, None)]
+        )
 
         if not conn.entries:
             return jsonify({'error': 'Objeto não encontrado na lixeira.'}), 404
 
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
-        original_cn = entry.cn.value
+        new_rdn = f"CN={entry.cn.value}"  # Remove \0ADEL:<GUID>
 
-        # 2. Limpa o CN para criar um RDN válido, removendo o sufixo \nDEL:...
-        clean_cn = re.sub(r'\\nDEL:[a-fA-F0-9-]+$', '', original_cn).strip()
-        new_rdn = f"CN={clean_cn}"
+        # Verifica se a OU original existe, senão usa uma OU fallback
+        if not ou_exists(conn, target_ou_dn):
+            logging.warning(f"OU original '{target_ou_dn}' não existe. Usando OU de recuperação.")
+            target_ou_dn = "OU=Recuperados,DC=grupocomolatti,DC=corp"
 
-        # 3. Move o objeto de volta para sua OU original com controle de restauração
+        # Restaura com controle de restauração
         conn.modify_dn(
             object_dn,
             new_rdn,
@@ -1690,20 +1695,26 @@ def restore_object():
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        # 4. Após mover, reativa a conta se for um usuário e estiver desativada
+        # Ajusta atributos pós-restauração (reativar conta se necessário)
         final_dn = f"{new_rdn},{target_ou_dn}"
-        final_entry = get_user_by_dn(conn, final_dn, attributes=['userAccountControl', 'objectClass'])
-        if final_entry and 'user' in final_entry.objectClass and 'userAccountControl' in final_entry:
-            uac = final_entry.userAccountControl.value
-            if uac & 2: # Se a conta estiver desativada (bit 2)
+        uac_entry = get_user_by_dn(conn, final_dn, attributes=['userAccountControl'])
+        if uac_entry and 'userAccountControl' in uac_entry:
+            uac = uac_entry.userAccountControl.value
+            if uac & 2:  # Conta desativada
                 conn.modify(final_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
 
-        logging.info(f"Objeto '{object_dn}' restaurado com sucesso para '{final_dn}' por '{session.get('user_display_name')}'.")
+        logging.info(f"Objeto '{object_dn}' restaurado para '{final_dn}' por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
 
     except Exception as e:
         logging.error(f"Erro ao restaurar objeto '{object_dn}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao restaurar o objeto: {e}'}), 500
+
+
+def ou_exists(conn, ou_dn):
+    """Verifica se a OU existe no AD."""
+    conn.search(search_base=ou_dn, search_filter='(objectClass=organizationalUnit)', search_scope=BASE)
+    return bool(conn.entries)
 
 
 @app.route('/api/move_object', methods=['POST'])
