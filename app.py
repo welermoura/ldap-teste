@@ -206,11 +206,6 @@ def require_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'ad_user' not in session:
-            # Se o SSO estiver habilitado, tenta o login por SSO
-            config = load_config()
-            if config.get('SSO_ENABLED', False) and request.path != url_for('sso_login'):
-                 return redirect(url_for('sso_login', next=request.url))
-            # Caso contrário, redireciona para a página de login padrão
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
@@ -1681,31 +1676,21 @@ def restore_object():
         original_cn = entry.cn.value
 
         # 2. Limpa o CN para criar um RDN válido, removendo o sufixo \nDEL:...
-        # A regex remove o caractere de nova linha e o sufixo DEL.
         clean_cn = re.sub(r'\\nDEL:[a-fA-F0-9-]+$', '', original_cn).strip()
         new_rdn = f"CN={clean_cn}"
 
-        # 3. Etapa 1 da Restauração: Renomear o objeto no local (dentro de Deleted Objects)
-        # Isso corrige o DN inválido antes de tentar mover.
-        conn.modify_dn(object_dn, new_rdn)
+        # 3. Move o objeto de volta para sua OU original com controle de restauração
+        conn.modify_dn(
+            object_dn,
+            new_rdn,
+            new_superior=target_ou_dn,
+            controls=[('1.2.840.113556.1.4.417', True, None)]
+        )
+
         if conn.result['description'] != 'success':
-            raise Exception(f"Erro do LDAP ao renomear objeto na lixeira: {conn.result['message']}")
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        # O DN do objeto agora foi alterado para o nome limpo
-        renamed_object_dn = f"{new_rdn},{','.join(object_dn.split(',')[1:])}"
-
-        # 4. Etapa 2 da Restauração: Mover o objeto renomeado para sua OU original
-        conn.modify_dn(renamed_object_dn, new_rdn, new_superior=target_ou_dn)
-        if conn.result['description'] != 'success':
-             # Tenta reverter a renomeação em caso de falha na movimentação
-            try:
-                original_rdn = object_dn.split(',')[0]
-                conn.modify_dn(renamed_object_dn, original_rdn)
-            except Exception as revert_e:
-                logging.error(f"FALHA CRÍTICA: Não foi possível reverter a renomeação do objeto '{renamed_object_dn}' após falha na movimentação. Erro: {revert_e}")
-            raise Exception(f"Erro do LDAP ao mover objeto da lixeira: {conn.result['message']}")
-
-        # 5. Após mover, reativa a conta se for um usuário e estiver desativada
+        # 4. Após mover, reativa a conta se for um usuário e estiver desativada
         final_dn = f"{new_rdn},{target_ou_dn}"
         final_entry = get_user_by_dn(conn, final_dn, attributes=['userAccountControl', 'objectClass'])
         if final_entry and 'user' in final_entry.objectClass and 'userAccountControl' in final_entry:
