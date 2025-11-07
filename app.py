@@ -1664,7 +1664,7 @@ def restore_object():
     try:
         conn = get_service_account_connection()
 
-        # Busca o objeto para obter seu 'lastKnownParent' e o RDN
+        # Busca o objeto para obter seu 'lastKnownParent'
         conn.search(object_dn, '(objectClass=*)', BASE,
                     attributes=['lastKnownParent', 'cn'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
@@ -1674,26 +1674,25 @@ def restore_object():
 
         entry = conn.entries[0]
         target_ou_dn = entry.lastKnownParent.value
+        # O RDN (Relative Distinguished Name) é o primeiro componente do DN
+        new_rdn = object_dn.split(',')[0]
 
-        # Limpa o CN removendo o sufixo '\nDEL:...' para criar um RDN válido.
-        # Ex: "John Doe\nDEL:guid..." se torna "John Doe".
-        clean_cn = entry.cn.value.split('\n')[0]
-        new_rdn = f"CN={clean_cn}"
-
-        # Restaura o objeto (movendo-o para sua antiga OU)
+        # Move o objeto de volta para sua OU original
         conn.modify_dn(object_dn, new_rdn, new_superior=target_ou_dn)
 
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        # Reativa a conta (remove o estado de desativado, se houver)
-        uac_entry = get_user_by_dn(conn, f"{new_rdn},{target_ou_dn}", attributes=['userAccountControl'])
+        # Após mover, reativa a conta se for um usuário e estiver desativada
+        final_dn = f"{new_rdn},{target_ou_dn}"
+        uac_entry = get_user_by_dn(conn, final_dn, attributes=['userAccountControl'])
         if uac_entry and 'userAccountControl' in uac_entry:
             uac = uac_entry.userAccountControl.value
-            if uac & 2: # Se estiver desativado
-                conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
+            if uac & 2: # Se a conta estiver desativada (bit 2)
+                conn.modify(final_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
 
-        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
+
+        logging.info(f"Objeto '{object_dn}' restaurado com sucesso para '{final_dn}' por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
 
     except Exception as e:
@@ -2605,6 +2604,136 @@ def export_ad_data():
         logging.error(f"Erro na exportação de dados: {e}", exc_info=True)
         flash("Erro ao gerar exportação. Verifique os logs.", "error")
         return redirect(url_for('dashboard'))
+
+# ==============================================================================
+# Novas Rotas de API para Gerenciamento de Grupos
+# ==============================================================================
+@app.route('/api/search_groups', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_search_groups():
+    query = request.args.get('q', '').strip()
+    if len(query) < 2:
+        return jsonify([])
+
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+        safe_query = escape_filter_chars(query)
+        search_filter = f"(&(objectClass=group)(cn=*{safe_query}*))"
+        conn.search(search_base, search_filter, attributes=['cn', 'description'])
+
+        groups = [{
+            'cn': get_attr_value(g, 'cn'),
+            'description': get_attr_value(g, 'description')
+        } for g in conn.entries]
+
+        return jsonify(groups)
+    except Exception as e:
+        logging.error(f"Erro na API de busca de grupos com query '{query}': {e}", exc_info=True)
+        return jsonify({'error': 'Falha ao buscar grupos.'}), 500
+
+@app.route('/api/add_user_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
+        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            logging.info(f"Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao adicionar usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/remove_user_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_user_from_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
+        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            logging.info(f"Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao remover usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/add_user_to_group_temp', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group_temp():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+    days = data.get('days')
+
+    if not all([username, group_name, days]):
+        return jsonify({'error': 'Usuário, grupo e dias são obrigatórios.'}), 400
+    if not isinstance(days, int) or days <= 0:
+        return jsonify({'error': 'O número de dias deve ser um inteiro positivo.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user: return jsonify({'error': 'Usuário não encontrado.'}), 404
+        if not group: return jsonify({'error': 'Grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            schedules = load_group_schedules()
+            revert_date = (date.today() + timedelta(days=days)).isoformat()
+            schedule_entry = {
+                'user_sam': username,
+                'group_name': group_name,
+                'revert_action': 'remove',
+                'revert_date': revert_date
+            }
+            schedules.append(schedule_entry)
+            save_group_schedules(schedules)
+            logging.info(f"Usuário '{username}' adicionado temporariamente ao grupo '{group_name}' por '{session.get('user_display_name')}'. Remoção em {revert_date}.")
+            return jsonify({'success': True})
+        else:
+            raise Exception(f"Erro do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro na adição temporária de '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
