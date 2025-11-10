@@ -28,6 +28,10 @@ Este guia explica como executar a aplicação de gerenciamento de AD usando Dock
    docker-compose down
    ```
 
+## Configuração do Ambiente
+
+- **Fuso Horário:** O ambiente dos contêineres está configurado para o fuso horário de Brasília (`America/Sao_Paulo`). Isso garante que os logs e as tarefas agendadas (`cron`) sejam executados nos horários corretos.
+
 ## Persistência de Dados e Logs
 
 **Seus dados estão seguros!** Graças à configuração no `docker-compose.yml`, os diretórios `data/` e `logs/` da sua máquina local são espelhados para dentro de ambos os contêineres.
