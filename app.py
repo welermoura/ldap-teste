@@ -2602,5 +2602,60 @@ def export_ad_data():
         flash("Erro ao gerar exportação. Verifique os logs.", "error")
         return redirect(url_for('dashboard'))
 
+@app.route('/export_group_members/<group_name>')
+@require_auth
+@require_permission(action='can_manage_groups')
+def export_group_members(group_name):
+    """Exporta os membros de um grupo para um arquivo CSV."""
+    try:
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, attributes=['member'])
+        if not group:
+            flash(f"Grupo '{group_name}' não encontrado.", 'error')
+            return redirect(url_for('group_management'))
+
+        member_dns = group.member.values if group.member.values else []
+        if not member_dns:
+            flash(f"O grupo '{group_name}' não possui membros para exportar.", 'info')
+            return redirect(url_for('view_group', group_name=group_name))
+
+        header = ['Nome de Exibição', 'Login (sAMAccountName)', 'Cargo', 'Cidade', 'Email']
+        attributes_to_get = ['displayName', 'sAMAccountName', 'title', 'l', 'mail']
+
+        output = io.StringIO()
+        output.write('\ufeff')  # BOM para Excel entender UTF-8
+        writer = csv.writer(output, quoting=csv.QUOTE_ALL)
+        writer.writerow(header)
+
+        # Ordena os DNs para uma saída consistente
+        for dn in sorted(member_dns):
+            user_entry = get_user_by_dn(conn, dn, attributes=attributes_to_get)
+            if user_entry:
+                row = [
+                    get_attr_value(user_entry, 'displayName'),
+                    get_attr_value(user_entry, 'sAMAccountName'),
+                    get_attr_value(user_entry, 'title'),
+                    get_attr_value(user_entry, 'l'),
+                    get_attr_value(user_entry, 'mail')
+                ]
+                writer.writerow(row)
+            else:
+                # Se o membro não for um usuário (ex: outro grupo), registra como tal
+                cn_part = dn.split(',')[0]
+                display_name = cn_part.split('=')[1] if '=' in cn_part else cn_part
+                writer.writerow([f"{display_name} (Objeto não-usuário)", dn, "N/A", "N/A", "N/A"])
+
+        output.seek(0)
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv; charset=utf-8-sig",
+            headers={"Content-Disposition": f"attachment;filename=membros_{group_name}.csv"}
+        )
+
+    except Exception as e:
+        logging.error(f"Erro ao exportar membros do grupo '{group_name}': {e}", exc_info=True)
+        flash("Erro ao gerar a exportação. Verifique os logs.", "error")
+        return redirect(url_for('view_group', group_name=group_name))
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
