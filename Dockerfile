@@ -12,6 +12,7 @@ ENV NODE_VERSION=20.11.1
 # - curl: needed by nvm to download Node.js
 # - build-essential, libldap2-dev, libsasl2-dev: for Python LDAP dependencies
 RUN apt-get update && apt-get install -y \
+    cron \
     curl \
     build-essential \
     libldap2-dev \
