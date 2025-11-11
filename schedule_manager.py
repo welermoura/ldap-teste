@@ -3,10 +3,10 @@ import os
 import json
 from datetime import date
 import logging
+import ldap3
 from ldap3 import MODIFY_REPLACE
 from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, DISABLE_SCHEDULE_FILE, GROUP_SCHEDULE_FILE
-import json
-import os
+
 # ==============================================================================
 # Configuração Base
 # ==============================================================================
@@ -14,7 +14,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 logs_dir = os.path.join(basedir, 'logs')
 os.makedirs(logs_dir, exist_ok=True)
 
-log_path = os.path.join(logs_dir, 'schedule_manager.log') # Nome do log atualizado
+log_path = os.path.join(logs_dir, 'schedule_manager.log')
 logging.basicConfig(
     filename=log_path,
     level=logging.INFO,
@@ -164,6 +164,5 @@ if __name__ == "__main__":
             logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
     else:
         logging.error("Não foi possível conectar ao AD. As operações de AD foram puladas.")
-        logging.info("Conexão com o AD encerrada.")
-        logging.info("Gerenciador de Agendamentos do AD finalizado.")
-        logging.info("=============================================\n")
+    logging.info("Gerenciador de Agendamentos do AD finalizado.")
+    logging.info("=============================================\n")
