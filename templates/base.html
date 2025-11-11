@@ -30,6 +30,15 @@
                 {% endif %}
             {% endwith %}
 
+            {# Botão Voltar Universal #}
+            {% block back_button %}
+            <div class="mb-3">
+                <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Voltar
+                </a>
+            </div>
+            {% endblock %}
+
             {% block content %}{% endblock %}
         </main>
     {% endblock %}
