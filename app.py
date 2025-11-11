@@ -186,6 +186,16 @@ def require_api_permission(action=None):
 # ==============================================================================
 # Decorators e Processadores de Contexto (sem alteração)
 # ==============================================================================
+@app.after_request
+def add_header(response):
+    """
+    Adiciona cabeçalhos para forçar o conteúdo mais recente e evitar o cache.
+    """
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 @app.before_request
 def before_request_func():
     # A verificação de usuário admin foi removida daqui para corrigir o loop de login.
