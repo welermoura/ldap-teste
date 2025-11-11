@@ -40,7 +40,7 @@ def process_user_deactivations(conn, search_base):
     for username, deactivation_date in schedules.items():
         if deactivation_date <= today:
             logging.info(f"Tentando desativar o usuário '{username}' agendado para {deactivation_date}.")
-            user = get_user_by_samaccountname(conn, username, search_base)
+            user = get_user_by_samaccountname(conn, username)
             if user:
                 uac = user.userAccountControl.value
                 if not (uac & 2): # Se a conta NÃO estiver desativada
@@ -78,7 +78,7 @@ def process_user_reactivations(conn, search_base):
     for username, reactivation_date in schedules.items():
         if reactivation_date <= today:
             logging.info(f"Tentando reativar o usuário '{username}' agendado para {reactivation_date}.")
-            user = get_user_by_samaccountname(conn, username, search_base)
+            user = get_user_by_samaccountname(conn, username)
             if user:
                 uac = user.userAccountControl.value
                 if uac & 2:  # Se a conta estiver desativada
@@ -116,8 +116,8 @@ def process_group_membership_changes(conn, search_base):
         if schedule.get('revert_date') <= today:
             user_sam, group_name, action = schedule['user_sam'], schedule['group_name'], schedule['revert_action']
             logging.info(f"Processando: {action} '{user_sam}' em '{group_name}'.")
-            user = get_user_by_samaccountname(conn, user_sam, search_base)
-            group = get_group_by_name(conn, group_name, search_base)
+            user = get_user_by_samaccountname(conn, user_sam)
+            group = get_group_by_name(conn, group_name)
             if not user or not group:
                 logging.warning(f"Usuário '{user_sam}' ou grupo '{group_name}' não encontrado. Removendo agendamento.")
                 continue
