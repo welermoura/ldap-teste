@@ -18,8 +18,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    # O comando copia a definição do crontab, define as permissões corretas e inicia o cron.
-    command: >
-      bash -c "crontab scheduler/crontab && chmod 0644 /var/spool/cron/crontabs/root && cron -f"
+    # O comando agora apenas inicia o cron em primeiro plano. A configuração é feita no Dockerfile.
+    command: cron -f
     restart: unless-stopped
     container_name: ad_manager_scheduler

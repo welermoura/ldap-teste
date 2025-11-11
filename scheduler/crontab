@@ -1,7 +1,2 @@
-# Definição do crontab para executar o schedule_manager.py
-
-# m h  dom mon dow   command
-# Adicionado log detalhado para stdout e stderr para depuração.
-0 4,15 * * * /usr/bin/flock -n /tmp/cron.lockfile /app/venv/bin/python /app/schedule_manager.py >> /app/logs/cron_execution.log 2>&1
-
-# Uma linha em branco no final é necessária para o cron
+# m h  dom mon dow   user   command
+0 4,15 * * * root  sh -c "/usr/bin/flock -n /tmp/cron.lockfile /app/venv/bin/python /app/schedule_manager.py >> /app/logs/cron_execution.log 2>&1"
