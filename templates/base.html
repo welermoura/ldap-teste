@@ -120,6 +120,15 @@
     })();
     </script>
 
-    {% block scripts %}{% endblock %}
+    {% block scripts %}
+    <script>
+        // Força o recarregamento da página ao navegar de volta usando o cache (bfcache)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+    </script>
+    {% endblock %}
 </body>
 </html>
