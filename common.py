@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from ldap3 import Server, Connection, ALL
+from ldap3 import Server, Connection, ALL, ALL_ATTRIBUTES
 from ldap3.utils.log import set_library_log_detail_level, EXTENDED
 from cryptography.fernet import Fernet
 
@@ -119,7 +119,7 @@ def is_recycle_bin_enabled(conn):
 
 def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
     if attributes is None:
-        attributes = ALL
+        attributes = ALL_ATTRIBUTES
     config = load_config()
     search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
     conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=attributes)
@@ -137,7 +137,7 @@ def filetime_to_datetime(ft):
 
 def get_group_by_name(conn, group_name, attributes=None):
     if attributes is None:
-        attributes = ALL
+        attributes = ALL_ATTRIBUTES
     config = load_config()
     search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
     conn.search(search_base, f'(&(objectClass=group)(cn={group_name}))', attributes=attributes)
