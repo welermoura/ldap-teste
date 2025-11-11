@@ -35,6 +35,14 @@ WORKDIR /app
 # Copy the entire project into the container
 COPY . .
 
+# Configure cron job
+# 1. Copy the crontab file to the cron directory
+# 2. Set the correct permissions
+# 3. Add a newline to the file to ensure cron reads it
+RUN cp scheduler/crontab /etc/cron.d/scheduler \
+    && chmod 0644 /etc/cron.d/scheduler \
+    && echo "" >> /etc/cron.d/scheduler
+
 # Make the install script executable
 RUN chmod +x ./install.sh
 
