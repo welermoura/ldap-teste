@@ -1197,6 +1197,96 @@ def api_user_groups(username):
         logging.error(f"Erro na API de grupos do usuário '{username}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/search_groups', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_search_groups():
+    query = request.args.get('q', '')
+    username = request.args.get('username', '')
+    if not query or len(query) < 3:
+        return jsonify([])
+
+    try:
+        conn = get_service_account_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        user = get_user_by_samaccountname(conn, username, attributes=['memberOf'])
+        user_groups = user.memberOf.values if 'memberOf' in user and user.memberOf.values else []
+
+        search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
+        conn.search(search_base, search_filter, attributes=['cn', 'description'])
+
+        groups = [
+            {'cn': g.cn.value, 'description': g.description.value if 'description' in g and g.description.value else ''}
+            for g in conn.entries if g.distinguishedName.value not in user_groups
+        ]
+
+        return jsonify(groups)
+    except Exception as e:
+        logging.error(f"Erro ao buscar grupos com a query '{query}': {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/remove_user_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_user_from_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao remover o usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao remover do grupo: {e}'}), 500
+
+@app.route('/api/add_user_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao adicionar o usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao adicionar ao grupo: {e}'}), 500
+
 @app.route('/api/user_details/<username>')
 @require_auth
 @require_api_permission(action='can_edit')
