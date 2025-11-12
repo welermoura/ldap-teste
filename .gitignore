@@ -3,4 +3,10 @@ frontend/node_modules/
 __pycache__/
 *.pyc
 app.log
+app_server.log
 .DS_Store
+
+# Pastas de dados e logs
+data/
+logs/
+secret.key
