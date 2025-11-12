@@ -18,7 +18,7 @@
             <i class="fas fa-user-plus me-2"></i>Adicionar Usuário
         </button>
     {% endset %}
-    {{ render_page_header(title_html, extra_actions=extra_actions_html) }}
+    {{ render_page_header(title_html, extra_actions=extra_actions_html, back_url=url_for('group_management')) }}
 {% endblock %}
 
 {% block content %}
