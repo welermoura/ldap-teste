@@ -6,7 +6,7 @@
 
 {% block page_title %}
     {% set title_text = '<i class="fas fa-user-circle me-2"></i>Detalhes de: ' ~ (get_attr_value(user, 'displayName') or 'N/A') %}
-    {{ render_page_header(title_text) }}
+    {{ render_page_header(title_text, back_url=url_for('manage_users')) }}
 {% endblock %}
 
 
