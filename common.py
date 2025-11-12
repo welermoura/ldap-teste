@@ -4,6 +4,7 @@ import logging
 from ldap3 import Server, Connection, ALL, ALL_ATTRIBUTES
 from ldap3.utils.log import set_library_log_detail_level, EXTENDED
 from cryptography.fernet import Fernet
+from ldap3.utils.conv import escape_filter_chars
 
 # Habilita o logging detalhado para a biblioteca ldap3 para depuração
 set_library_log_detail_level(EXTENDED)
@@ -166,33 +167,6 @@ def search_groups_for_user_addition(conn, query, username):
         # logging.error(f"Erro ao buscar grupos para adição do usuário '{username}': {e}", exc_info=True)
         # Retorna uma lista vazia em caso de erro para não quebrar a API
         return []
-
-def search_groups_for_user_addition(conn, query, username):
-    """
-    Busca por grupos no AD, excluindo aqueles dos quais o usuário já é membro.
-    """
-    config = load_config()
-    search_base = config.get('AD_SEARCH_BASE')
-
-    # 1. Obter os grupos atuais do usuário
-    user = get_user_by_samaccountname(conn, username, attributes=['memberOf'])
-    if not user:
-        # Se o usuário não for encontrado, retorna uma lista vazia para evitar erros.
-        return []
-
-    user_groups_dns = user.memberOf.values if 'memberOf' in user and user.memberOf.values else []
-
-    # 2. Buscar todos os grupos que correspondem à query
-    search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
-    conn.search(search_base, search_filter, attributes=['cn', 'description', 'distinguishedName'])
-
-    # 3. Filtrar os resultados para excluir aqueles dos quais o usuário já é membro
-    groups = [
-        {'cn': g.cn.value, 'description': g.description.value if 'description' in g and g.description.value else ''}
-        for g in conn.entries if g.distinguishedName.value not in user_groups_dns
-    ]
-
-    return groups
 
 def filetime_to_datetime(ft):
     """Converts a Microsoft FILETIME timestamp to a Python datetime object."""
