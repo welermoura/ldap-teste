@@ -17,7 +17,7 @@ import secrets
 import io
 import csv
 import base64
-from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
+from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name
 
 # ==============================================================================
 # Configuração Base
@@ -2386,6 +2386,7 @@ def admin_logs():
         with open(log_path, 'r', encoding='utf-8') as f:
             all_lines = f.readlines()
 
+        # Primeiro, categoriza todos os logs sem filtrar
         for line in reversed(all_lines):
             match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - (.*)", line)
             if not match:
@@ -2395,26 +2396,21 @@ def admin_logs():
             message = match.group(2)
             entry = {"timestamp": timestamp, "message": message}
 
-            # Primeiro, categoriza a entrada
             category = None
             for cat, prefix in category_map.items():
                 if message.startswith(prefix):
                     category = cat
                     break
 
-            if not category:
-                continue
-
-            # Se houver uma busca, filtra APENAS na aba ativa
-            if query:
-                if category == active_tab and query.lower() in message.lower():
-                    logs_categorized[category].append(entry)
-                elif category != active_tab:
-                    # Adiciona a entrada não filtrada se não for a aba da busca
-                    logs_categorized[category].append(entry)
-            else:
-                # Se não houver busca, adiciona todas as entradas
+            if category:
                 logs_categorized[category].append(entry)
+
+        # Se houver uma busca, filtra APENAS a lista da aba ativa
+        if query and active_tab in logs_categorized:
+            logs_categorized[active_tab] = [
+                entry for entry in logs_categorized[active_tab]
+                if query.lower() in entry['message'].lower()
+            ]
 
     except FileNotFoundError:
         flash("Arquivo de log não encontrado.", "warning")
