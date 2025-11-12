@@ -1,0 +1,46 @@
+2025-11-12 13:43:23,509 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.2:5000
+2025-11-12 13:43:23,509 - INFO - [33mPress CTRL+C to quit[0m
+2025-11-12 13:43:23,510 - INFO -  * Restarting with stat
+2025-11-12 13:50:07,874 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.2:5000
+2025-11-12 13:50:07,874 - INFO - [33mPress CTRL+C to quit[0m
+2025-11-12 13:50:07,875 - INFO -  * Restarting with stat
+2025-11-12 13:52:22,999 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.0.2:5000
+2025-11-12 13:52:22,999 - INFO - [33mPress CTRL+C to quit[0m
+2025-11-12 13:52:23,000 - INFO -  * Restarting with stat
+2025-11-12 13:52:23,441 - WARNING -  * Debugger is active!
+2025-11-12 13:52:23,442 - INFO -  * Debugger PIN: 652-264-420
+2025-11-12 11:13:15,364 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.18.0.2:5000
+2025-11-12 11:13:15,364 - INFO - [33mPress CTRL+C to quit[0m
+2025-11-12 11:13:15,365 - INFO -  * Restarting with stat
+2025-11-12 11:13:15,744 - WARNING -  * Debugger is active!
+2025-11-12 11:13:15,745 - INFO -  * Debugger PIN: 109-737-340
+2025-11-12 11:29:41,030 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.18.0.2:5000
+2025-11-12 11:29:41,030 - INFO - [33mPress CTRL+C to quit[0m
+2025-11-12 11:29:41,031 - INFO -  * Restarting with stat
+2025-11-12 11:29:41,431 - WARNING -  * Debugger is active!
+2025-11-12 11:29:41,431 - INFO -  * Debugger PIN: 142-642-586
+2025-11-12 11:29:46,383 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:46] "GET /admin/register HTTP/1.1" 200 -
+2025-11-12 11:29:46,467 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:46] "GET /static/style.css HTTP/1.1" 200 -
+2025-11-12 11:29:48,946 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:48] "[32mPOST /admin/register HTTP/1.1[0m" 302 -
+2025-11-12 11:29:48,965 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:48] "GET /admin/login HTTP/1.1" 200 -
+2025-11-12 11:29:49,005 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:49] "GET /static/style.css HTTP/1.1" 200 -
+2025-11-12 11:29:49,663 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:49] "[32mPOST /admin/login HTTP/1.1[0m" 302 -
+2025-11-12 11:29:49,675 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:49] "GET /admin/dashboard HTTP/1.1" 200 -
+2025-11-12 11:29:49,690 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:49] "GET /static/style.css HTTP/1.1" 200 -
+2025-11-12 11:29:49,995 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:49] "GET /admin/logs HTTP/1.1" 200 -
+2025-11-12 11:29:50,011 - INFO - 172.18.0.1 - - [12/Nov/2025 11:29:50] "GET /static/style.css HTTP/1.1" 200 -

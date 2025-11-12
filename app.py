@@ -67,6 +67,8 @@ def load_user():
 
 def save_user(user_data):
     user_path = os.path.join(data_dir, 'user.json')
+    # Garante que o diretório de dados exista antes de salvar
+    os.makedirs(os.path.dirname(user_path), exist_ok=True)
     with open(user_path, 'w', encoding='utf-8') as f:
         json.dump(user_data, f, indent=4)
 
@@ -558,7 +560,7 @@ def create_ad_user(conn, form_data, model_attrs):
         conn.extend.microsoft.modify_password(user_dn, default_password)
         conn.modify(user_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [512])], 'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
         if 'memberOf' in model_attrs and model_attrs.memberOf: conn.extend.microsoft.add_members_to_groups(user_dn, [str(g) for g in model_attrs.memberOf])
-        logging.info(f"Usuário '{display_name}' ({sam}) foi criado por '{session.get('ad_user')}'.")
+        logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado por '{session.get('ad_user')}'.")
         return {'success': True, 'message': f"Usuário '{display_name}' criado com sucesso!", 'email': email, 'initials': initials, 'display_name': display_name, 'sam_account': sam, 'password': default_password, 'ou_path': get_ou_path(model_attrs.entry_dn)}
     except Exception as e:
         logging.error(f"Erro ao criar o usuário '{display_name}': {e}")
@@ -669,7 +671,6 @@ def sso_login():
             return redirect(url_for('address_book'))
 
         flash('Login via SSO realizado com sucesso!', 'success')
-        logging.info(f"Usuário '{username}' logado com sucesso via SSO.")
         return redirect(url_for('dashboard'))
 
     except Exception as e:
@@ -1275,7 +1276,7 @@ def api_edit_user(username):
         conn.modify(user.distinguishedName.value, changes)
         if conn.result['description'] == 'success':
             log_details = "; ".join(changes_to_log)
-            logging.info(f"Usuário '{username}' atualizado via API por '{session.get('user_display_name')}'. Detalhes: {log_details}")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' atualizado via API por '{session.get('user_display_name')}'. Detalhes: {log_details}")
             return jsonify({'success': True, 'message': 'Usuário atualizado com sucesso!'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
@@ -1321,9 +1322,8 @@ def api_toggle_object_status():
             if sam in schedules:
                 del schedules[sam]
                 save_schedules(schedules)
-                logging.info(f"Agendamento de reativação para '{sam}' foi removido devido à reativação manual.")
 
-        logging.info(f"Conta '{sam or dn}' foi {action_message} por '{session.get('user_display_name')}'.")
+        logging.info(f"[ALTERAÇÃO] Conta '{sam or dn}' foi {action_message} por '{session.get('user_display_name')}'.")
 
         new_status = "Ativo" if action_message == "ativada" else "Desativado"
         return jsonify({'success': True, 'message': f"Conta {action_message} com sucesso.", 'newStatus': new_status})
@@ -1354,7 +1354,7 @@ def api_reset_password(username):
         if conn.result['description'] != 'success':
              raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        logging.info(f"A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
+        logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
 
     except Exception as e:
@@ -1380,7 +1380,7 @@ def api_delete_object():
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
-        logging.info(f"Objeto '{name or dn}' foi EXCLUÍDO por '{session.get('user_display_name')}'.")
+        logging.info(f"[EXCLUSÃO] Objeto '{name or dn}' foi EXCLUÍDO por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
 
     except Exception as e:
@@ -1415,7 +1415,7 @@ def api_disable_user_temp(username):
         schedules[username] = reactivation_date.isoformat()
         save_schedules(schedules)
 
-        logging.info(f"Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
+        logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
         return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
 
     except Exception as e:
@@ -1451,7 +1451,7 @@ def api_schedule_absence(username):
         reactivation_schedules[username] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
 
-        logging.info(f"Ausência para '{username}' agendada via API por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
+        logging.info(f"[ALTERAÇÃO] Ausência para '{username}' agendada via API por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
         return jsonify({'success': True, 'message': 'Ausência agendada com sucesso.'})
 
     except ValueError:
@@ -1498,8 +1498,6 @@ def api_recycle_bin():
         conn.search(deleted_objects_container, search_filter, SUBTREE,
                     attributes=['lastKnownParent', 'cn', 'distinguishedName', 'objectClass', 'title', 'whenChanged', 'sAMAccountName'],
                     controls=[('1.2.840.113556.1.4.417', True, None)])
-
-        logging.info(f"Busca na lixeira encontrou {len(conn.entries)} objetos no total.")
 
         processed_dns = set()
         items = []
@@ -1699,7 +1697,7 @@ def restore_object():
             if uac & 2: # Se estiver desativado
                 conn.modify(f"{new_rdn},{target_ou_dn}", {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
 
-        logging.info(f"Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
+        logging.info(f"[ALTERAÇÃO] Objeto '{object_dn}' restaurado por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Objeto restaurado com sucesso!'})
 
     except Exception as e:
@@ -1727,7 +1725,7 @@ def move_object():
 
         # Se a operação foi um sucesso direto, retorna a confirmação.
         if conn.result['description'] == 'success':
-            logging.info(f"Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
+            logging.info(f"[MOVIMENTAÇÃO] Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
             return jsonify({'success': True, 'message': 'Objeto movido com sucesso.'})
 
         # Se falhou, extrai a mensagem de erro para análise.
@@ -1744,7 +1742,7 @@ def move_object():
                 conn.search(search_base=new_dn, search_filter='(objectClass=*)', search_scope=BASE, attributes=['cn'])
 
                 if conn.entries:
-                    logging.info(f"VERIFICAÇÃO BEM-SUCEDIDA: Objeto '{object_dn}' foi movido para '{target_ou_dn}' apesar do erro inicial.")
+                    logging.info(f"[MOVIMENTAÇÃO] VERIFICAÇÃO BEM-SUCEDIDA: Objeto '{object_dn}' foi movido para '{target_ou_dn}' apesar do erro inicial.")
                     return jsonify({'success': True, 'message': 'Objeto movido com sucesso (verificado).'})
                 else:
                     logging.error(f"FALHA NA VERIFICAÇÃO: Objeto '{object_dn}' não encontrado em '{target_ou_dn}' após erro 'WILL_NOT_PERFORM'.")
@@ -1779,7 +1777,7 @@ def add_member(group_name):
             conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado ao grupo '{group_name}' por '{session.get('ad_user')}'.")
             else:
                 flash(f"Falha ao adicionar usuário: {conn.result['message']}", 'error')
         else:
@@ -1803,7 +1801,7 @@ def remove_member(group_name, user_sam):
             conn.extend.microsoft.remove_members_from_groups([user_to_remove.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"Usuário '{user_sam}' removido do grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' por '{session.get('ad_user')}'.")
             else:
                 flash(f"Falha ao remover usuário: {conn.result['message']}", 'error')
         else:
@@ -1847,7 +1845,7 @@ def add_member_temp(group_name):
                 save_group_schedules(schedules)
 
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' por {days} dias.", 'success')
-                logging.info(f"Usuário '{user_sam}' adicionado temporariamente ao grupo '{group_name}' por '{session.get('ad_user')}'. Reversão em {revert_date}.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado temporariamente ao grupo '{group_name}' por '{session.get('ad_user')}'. Reversão em {revert_date}.")
             else:
                 flash(f"Falha ao adicionar usuário: {conn.result['message']}", 'error')
         else:
@@ -1890,7 +1888,7 @@ def remove_member_temp(group_name, user_sam):
                 save_group_schedules(schedules)
 
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' por {days} dias.", 'success')
-                logging.info(f"Usuário '{user_sam}' removido temporariamente do grupo '{group_name}' por '{session.get('ad_user')}'. Reversão em {revert_date}.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido temporariamente do grupo '{group_name}' por '{session.get('ad_user')}'. Reversão em {revert_date}.")
             else:
                  flash(f"Falha ao remover usuário: {conn.result['message']}", 'error')
         else:
@@ -1910,7 +1908,6 @@ def view_user(username):
         attributes = ['*', 'msDS-UserPasswordExpiryTimeComputed']
         user = get_user_by_samaccountname(conn, username, attributes=attributes)
         if not user:
-            logging.warning(f"Usuário '{session.get('ad_user')}' tentou ver o usuário '{username}' sem sucesso. Motivo: Usuário não encontrado ou permissões insuficientes.")
             flash("Usuário não encontrado ou você não tem permissão para ver os detalhes.", "error")
             return redirect(url_for('manage_users'))
         password_expiry_info = "Não aplicável (senha nunca expira ou não foi possível calcular)."
@@ -1955,9 +1952,8 @@ def toggle_status(username):
             if username in schedules:
                 del schedules[username]
                 save_schedules(schedules)
-                logging.info(f"Agendamento de reativação para '{username}' foi removido devido à reativação manual.")
 
-        logging.info(f"Conta '{username}' foi {action_message} por '{session.get('user_display_name', session.get('ad_user'))}'.")
+        logging.info(f"[ALTERAÇÃO] Conta '{username}' foi {action_message} por '{session.get('user_display_name', session.get('ad_user'))}'.")
         flash(f"Conta do usuário foi {action_message} com sucesso.", "success")
     except Exception as e:
         flash(f"Erro ao alterar status da conta: {e}", "error")
@@ -1989,7 +1985,7 @@ def disable_user_temp(username):
         schedules[username] = reactivation_date
         save_schedules(schedules)
 
-        logging.info(f"Conta de '{username}' desativada por {days} dias por '{session.get('ad_user')}'. Reativação agendada para {reactivation_date}.")
+        logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada por {days} dias por '{session.get('ad_user')}'. Reativação agendada para {reactivation_date}.")
         flash(f"Conta do usuário desativada com sucesso. A reativação está agendada para {reactivation_date}.", "success")
     except Exception as e:
         flash(f"Erro ao desativar conta temporariamente: {e}", "error")
@@ -2026,7 +2022,7 @@ def schedule_absence(username):
         save_schedules(reactivation_schedules)
 
         flash(f"Ausência para '{username}' agendada com sucesso.", "success")
-        logging.info(f"Ausência para '{username}' agendada por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
+        logging.info(f"[ALTERAÇÃO] Ausência para '{username}' agendada por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
 
     except ValueError:
         flash("Formato de data inválido.", "error")
@@ -2059,7 +2055,7 @@ def delete_user(username):
                 conn.delete(user.distinguishedName.value)
                 if conn.result['description'] == 'success':
                     flash(f"Usuário '{username}' foi excluído permanentemente com sucesso.", "success")
-                    logging.info(f"Usuário '{username}' foi EXCLUÍDO por '{session.get('user_display_name', session.get('ad_user'))}'.")
+                    logging.info(f"[EXCLUSÃO] Usuário '{username}' foi EXCLUÍDO por '{session.get('user_display_name', session.get('ad_user'))}'.")
                     return redirect(url_for('manage_users'))
                 else:
                     flash(f"Falha ao excluir usuário no Active Directory: {conn.result['message']}", "error")
@@ -2093,7 +2089,7 @@ def reset_password(username):
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
         conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-        logging.info(f"A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
+        logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
         flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
     except Exception as e:
         flash(f"Erro ao resetar a senha: {e}", "error")
@@ -2170,7 +2166,7 @@ def edit_user(username):
                 if service_conn.result['description'] == 'success':
                     flash('Usuário atualizado com sucesso!', 'success')
                     log_details = "; ".join(changes_to_log)
-                    log_message = f"Usuário '{username}' atualizado por '{session.get('user_display_name', session.get('ad_user'))}'. Detalhes: {log_details}"
+                    log_message = f"[ALTERAÇÃO] Usuário '{username}' atualizado por '{session.get('user_display_name', session.get('ad_user'))}'. Detalhes: {log_details}"
                     logging.info(log_message)
                 else:
                     flash(f"Erro ao atualizar usuário: {service_conn.result['message']}", 'error')
@@ -2309,32 +2305,49 @@ def admin_logs():
         return redirect(url_for('admin_login'))
 
     search_form = LogSearchForm()
-    log_content = []
+    logs_categorized = {
+        'creation': [],
+        'alteration': [],
+        'exclusion': [],
+        'movement': [],
+    }
 
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             all_lines = f.readlines()
 
-        # Log improvement: Capture more details and make them searchable
         log_entries = []
-        for line in all_lines:
+        for line in reversed(all_lines): # Inverte para processar do mais novo para o mais antigo
             match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - (.*)", line)
-            if match:
-                log_entries.append({"timestamp": match.group(1), "message": match.group(2)})
+            if not match:
+                continue
 
-        query = search_form.search_query.data
-        if search_form.validate_on_submit() and query:
-            log_entries = [entry for entry in log_entries if query.lower() in entry['message'].lower()]
+            timestamp = match.group(1)
+            message = match.group(2)
 
-        # Reverse for chronological order (newest first)
-        log_content = list(reversed(log_entries))
+            entry = {"timestamp": timestamp, "message": message}
+
+            # Filtra pela query de busca ANTES de categorizar
+            query = search_form.search_query.data
+            if search_form.validate_on_submit() and query and query.lower() not in message.lower():
+                continue
+
+            # Categoriza a entrada de log
+            if message.startswith('[CRIAÇÃO]'):
+                logs_categorized['creation'].append(entry)
+            elif message.startswith('[ALTERAÇÃO]'):
+                logs_categorized['alteration'].append(entry)
+            elif message.startswith('[EXCLUSÃO]'):
+                logs_categorized['exclusion'].append(entry)
+            elif message.startswith('[MOVIMENTAÇÃO]'):
+                logs_categorized['movement'].append(entry)
 
     except FileNotFoundError:
         flash("Arquivo de log não encontrado.", "warning")
     except Exception as e:
         flash(f"Erro ao ler o arquivo de log: {e}", "error")
 
-    return render_template('admin/logs.html', logs=log_content, search_form=search_form)
+    return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form)
 
 @app.route('/admin/permissions', methods=['GET', 'POST'])
 def permissions():
@@ -2445,7 +2458,6 @@ def get_dashboard_stats(conn):
                 stats['disabled_users'] += 1
             else:
                 stats['enabled_users'] += 1
-        logging.info(f"Dashboard: contagem de usuários ativos/desativados processou {user_count} entradas.")
     except Exception as e:
         logging.error(f"Erro ao buscar estatísticas do dashboard: {e}", exc_info=True)
     return stats

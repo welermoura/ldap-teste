@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_form_helpers.html" import render_field, render_submit_button %}
+{% from "_macros.html" import render_log_table %}
 
 {% block title %}Logs do Sistema - Admin{% endblock %}
 
@@ -28,34 +29,43 @@
 
 <div class="card glass-card">
     <div class="card-header">
-        <h5 class="mb-0">Registros de Atividade</h5>
+        <ul class="nav nav-tabs card-header-tabs" id="logTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="creation-tab" data-bs-toggle="tab" data-bs-target="#creation" type="button" role="tab" aria-controls="creation" aria-selected="true">
+                    <i class="fas fa-plus-circle me-1"></i>Criação ({{ logs.creation|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="alteration-tab" data-bs-toggle="tab" data-bs-target="#alteration" type="button" role="tab" aria-controls="alteration" aria-selected="false">
+                    <i class="fas fa-edit me-1"></i>Alteração ({{ logs.alteration|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="exclusion-tab" data-bs-toggle="tab" data-bs-target="#exclusion" type="button" role="tab" aria-controls="exclusion" aria-selected="false">
+                    <i class="fas fa-trash-alt me-1"></i>Exclusão ({{ logs.exclusion|length }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="movement-tab" data-bs-toggle="tab" data-bs-target="#movement" type="button" role="tab" aria-controls="movement" aria-selected="false">
+                    <i class="fas fa-people-arrows me-1"></i>Movimentação ({{ logs.movement|length }})
+                </button>
+            </li>
+        </ul>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-sm table-hover glass-table mb-0">
-                <thead>
-                    <tr>
-                        <th style="width: 20%;">Timestamp</th>
-                        <th>Mensagem</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if logs %}
-                        {% for log_entry in logs %}
-                        <tr>
-                            <td>{{ log_entry.timestamp }}</td>
-                            <td>{{ log_entry.message }}</td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="2" class="text-center p-4">
-                                <i class="fas fa-info-circle me-2"></i>Nenhum registro de log encontrado ou correspondente à sua busca.
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+        <div class="tab-content" id="logTabsContent">
+            <div class="tab-pane fade show active" id="creation" role="tabpanel" aria-labelledby="creation-tab">
+                {{ render_log_table(logs.creation) }}
+            </div>
+            <div class="tab-pane fade" id="alteration" role="tabpanel" aria-labelledby="alteration-tab">
+                {{ render_log_table(logs.alteration) }}
+            </div>
+            <div class="tab-pane fade" id="exclusion" role="tabpanel" aria-labelledby="exclusion-tab">
+                {{ render_log_table(logs.exclusion) }}
+            </div>
+            <div class="tab-pane fade" id="movement" role="tabpanel" aria-labelledby="movement-tab">
+                {{ render_log_table(logs.movement) }}
+            </div>
         </div>
     </div>
 </div>
