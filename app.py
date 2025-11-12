@@ -17,7 +17,7 @@ import secrets
 import io
 import csv
 import base64
-from common import load_config, save_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, filetime_to_datetime, is_recycle_bin_enabled
+from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
 
 # ==============================================================================
 # Configuração Base
@@ -1187,20 +1187,7 @@ def api_search_groups():
 
     try:
         conn = get_service_account_connection()
-        config = load_config()
-        search_base = config.get('AD_SEARCH_BASE')
-
-        user = get_user_by_samaccountname(conn, username, attributes=['memberOf'])
-        user_groups = user.memberOf.values if 'memberOf' in user and user.memberOf.values else []
-
-        search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
-        conn.search(search_base, search_filter, attributes=['cn', 'description'])
-
-        groups = [
-            {'cn': g.cn.value, 'description': g.description.value if 'description' in g and g.description.value else ''}
-            for g in conn.entries if g.distinguishedName.value not in user_groups
-        ]
-
+        groups = search_groups_for_user_addition(conn, query, username)
         return jsonify(groups)
     except Exception as e:
         logging.error(f"Erro ao buscar grupos com a query '{query}': {e}", exc_info=True)
