@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
 import ldap3
-from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL
+from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL, ALL_ATTRIBUTES
 from ldap3.utils.conv import escape_filter_chars
 from datetime import datetime, timedelta, date, timezone
 import json
@@ -375,27 +375,6 @@ def get_read_connection():
     except Exception as e:
         raise Exception(f"É necessária uma conta de serviço configurada para todas as operações de leitura. Erro: {e}")
 
-def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
-    if attributes is None:
-        attributes = ldap3.ALL_ATTRIBUTES
-    config = load_config()
-    search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
-    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=attributes)
-    if conn.entries:
-        return conn.entries[0]
-    return None
-
-def get_group_by_name(conn, group_name, attributes=None):
-    if attributes is None:
-        attributes = ldap3.ALL_ATTRIBUTES
-    config = load_config()
-    search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
-    # Escape the group name to handle special characters in the LDAP filter
-    safe_group_name = escape_filter_chars(group_name)
-    conn.search(search_base, f'(&(objectClass=group)(cn={safe_group_name}))', attributes=attributes)
-    if conn.entries:
-        return conn.entries[0]
-    return None
 
 def get_user_by_dn(conn, user_dn, attributes=None):
     """Busca um usuário diretamente pelo seu Distinguished Name."""
