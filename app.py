@@ -2305,6 +2305,13 @@ def admin_logs():
         return redirect(url_for('admin_login'))
 
     search_form = LogSearchForm()
+    active_tab = 'creation'  # Aba padrão
+    query = ''
+
+    if search_form.validate_on_submit():
+        query = search_form.search_query.data
+        active_tab = request.form.get('active_tab', 'creation')
+
     logs_categorized = {
         'creation': [],
         'alteration': [],
@@ -2312,42 +2319,53 @@ def admin_logs():
         'movement': [],
     }
 
+    category_map = {
+        'creation': '[CRIAÇÃO]',
+        'alteration': '[ALTERAÇÃO]',
+        'exclusion': '[EXCLUSÃO]',
+        'movement': '[MOVIMENTAÇÃO]',
+    }
+
     try:
         with open(log_path, 'r', encoding='utf-8') as f:
             all_lines = f.readlines()
 
-        log_entries = []
-        for line in reversed(all_lines): # Inverte para processar do mais novo para o mais antigo
+        for line in reversed(all_lines):
             match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - (.*)", line)
             if not match:
                 continue
 
             timestamp = match.group(1)
             message = match.group(2)
-
             entry = {"timestamp": timestamp, "message": message}
 
-            # Filtra pela query de busca ANTES de categorizar
-            query = search_form.search_query.data
-            if search_form.validate_on_submit() and query and query.lower() not in message.lower():
+            # Primeiro, categoriza a entrada
+            category = None
+            for cat, prefix in category_map.items():
+                if message.startswith(prefix):
+                    category = cat
+                    break
+
+            if not category:
                 continue
 
-            # Categoriza a entrada de log
-            if message.startswith('[CRIAÇÃO]'):
-                logs_categorized['creation'].append(entry)
-            elif message.startswith('[ALTERAÇÃO]'):
-                logs_categorized['alteration'].append(entry)
-            elif message.startswith('[EXCLUSÃO]'):
-                logs_categorized['exclusion'].append(entry)
-            elif message.startswith('[MOVIMENTAÇÃO]'):
-                logs_categorized['movement'].append(entry)
+            # Se houver uma busca, filtra APENAS na aba ativa
+            if query:
+                if category == active_tab and query.lower() in message.lower():
+                    logs_categorized[category].append(entry)
+                elif category != active_tab:
+                    # Adiciona a entrada não filtrada se não for a aba da busca
+                    logs_categorized[category].append(entry)
+            else:
+                # Se não houver busca, adiciona todas as entradas
+                logs_categorized[category].append(entry)
 
     except FileNotFoundError:
         flash("Arquivo de log não encontrado.", "warning")
     except Exception as e:
         flash(f"Erro ao ler o arquivo de log: {e}", "error")
 
-    return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form)
+    return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
 
 @app.route('/admin/permissions', methods=['GET', 'POST'])
 def permissions():
