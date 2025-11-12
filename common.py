@@ -127,6 +127,46 @@ def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
         return conn.entries[0]
     return None
 
+
+def search_groups_for_user_addition(conn, query, username):
+    """
+    Busca grupos no AD para adicionar um usuário, excluindo os grupos dos quais o usuário já é membro.
+    Retorna uma lista de dicionários, cada um contendo 'cn' e 'description' do grupo.
+    """
+    try:
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        # 1. Obter os grupos atuais do usuário para exclusão posterior
+        user = get_user_by_samaccountname(conn, username, attributes=['memberOf'])
+        if not user:
+            # Se o usuário não for encontrado, retorna uma lista vazia, pois não é possível determinar a associação.
+            return []
+
+        current_user_groups_dns = set(user.memberOf.values) if 'memberOf' in user and user.memberOf.values else set()
+
+        # 2. Buscar todos os grupos que correspondem à query
+        search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
+        conn.search(search_base, search_filter, attributes=['cn', 'description', 'distinguishedName'])
+
+        # 3. Filtrar os resultados para excluir aqueles dos quais o usuário já é membro
+        groups_not_member_of = []
+        for group in conn.entries:
+            if group.distinguishedName.value not in current_user_groups_dns:
+                groups_not_member_of.append({
+                    'cn': group.cn.value if 'cn' in group else '',
+                    'description': group.description.value if 'description' in group else 'N/A'
+                })
+
+        return sorted(groups_not_member_of, key=lambda g: g['cn'].lower())
+
+    except Exception as e:
+        # Loga o erro para depuração
+        # Supondo que 'logging' está configurado no módulo que chama esta função
+        # logging.error(f"Erro ao buscar grupos para adição do usuário '{username}': {e}", exc_info=True)
+        # Retorna uma lista vazia em caso de erro para não quebrar a API
+        return []
+
 def search_groups_for_user_addition(conn, query, username):
     """
     Busca por grupos no AD, excluindo aqueles dos quais o usuário já é membro.
