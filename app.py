@@ -1911,6 +1911,7 @@ def api_add_user_to_group_temp():
             schedule_id = str(uuid.uuid4())
             add_schedule = {
                 'id': schedule_id,
+            add_schedule = {
                 'user_sam': username, 'group_name': group_name,
                 'action': 'add', 'execution_date': start_date.isoformat()
             }
@@ -1921,6 +1922,19 @@ def api_add_user_to_group_temp():
         schedule_id = str(uuid.uuid4())
         remove_schedule = {
             'id': schedule_id,
+            'user_sam': username, 'group_name': group_name,
+            'action': 'remove', 'execution_date': end_date.isoformat()
+        }
+        schedules.append(remove_schedule)
+        save_group_schedules(schedules)
+
+        return jsonify({'success': True, 'message': f"Agendamento para '{username}' no grupo '{group_name}' realizado com sucesso."})
+
+            logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
+
+
+        # Agenda a remoção para a data de fim.
+        remove_schedule = {
             'user_sam': username, 'group_name': group_name,
             'action': 'remove', 'execution_date': end_date.isoformat()
         }
