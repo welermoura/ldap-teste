@@ -1254,65 +1254,6 @@ def api_search_groups():
         logging.error(f"Erro ao buscar grupos com a query '{query}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/remove_user_from_group', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_remove_user_from_group():
-    data = request.get_json()
-    username = data.get('username')
-    group_name = data.get('group_name')
-
-    if not username or not group_name:
-        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        group = get_group_by_name(conn, group_name, ['distinguishedName'])
-
-        if not user or not group:
-            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
-
-        conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
-
-        if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
-            return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
-        else:
-            raise Exception(f"Falha do LDAP: {conn.result['message']}")
-    except Exception as e:
-        logging.error(f"Erro ao remover o usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao remover do grupo: {e}'}), 500
-
-@app.route('/api/add_user_to_group', methods=['POST'])
-@require_auth
-@require_api_permission(action='can_manage_groups')
-def api_add_user_to_group():
-    data = request.get_json()
-    username = data.get('username')
-    group_name = data.get('group_name')
-
-    if not username or not group_name:
-        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
-
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        group = get_group_by_name(conn, group_name, ['distinguishedName'])
-
-        if not user or not group:
-            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
-
-        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
-
-        if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
-            return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
-        else:
-            raise Exception(f"Falha do LDAP: {conn.result['message']}")
-    except Exception as e:
-        logging.error(f"Erro ao adicionar o usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao adicionar ao grupo: {e}'}), 500
 
 @app.route('/api/user_details/<username>')
 @require_auth
@@ -1967,11 +1908,28 @@ def api_add_user_to_group_temp():
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
         else:
             # Se for no futuro, agenda a adição.
+            schedule_id = str(uuid.uuid4())
+            add_schedule = {
+                'id': schedule_id,
             add_schedule = {
                 'user_sam': username, 'group_name': group_name,
                 'action': 'add', 'execution_date': start_date.isoformat()
             }
             schedules.append(add_schedule)
+            logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'. ID: {schedule_id}")
+
+        # Agenda a remoção para a data de fim.
+        schedule_id = str(uuid.uuid4())
+        remove_schedule = {
+            'id': schedule_id,
+            'user_sam': username, 'group_name': group_name,
+            'action': 'remove', 'execution_date': end_date.isoformat()
+        }
+        schedules.append(remove_schedule)
+        save_group_schedules(schedules)
+
+        return jsonify({'success': True, 'message': f"Agendamento para '{username}' no grupo '{group_name}' realizado com sucesso."})
+
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
 
