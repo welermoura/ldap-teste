@@ -1482,33 +1482,57 @@ def api_disable_user_temp(username):
 @require_auth
 @require_api_permission(action='can_disable')
 def api_schedule_absence(username):
-    """Agenda a desativação e reativação de um usuário."""
+    """Agenda a desativação e reativação de um usuário, com desativação imediata se a data for hoje ou no passado."""
     data = request.get_json()
     deactivation_date_str = data.get('deactivation_date')
     reactivation_date_str = data.get('reactivation_date')
 
     if not deactivation_date_str or not reactivation_date_str:
-        return jsonify({'error': 'Datas de desativação and reativação são obrigatórias.'}), 400
+        return jsonify({'error': 'Datas de desativação e reativação são obrigatórias.'}), 400
 
     try:
         deactivation_date = date.fromisoformat(deactivation_date_str)
         reactivation_date = date.fromisoformat(reactivation_date_str)
+        today = date.today()
 
         if deactivation_date >= reactivation_date:
             return jsonify({'error': 'A data de reativação deve ser posterior à de desativação.'}), 400
 
-        # Salva o agendamento de desativação
-        disable_schedules = load_disable_schedules()
-        disable_schedules[username] = deactivation_date.isoformat()
-        save_disable_schedules(disable_schedules)
+        message = ""
 
-        # Salva o agendamento de reativação
+        # Se a data de desativação for hoje ou no passado, desativa imediatamente.
+        if deactivation_date <= today:
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
+            if not user:
+                return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+            uac = user.userAccountControl.value
+            if not (uac & 2):  # Se a conta não estiver desativada
+                conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac + 2)])]})
+                if conn.result['description'] != 'success':
+                    raise Exception(f"Erro do LDAP ao desativar: {conn.result['message']}")
+                logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada IMEDIATAMENTE (agendamento de ausência) por '{session.get('user_display_name')}'.")
+                message = "Usuário desativado imediatamente. "
+            else:
+                message = "Usuário já estava desativado. "
+        else:
+            # Se for no futuro, agenda a desativação.
+            disable_schedules = load_disable_schedules()
+            disable_schedules[username] = deactivation_date.isoformat()
+            save_disable_schedules(disable_schedules)
+            logging.info(f"[AGENDAMENTO] Desativação de '{username}' agendada para {deactivation_date_str} por '{session.get('user_display_name')}'.")
+            message = f"Desativação agendada para {deactivation_date.strftime('%d/%m/%Y')}. "
+
+        # Salva o agendamento de reativação em todos os casos.
         reactivation_schedules = load_schedules()
         reactivation_schedules[username] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
 
-        logging.info(f"[ALTERAÇÃO] Ausência para '{username}' agendada via API por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
-        return jsonify({'success': True, 'message': 'Ausência agendada com sucesso.'})
+        logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
+        message += f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."
+
+        return jsonify({'success': True, 'message': message})
 
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400

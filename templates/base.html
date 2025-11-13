@@ -88,7 +88,7 @@
         const themeToggleIcon = themeToggle.querySelector('i');
 
         const applyTheme = (theme) => {
-            docElement.setAttribute('data-theme', theme);
+            docElement.setAttribute('data-bs-theme', theme); // Alterado para data-bs-theme
             localStorage.setItem('theme', theme);
             if (theme === 'light') {
                 themeToggleIcon.className = 'fas fa-moon';
@@ -100,7 +100,7 @@
         };
 
         const toggleTheme = () => {
-            const currentTheme = docElement.getAttribute('data-theme') || 'light';
+            const currentTheme = docElement.getAttribute('data-bs-theme') || 'light'; // Alterado para data-bs-theme
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             applyTheme(newTheme);
         };
