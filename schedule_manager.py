@@ -113,24 +113,37 @@ def process_group_membership_changes(conn, search_base):
     today = date.today().isoformat()
     remaining_schedules = []
     for schedule in schedules:
-        if schedule.get('revert_date') <= today:
-            user_sam, group_name, action = schedule['user_sam'], schedule['group_name'], schedule['revert_action']
-            logging.info(f"Processando: {action} '{user_sam}' em '{group_name}'.")
+        # Adaptação para o novo formato de agendamento
+        execution_date = schedule.get('execution_date') or schedule.get('revert_date')
+        action = schedule.get('action') or schedule.get('revert_action')
+
+        if not execution_date or not action:
+            logging.warning(f"Agendamento malformado ignorado: {schedule}")
+            continue
+
+        if execution_date <= today:
+            user_sam, group_name = schedule['user_sam'], schedule['group_name']
+            logging.info(f"Processando: {action} '{user_sam}' em '{group_name}' agendado para {execution_date}.")
+
             user = get_user_by_samaccountname(conn, user_sam)
             group = get_group_by_name(conn, group_name)
+
             if not user or not group:
                 logging.warning(f"Usuário '{user_sam}' ou grupo '{group_name}' não encontrado. Removendo agendamento.")
                 continue
+
             try:
                 if action == 'add':
                     conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
                 elif action == 'remove':
                     conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+
                 if conn.result['description'] == 'success':
-                    logging.info(f"Sucesso na ação '{action}'.")
+                    logging.info(f"Sucesso ao executar a ação '{action}' para '{user_sam}' no grupo '{group_name}'.")
                 else:
-                    logging.error(f"Falha na ação '{action}': {conn.result['message']}. Mantendo agendamento.")
+                    logging.error(f"Falha na ação '{action}' para '{user_sam}': {conn.result['message']}. Mantendo agendamento.")
                     remaining_schedules.append(schedule)
+
             except Exception as e:
                 logging.error(f"Exceção ao processar agendamento para '{user_sam}': {e}. Mantendo agendamento.")
                 remaining_schedules.append(schedule)

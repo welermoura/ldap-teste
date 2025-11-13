@@ -17,6 +17,7 @@ import secrets
 import io
 import csv
 import base64
+import uuid
 from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
 
 # ==============================================================================
@@ -1121,6 +1122,66 @@ def api_search_users_for_group(group_name):
         logging.error(f"Erro na API de busca de usuários para o grupo '{group_name}': {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/add_user_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao adicionar o usuário '{username}' ao grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao adicionar ao grupo: {e}'}), 500
+
+@app.route('/api/remove_user_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_user_from_group():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+
+    if not username or not group_name:
+        return jsonify({'error': 'Nome de usuário e nome do grupo são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+        if not user or not group:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        logging.error(f"Erro ao remover o usuário '{username}' do grupo '{group_name}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao remover do grupo: {e}'}), 500
+
 @app.route('/view_group/<group_name>')
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -1868,50 +1929,70 @@ def remove_member(group_name, user_sam):
 
     return redirect(url_for('view_group', group_name=group_name))
 
-@app.route('/add_member_temp/<group_name>', methods=['POST'])
+@app.route('/api/add_user_to_group_temp', methods=['POST'])
 @require_auth
-@require_permission(action='can_manage_groups')
-def add_member_temp(group_name):
-    try:
-        days = int(request.args.get('days'))
-        user_sam = request.form.get('user_sam')
+@require_api_permission(action='can_manage_groups')
+def api_add_user_to_group_temp():
+    data = request.get_json()
+    username = data.get('username')
+    group_name = data.get('group_name')
+    start_date_str = data.get('start_date')
+    end_date_str = data.get('end_date')
 
-        if days <= 0 or not user_sam:
-            flash("Informações inválidas para adição temporária.", 'error')
-            return redirect(url_for('view_group', group_name=group_name))
+    if not all([username, group_name, start_date_str, end_date_str]):
+        return jsonify({'error': 'Todos os campos (usuário, grupo, data de início, data de fim) são obrigatórios.'}), 400
+
+    try:
+        start_date = date.fromisoformat(start_date_str)
+        end_date = date.fromisoformat(end_date_str)
+        today = date.today()
+
+        if start_date > end_date:
+            return jsonify({'error': 'A data de início não pode ser posterior à data de fim.'}), 400
 
         conn = get_service_account_connection()
-        user_to_add = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+        user_to_add = get_user_by_samaccountname(conn, username, ['distinguishedName'])
         group_to_modify = get_group_by_name(conn, group_name, ['distinguishedName'])
 
-        if user_to_add and group_to_modify:
-            # Adiciona o usuário imediatamente
+        if not user_to_add or not group_to_modify:
+            return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
+
+        schedules = load_group_schedules()
+
+        # Se a data de início for hoje ou no passado, adiciona imediatamente.
+        if start_date <= today:
             conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
-            if conn.result['description'] == 'success':
-                # Agenda a remoção
-                schedules = load_group_schedules()
-                revert_date = (date.today() + timedelta(days=days)).isoformat()
-                schedule_entry = {
-                    'user_sam': user_sam,
-                    'group_name': group_name,
-                    'revert_action': 'remove',
-                    'revert_date': revert_date
-                }
-                schedules.append(schedule_entry)
-                save_group_schedules(schedules)
-
-                flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' por {days} dias.", 'success')
-                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado temporariamente ao grupo '{group_name}' por '{session.get('ad_user')}'. Reversão em {revert_date}.")
-            else:
-                flash(f"Falha ao adicionar usuário: {conn.result['message']}", 'error')
+            if conn.result['description'] != 'success':
+                raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
         else:
-            flash("Usuário ou grupo não encontrado.", 'error')
+            # Se for no futuro, agenda a adição.
+            schedule_id = str(uuid.uuid4())
+            add_schedule = {
+                'id': schedule_id,
+                'user_sam': username, 'group_name': group_name,
+                'action': 'add', 'execution_date': start_date.isoformat()
+            }
+            schedules.append(add_schedule)
+            logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'. ID: {schedule_id}")
 
+        # Agenda a remoção para a data de fim.
+        schedule_id = str(uuid.uuid4())
+        remove_schedule = {
+            'id': schedule_id,
+            'user_sam': username, 'group_name': group_name,
+            'action': 'remove', 'execution_date': end_date.isoformat()
+        }
+        schedules.append(remove_schedule)
+        save_group_schedules(schedules)
+
+        return jsonify({'success': True, 'message': f"Agendamento para '{username}' no grupo '{group_name}' realizado com sucesso."})
+
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
     except Exception as e:
-        flash(f"Erro na adição temporária: {e}", 'error')
-        logging.error(f"Erro ao adicionar temporariamente o usuário '{request.form.get('user_sam')}' ao grupo '{group_name}': {e}", exc_info=True)
-
-    return redirect(url_for('view_group', group_name=group_name))
+        logging.error(f"Erro na API de adição temporária de grupo para o usuário '{username}': {e}", exc_info=True)
+        return jsonify({'error': f'Erro no servidor: {e}'}), 500
 
 @app.route('/remove_member_temp/<group_name>/<user_sam>', methods=['POST'])
 @require_auth
@@ -1955,6 +2036,49 @@ def remove_member_temp(group_name, user_sam):
         logging.error(f"Erro ao remover temporariamente o usuário '{user_sam}' do grupo '{group_name}': {e}", exc_info=True)
 
     return redirect(url_for('view_group', group_name=group_name))
+
+@app.route('/api/schedules', methods=['GET'])
+def api_get_schedules():
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Acesso negado.'}), 403
+
+    schedules = load_group_schedules()
+    return jsonify(schedules)
+
+@app.route('/api/schedules/<schedule_id>', methods=['PUT', 'DELETE'])
+def api_manage_schedule(schedule_id):
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Acesso negado.'}), 403
+
+    schedules = load_group_schedules()
+
+    if request.method == 'PUT':
+        data = request.get_json()
+        new_date = data.get('execution_date')
+        if not new_date:
+            return jsonify({'error': 'Nova data de execução é obrigatória.'}), 400
+
+        schedule_found = False
+        for schedule in schedules:
+            if schedule.get('id') == schedule_id:
+                schedule['execution_date'] = new_date
+                schedule_found = True
+                break
+
+        if not schedule_found:
+            return jsonify({'error': 'Agendamento não encontrado.'}), 404
+
+        save_group_schedules(schedules)
+        return jsonify({'success': True, 'message': 'Agendamento atualizado com sucesso.'})
+
+    elif request.method == 'DELETE':
+        schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
+
+        if len(schedules_to_keep) == len(schedules):
+            return jsonify({'error': 'Agendamento não encontrado.'}), 404
+
+        save_group_schedules(schedules_to_keep)
+        return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
 
 @app.route('/view_user/<username>')
 @require_auth
@@ -2284,6 +2408,12 @@ def admin_dashboard():
     if 'master_admin' not in session:
         return redirect(url_for('admin_login'))
     return render_template('admin/dashboard.html')
+
+@app.route('/admin/manage_schedules')
+def manage_schedules():
+    if 'master_admin' not in session:
+        return redirect(url_for('admin_login'))
+    return render_template('admin/manage_schedules.html')
 
 @app.route('/admin/logout')
 def admin_logout():
