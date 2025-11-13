@@ -1967,19 +1967,16 @@ def api_add_user_to_group_temp():
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
         else:
             # Se for no futuro, agenda a adição.
-            schedule_id = str(uuid.uuid4())
             add_schedule = {
-                'id': schedule_id,
                 'user_sam': username, 'group_name': group_name,
                 'action': 'add', 'execution_date': start_date.isoformat()
             }
             schedules.append(add_schedule)
-            logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'. ID: {schedule_id}")
+            logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
+
 
         # Agenda a remoção para a data de fim.
-        schedule_id = str(uuid.uuid4())
         remove_schedule = {
-            'id': schedule_id,
             'user_sam': username, 'group_name': group_name,
             'action': 'remove', 'execution_date': end_date.isoformat()
         }
