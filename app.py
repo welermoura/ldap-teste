@@ -539,7 +539,7 @@ def create_ad_user(conn, form_data, model_attrs):
         conn.extend.microsoft.modify_password(user_dn, default_password)
         conn.modify(user_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [512])], 'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
         if 'memberOf' in model_attrs and model_attrs.memberOf: conn.extend.microsoft.add_members_to_groups(user_dn, [str(g) for g in model_attrs.memberOf])
-        logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado por '{session.get('ad_user')}'.")
+        logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado por '{session.get('user_display_name')}'.")
         return {'success': True, 'message': f"Usuário '{display_name}' criado com sucesso!", 'email': email, 'initials': initials, 'display_name': display_name, 'sam_account': sam, 'password': default_password, 'ou_path': get_ou_path(model_attrs.entry_dn)}
     except Exception as e:
         logging.error(f"Erro ao criar o usuário '{display_name}': {e}")
