@@ -17,6 +17,7 @@ import secrets
 import io
 import csv
 import base64
+import uuid
 from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
 
 # ==============================================================================
@@ -1921,6 +1922,7 @@ def api_add_user_to_group_temp():
             return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
 
         schedules = load_group_schedules()
+        schedule_id = str(uuid.uuid4()) # Gera um ID único para o par de agendamentos
 
         # Se a data de início for hoje ou no passado, adiciona imediatamente.
         if start_date <= today:
@@ -1931,17 +1933,22 @@ def api_add_user_to_group_temp():
         else:
             # Se for no futuro, agenda a adição.
             add_schedule = {
-                'user_sam': username, 'group_name': group_name,
-                'action': 'add', 'execution_date': start_date.isoformat()
+                'id': schedule_id,
+                'user_sam': username,
+                'group_name': group_name,
+                'action': 'add',
+                'execution_date': start_date.isoformat()
             }
             schedules.append(add_schedule)
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
-
         # Agenda a remoção para a data de fim.
         remove_schedule = {
-            'user_sam': username, 'group_name': group_name,
-            'action': 'remove', 'execution_date': end_date.isoformat()
+            'id': schedule_id,
+            'user_sam': username,
+            'group_name': group_name,
+            'action': 'remove',
+            'execution_date': end_date.isoformat()
         }
         schedules.append(remove_schedule)
         save_group_schedules(schedules)
@@ -2459,6 +2466,63 @@ def admin_logs():
         flash(f"Erro ao ler o arquivo de log: {e}", "error")
 
     return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
+
+@app.route('/admin/manage_schedules')
+def manage_schedules():
+    if 'master_admin' not in session:
+        return redirect(url_for('admin_login'))
+    return render_template('admin/manage_schedules.html')
+
+@app.route('/api/schedules', methods=['GET'])
+def get_schedules():
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+    schedules = load_group_schedules()
+    return jsonify(schedules)
+
+@app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id):
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    schedules = load_group_schedules()
+    original_count = len(schedules)
+    schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
+
+    if len(schedules_to_keep) < original_count:
+        save_group_schedules(schedules_to_keep)
+        return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
+    else:
+        return jsonify({'error': 'Agendamento não encontrado.'}), 404
+
+@app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+def update_schedule(schedule_id):
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    data = request.get_json()
+    new_date = data.get('execution_date')
+    action_to_update = data.get('action') # 'add' or 'remove'
+
+    if not new_date:
+        return jsonify({'error': 'Nova data de execução é obrigatória.'}), 400
+    if not action_to_update:
+        return jsonify({'error': 'A ação específica (add/remove) é obrigatória para a atualização.'}), 400
+
+    schedules = load_group_schedules()
+    schedule_found = False
+    for schedule in schedules:
+        # A condição agora verifica tanto o ID quanto a ação
+        if schedule.get('id') == schedule_id and schedule.get('action') == action_to_update:
+            schedule['execution_date'] = new_date
+            schedule_found = True
+            break # Encontrou e atualizou a entrada específica, pode parar
+
+    if schedule_found:
+        save_group_schedules(schedules)
+        return jsonify({'success': True, 'message': 'Data do agendamento atualizada com sucesso.'})
+    else:
+        return jsonify({'error': 'Agendamento específico não encontrado.'}), 404
 
 @app.route('/admin/permissions', methods=['GET', 'POST'])
 def permissions():
