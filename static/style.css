@@ -1,7 +1,7 @@
 /* ==========================================================================
    Theme Variables - Dark and Light
    ========================================================================== */
-:root, html[data-theme='dark'] {
+:root, [data-bs-theme="dark"] {
     --primary-color: #28a745;
     --primary-hover-color: #218838;
     --secondary-color: #6c757d;
@@ -139,6 +139,11 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: var(--datepicker
 .modal .form-control { background-color: var(--input-background) !important; border-color: var(--input-border-color) !important; color: var(--text-color) !important; }
 .modal .form-control:focus { background-color: rgba(0, 0, 0, 0.4) !important; border-color: var(--primary-color) !important; }
 .modal .modal-title, .modal .modal-body, .modal .text-muted { color: var(--text-color); }
+
+[data-bs-theme="dark"] .modal-body {
+    color: var(--text-color);
+}
+
 .modal .btn-close { filter: var(--datepicker-filter); }
 
 .btn { color: #fff !important; background-image: none !important; text-transform: none !important; font-size: 0.9rem !important; padding: 0.4rem 0.8rem !important; border-radius: 8px !important; transition: all 0.2s ease-in-out !important; border: 1px solid transparent !important; }
