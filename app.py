@@ -1930,16 +1930,19 @@ def api_add_user_to_group_temp():
             if conn.result['description'] != 'success':
                 raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
-        else:
-            # Se for no futuro, agenda a adição.
-            add_schedule = {
-                'id': schedule_id,
-                'user_sam': username,
-                'group_name': group_name,
-                'action': 'add',
-                'execution_date': start_date.isoformat()
-            }
-            schedules.append(add_schedule)
+
+        # SEMPRE cria um registro de 'add' para garantir que a data de início seja exibida na interface.
+        add_schedule = {
+            'id': schedule_id,
+            'user_sam': username,
+            'group_name': group_name,
+            'action': 'add',
+            'execution_date': start_date.isoformat()
+        }
+        schedules.append(add_schedule)
+
+        # Loga a ação de agendamento apenas se a data for no futuro.
+        if start_date > today:
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
         # Agenda a remoção para a data de fim.
