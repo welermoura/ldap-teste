@@ -1,219 +1,244 @@
 {% extends "base.html" %}
-{% from "_macros.html" import render_page_header %}
 
 {% block title %}Gerenciar Agendamentos{% endblock %}
 
 {% block page_title %}
-    {{ render_page_header('<i class="fas fa-calendar-alt me-2"></i>Gerenciar Agendamentos de Grupos', back_url=url_for('admin_dashboard')) }}
+<div class="page-header">
+    <h1><i class="fas fa-calendar-alt me-2"></i>Gerenciar Agendamentos</h1>
+    <div>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-home me-2"></i>Home</a>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar ao Painel</a>
+    </div>
+</div>
 {% endblock %}
 
 {% block content %}
 <div class="card glass-card">
     <div class="card-header">
-        <h5 class="mb-0">Agendamentos Ativos</h5>
+        <h5 class="mb-0">Agendamentos de Grupos Temporários</h5>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive" id="schedules-table-container">
-            <div class="text-center p-5" id="loading-spinner">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2">Carregando agendamentos...</p>
-            </div>
-            <!-- A tabela de agendamentos será renderizada aqui via JavaScript -->
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Grupo</th>
+                        <th>Ação</th>
+                        <th>Data de Execução</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="schedules-table-body">
+                    <!-- As linhas da tabela serão inseridas aqui via JavaScript -->
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- Modal de Edição de Agendamento -->
-<div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editScheduleModalLabel">Editar Agendamento</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="edit-schedule-id">
-                <div class="mb-3">
-                    <label for="edit-execution-date" class="form-label">Nova Data de Execução</label>
-                    <input type="date" class="form-control" id="edit-execution-date">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" id="save-schedule-changes-btn" class="btn btn-primary">Salvar Alterações</button>
-            </div>
-        </div>
+<!-- Modal de Confirmação de Exclusão -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirmar Cancelamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Você tem certeza de que deseja cancelar este agendamento e sua ação correspondente?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
+        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Sim, Cancelar</button>
+      </div>
     </div>
-</div>
-
-<!-- Modal de Confirmação para Cancelamento -->
-<div class="modal fade" id="cancelConfirmationModal" tabindex="-1" aria-labelledby="cancelConfirmationModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="cancelConfirmationModalLabel">Confirmar Cancelamento</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                Tem certeza de que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Não</button>
-                <button type="button" id="confirm-cancel-btn" class="btn btn-danger">Sim, Cancelar</button>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-{{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const tableContainer = document.getElementById('schedules-table-container');
-    const loadingSpinner = document.getElementById('loading-spinner');
-    const editModalEl = document.getElementById('editScheduleModal');
-    const editModal = new bootstrap.Modal(editModalEl);
-    const cancelModalEl = document.getElementById('cancelConfirmationModal');
-    const cancelModal = new bootstrap.Modal(cancelModalEl);
+    const tableBody = document.getElementById('schedules-table-body');
+    let schedulesData = [];
+    let scheduleToDeleteId = null;
 
-    let currentScheduleId = null;
+    // Mapeia os nomes das ações para uma melhor exibição
+    const actionDisplayNames = {
+        'add': 'Adicionar ao Grupo',
+        'remove': 'Remover do Grupo'
+    };
 
-    async function fetchSchedules() {
-        try {
-            const response = await fetch('/api/schedules');
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Falha ao buscar agendamentos.');
-            }
-            const schedules = await response.json();
-            renderSchedules(schedules);
-        } catch (error) {
-            tableContainer.innerHTML = `<div class="alert alert-danger m-3">${error.message}</div>`;
-        }
-    }
-
-    function renderSchedules(schedules) {
-        if (schedules.length === 0) {
-            tableContainer.innerHTML = '<div class="alert alert-info m-3">Nenhum agendamento encontrado.</div>';
+    function renderTable() {
+        tableBody.innerHTML = '';
+        if (schedulesData.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Nenhum agendamento encontrado.</td></tr>';
             return;
         }
 
-        const table = document.createElement('table');
-        table.className = 'table table-hover glass-table mb-0';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Usuário</th>
-                    <th>Grupo</th>
-                    <th>Ação</th>
-                    <th>Data de Execução</th>
-                    <th class="text-end">Ações</th>
-                </tr>
-            </thead>
-        `;
-        const tbody = table.createTBody();
-        schedules.forEach(schedule => {
-            const row = tbody.insertRow();
-            const actionText = schedule.action === 'add' ? 'Adicionar' : 'Remover';
-            const actionClass = schedule.action === 'add' ? 'text-success' : 'text-danger';
-            row.innerHTML = `
-                <td>${schedule.user_sam}</td>
-                <td>${schedule.group_name}</td>
-                <td><strong class="${actionClass}">${actionText}</strong></td>
-                <td>${new Date(schedule.execution_date + 'T00:00:00').toLocaleDateString()}</td>
-                <td class="text-end">
-                    <button class="btn btn-primary btn-sm edit-btn" data-id="${schedule.id}" data-date="${schedule.execution_date}">
-                        <i class="fas fa-edit"></i> Editar
-                    </button>
-                    <button class="btn btn-danger btn-sm cancel-btn" data-id="${schedule.id}">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
-                </td>
-            `;
-        });
-        tableContainer.innerHTML = '';
-        tableContainer.appendChild(table);
-    }
+        // Agrupa os agendamentos por ID
+        const groupedSchedules = schedulesData.reduce((acc, schedule) => {
+            if (!acc[schedule.id]) {
+                acc[schedule.id] = [];
+            }
+            acc[schedule.id].push(schedule);
+            return acc;
+        }, {});
 
-    function showToast(title, message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
+        // Cria as linhas da tabela
+        Object.values(groupedSchedules).forEach(group => {
+            // Ordena para garantir que a remoção (data de fim) venha depois da adição (data de início) se as datas forem diferentes
+            group.sort((a, b) => new Date(a.execution_date) - new Date(b.execution_date));
 
-        const toastId = 'toast-' + Date.now();
-        toastContainer.insertAdjacentHTML('beforeend', `
-            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="me-auto text-${type}">${title}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-                <div class="toast-body">${message}</div>
-            </div>`);
-        const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-        toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
-    }
+            group.forEach((schedule, index) => {
+                const tr = document.createElement('tr');
+                const executionDate = new Date(schedule.execution_date + 'T00:00:00-03:00'); // Considera a data como local
+                const formattedDate = executionDate.toLocaleDateString('pt-BR');
 
-    async function updateSchedule(scheduleId, newDate) {
-        try {
-            const response = await fetch(`/api/schedules/${scheduleId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ execution_date: newDate })
+                // Na primeira linha do grupo, mostra usuário e grupo com rowspan
+                if (index === 0) {
+                    tr.innerHTML += `<td rowspan="${group.length}">${schedule.user_sam}</td>`;
+                    tr.innerHTML += `<td rowspan="${group.length}">${schedule.group_name}</td>`;
+                }
+
+                tr.innerHTML += `
+                    <td>
+                        <span class="badge ${schedule.action === 'add' ? 'bg-success' : 'bg-danger'}">
+                            ${actionDisplayNames[schedule.action] || schedule.action}
+                        </span>
+                    </td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm" value="${schedule.execution_date}" data-id="${schedule.id}" data-action="${schedule.action}" style="max-width: 150px;">
+                    </td>
+                `;
+
+                // Botão de cancelar apenas na primeira linha do grupo
+                if (index === 0) {
+                    tr.innerHTML += `
+                        <td rowspan="${group.length}" class="align-middle">
+                            <button class="btn btn-danger btn-sm delete-btn" data-id="${schedule.id}" title="Cancelar Agendamento">
+                                <i class="fas fa-trash-alt"></i> Cancelar
+                            </button>
+                        </td>`;
+                }
+
+                tableBody.appendChild(tr);
             });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error);
-            showToast('Sucesso', 'Agendamento atualizado.', 'success');
-            fetchSchedules();
-            editModal.hide();
-        } catch (error) {
-            showToast('Erro', error.message, 'error');
-        }
+        });
     }
 
-    async function deleteSchedule(scheduleId) {
-        try {
-            const response = await fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error);
-            showToast('Sucesso', 'Agendamento cancelado.', 'success');
-            fetchSchedules();
-            cancelModal.hide();
-        } catch (error) {
-            showToast('Erro', error.message, 'error');
-        }
+    function fetchSchedules() {
+        fetch('/api/schedules')
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    return;
+                }
+                // Ordena os dados por data de execução
+                schedulesData = data.sort((a, b) => new Date(a.execution_date) - new Date(b.execution_date));
+                renderTable();
+            })
+            .catch(error => {
+                console.error('Erro ao buscar agendamentos:', error);
+                showToast('Falha ao carregar agendamentos.', 'error');
+            });
     }
 
-    tableContainer.addEventListener('click', (e) => {
-        const editBtn = e.target.closest('.edit-btn');
-        if (editBtn) {
-            currentScheduleId = editBtn.dataset.id;
-            document.getElementById('edit-schedule-id').value = currentScheduleId;
-            document.getElementById('edit-execution-date').value = editBtn.dataset.date;
-            editModal.show();
-        }
-
-        const cancelBtn = e.target.closest('.cancel-btn');
-        if (cancelBtn) {
-            currentScheduleId = cancelBtn.dataset.id;
-            cancelModal.show();
+    // Delegação de eventos para os botões de cancelar
+    tableBody.addEventListener('click', function(event) {
+        if (event.target.closest('.delete-btn')) {
+            scheduleToDeleteId = event.target.closest('.delete-btn').dataset.id;
+            const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            deleteModal.show();
         }
     });
 
-    document.getElementById('save-schedule-changes-btn').addEventListener('click', () => {
-        const newDate = document.getElementById('edit-execution-date').value;
-        if (currentScheduleId && newDate) {
-            updateSchedule(currentScheduleId, newDate);
+    // Ação de confirmação do modal de exclusão
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        if (!scheduleToDeleteId) return;
+
+        fetch(`/api/schedules/${scheduleToDeleteId}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                fetchSchedules(); // Atualiza a tabela
+            } else {
+                showToast(data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao cancelar agendamento:', error);
+            showToast('Falha ao cancelar o agendamento.', 'error');
+        })
+        .finally(() => {
+            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+            deleteModal.hide();
+            scheduleToDeleteId = null;
+        });
+    });
+
+    // Delegação de eventos para os inputs de data
+    tableBody.addEventListener('change', function(event) {
+        if (event.target.matches('input[type="date"]')) {
+            const scheduleId = event.target.dataset.id;
+            const newDate = event.target.value;
+            const action = event.target.dataset.action;
+
+            // Encontrar o agendamento correspondente para validação
+            const scheduleGroup = schedulesData.filter(s => s.id === scheduleId);
+            const addSchedule = scheduleGroup.find(s => s.action === 'add');
+            const removeSchedule = scheduleGroup.find(s => s.action === 'remove');
+
+            let startDate, endDate;
+
+            if (action === 'add') {
+                startDate = newDate;
+                endDate = removeSchedule ? removeSchedule.execution_date : null;
+            } else { // action === 'remove'
+                startDate = addSchedule ? addSchedule.execution_date : null;
+                endDate = newDate;
+            }
+
+            // Validar se a data de início é anterior à data de fim
+            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+                 showToast('Erro: A data de início não pode ser posterior à data de fim.', 'error');
+                 event.target.value = schedulesData.find(s => s.id === scheduleId && s.action === action).execution_date; // Reverte a alteração
+                 return;
+            }
+
+
+            fetch(`/api/schedules/${scheduleId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ execution_date: newDate, action: action })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    fetchSchedules(); // Atualiza a tabela para refletir a mudança
+                } else {
+                    showToast(data.error || 'Falha ao atualizar a data.', 'error');
+                    // Reverte a alteração no input se a API falhar
+                    event.target.value = schedulesData.find(s => s.id === scheduleId).execution_date;
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar data:', error);
+                showToast('Um erro ocorreu ao tentar atualizar a data.', 'error');
+                event.target.value = schedulesData.find(s => s.id === scheduleId).execution_date;
+            });
         }
     });
 
-    document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
-        if (currentScheduleId) {
-            deleteSchedule(currentScheduleId);
-        }
-    });
-
+    // Carrega os dados iniciais
     fetchSchedules();
 });
 </script>
