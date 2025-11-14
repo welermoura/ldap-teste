@@ -493,27 +493,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // Função para exibir toasts (notificações) - requer um container no base.html
-    function showToast(title, message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
-
-        const toastId = 'toast-' + Date.now();
-        const toastHTML = `
-            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="me-auto text-${type}">${title}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-                <div class="toast-body">${message}</div>
-            </div>`;
-
-        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-        const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-        toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
-    }
+    // Single, persistent event listener on the confirmation button
+    confirmActionBtn.addEventListener('click', function() {
+        if (typeof currentConfirmAction === 'function') {
+            currentConfirmAction();
+        }
+        confirmationModal.hide();
+    });
 
     // Single, persistent event listener on the confirmation button
     confirmActionBtn.addEventListener('click', function() {
@@ -606,22 +592,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 {% endif %}
 
-<!-- Modal de Confirmação Genérico -->
-<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="confirmationModalBody">
-        ...
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}

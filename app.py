@@ -2489,14 +2489,38 @@ def delete_schedule(schedule_id):
         return jsonify({'error': 'Não autorizado'}), 401
 
     schedules = load_group_schedules()
-    original_count = len(schedules)
-    schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
 
-    if len(schedules_to_keep) < original_count:
-        save_group_schedules(schedules_to_keep)
-        return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
-    else:
+    # Encontra os agendamentos a serem removidos E guarda suas informações
+    schedules_to_remove = [s for s in schedules if s.get('id') == schedule_id]
+    if not schedules_to_remove:
         return jsonify({'error': 'Agendamento não encontrado.'}), 404
+
+    # Encontra a data de início para a lógica de remoção
+    add_schedule = next((s for s in schedules_to_remove if s.get('action') == 'add'), None)
+
+    try:
+        # Se o agendamento de adição existia e sua data já passou, remove o usuário do grupo no AD
+        if add_schedule and date.fromisoformat(add_schedule['execution_date']) <= date.today():
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, add_schedule['user_sam'], ['distinguishedName'])
+            group = get_group_by_name(conn, add_schedule['group_name'], ['distinguishedName'])
+
+            if user and group:
+                conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                if conn.result['description'] != 'success':
+                    # Loga o erro mas não impede o cancelamento do agendamento
+                    logging.error(f"Falha ao remover '{add_schedule['user_sam']}' do grupo '{add_schedule['group_name']}' durante o cancelamento: {conn.result['message']}")
+
+    except Exception as e:
+        logging.error(f"Erro na lógica de remoção de grupo durante o cancelamento do agendamento '{schedule_id}': {e}", exc_info=True)
+        # Retorna um erro, pois a ação no AD falhou
+        return jsonify({'error': f'Falha ao remover usuário do grupo no AD: {e}'}), 500
+
+    # Remove os agendamentos do arquivo JSON
+    schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
+    save_group_schedules(schedules_to_keep)
+
+    return jsonify({'success': True, 'message': 'Agendamento cancelado e acesso removido (se aplicável).'})
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
 def update_schedule(schedule_id):
