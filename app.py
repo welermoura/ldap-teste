@@ -17,6 +17,7 @@ import secrets
 import io
 import csv
 import base64
+import uuid
 from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
 
 # ==============================================================================
@@ -1482,33 +1483,57 @@ def api_disable_user_temp(username):
 @require_auth
 @require_api_permission(action='can_disable')
 def api_schedule_absence(username):
-    """Agenda a desativação e reativação de um usuário."""
+    """Agenda a desativação e reativação de um usuário, com desativação imediata se a data for hoje ou no passado."""
     data = request.get_json()
     deactivation_date_str = data.get('deactivation_date')
     reactivation_date_str = data.get('reactivation_date')
 
     if not deactivation_date_str or not reactivation_date_str:
-        return jsonify({'error': 'Datas de desativação and reativação são obrigatórias.'}), 400
+        return jsonify({'error': 'Datas de desativação e reativação são obrigatórias.'}), 400
 
     try:
         deactivation_date = date.fromisoformat(deactivation_date_str)
         reactivation_date = date.fromisoformat(reactivation_date_str)
+        today = date.today()
 
         if deactivation_date >= reactivation_date:
             return jsonify({'error': 'A data de reativação deve ser posterior à de desativação.'}), 400
 
-        # Salva o agendamento de desativação
-        disable_schedules = load_disable_schedules()
-        disable_schedules[username] = deactivation_date.isoformat()
-        save_disable_schedules(disable_schedules)
+        message = ""
 
-        # Salva o agendamento de reativação
+        # Se a data de desativação for hoje ou no passado, desativa imediatamente.
+        if deactivation_date <= today:
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
+            if not user:
+                return jsonify({'error': 'Usuário não encontrado.'}), 404
+
+            uac = user.userAccountControl.value
+            if not (uac & 2):  # Se a conta não estiver desativada
+                conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac + 2)])]})
+                if conn.result['description'] != 'success':
+                    raise Exception(f"Erro do LDAP ao desativar: {conn.result['message']}")
+                logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada IMEDIATAMENTE (agendamento de ausência) por '{session.get('user_display_name')}'.")
+                message = "Usuário desativado imediatamente. "
+            else:
+                message = "Usuário já estava desativado. "
+        else:
+            # Se for no futuro, agenda a desativação.
+            disable_schedules = load_disable_schedules()
+            disable_schedules[username] = deactivation_date.isoformat()
+            save_disable_schedules(disable_schedules)
+            logging.info(f"[AGENDAMENTO] Desativação de '{username}' agendada para {deactivation_date_str} por '{session.get('user_display_name')}'.")
+            message = f"Desativação agendada para {deactivation_date.strftime('%d/%m/%Y')}. "
+
+        # Salva o agendamento de reativação em todos os casos.
         reactivation_schedules = load_schedules()
         reactivation_schedules[username] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
 
-        logging.info(f"[ALTERAÇÃO] Ausência para '{username}' agendada via API por '{session.get('user_display_name')}'. Desativação em: {deactivation_date_str}, Reativação em: {reactivation_date_str}.")
-        return jsonify({'success': True, 'message': 'Ausência agendada com sucesso.'})
+        logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
+        message += f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."
+
+        return jsonify({'success': True, 'message': message})
 
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
@@ -1897,6 +1922,7 @@ def api_add_user_to_group_temp():
             return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
 
         schedules = load_group_schedules()
+        schedule_id = str(uuid.uuid4()) # Gera um ID único para o par de agendamentos
 
         # Se a data de início for hoje ou no passado, adiciona imediatamente.
         if start_date <= today:
@@ -1907,17 +1933,22 @@ def api_add_user_to_group_temp():
         else:
             # Se for no futuro, agenda a adição.
             add_schedule = {
-                'user_sam': username, 'group_name': group_name,
-                'action': 'add', 'execution_date': start_date.isoformat()
+                'id': schedule_id,
+                'user_sam': username,
+                'group_name': group_name,
+                'action': 'add',
+                'execution_date': start_date.isoformat()
             }
             schedules.append(add_schedule)
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
-
         # Agenda a remoção para a data de fim.
         remove_schedule = {
-            'user_sam': username, 'group_name': group_name,
-            'action': 'remove', 'execution_date': end_date.isoformat()
+            'id': schedule_id,
+            'user_sam': username,
+            'group_name': group_name,
+            'action': 'remove',
+            'execution_date': end_date.isoformat()
         }
         schedules.append(remove_schedule)
         save_group_schedules(schedules)
@@ -2435,6 +2466,69 @@ def admin_logs():
         flash(f"Erro ao ler o arquivo de log: {e}", "error")
 
     return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
+
+@app.route('/admin/manage_schedules')
+def manage_schedules():
+    if 'master_admin' not in session:
+        return redirect(url_for('admin_login'))
+    return render_template('admin/manage_schedules.html')
+
+@app.route('/api/schedules', methods=['GET'])
+def get_schedules():
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+    schedules = load_group_schedules()
+    return jsonify(schedules)
+
+@app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id):
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    schedules = load_group_schedules()
+    original_count = len(schedules)
+    schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
+
+    if len(schedules_to_keep) < original_count:
+        save_group_schedules(schedules_to_keep)
+        return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
+    else:
+        return jsonify({'error': 'Agendamento não encontrado.'}), 404
+
+@app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+def update_schedule(schedule_id):
+    if 'master_admin' not in session:
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    data = request.get_json()
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+
+    if not start_date or not end_date:
+        return jsonify({'error': 'Datas de início e fim são obrigatórias.'}), 400
+
+    try:
+        # Validação do formato da data
+        date.fromisoformat(start_date)
+        date.fromisoformat(end_date)
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
+
+    schedules = load_group_schedules()
+
+    # Encontra as entradas de 'add' e 'remove' para o ID fornecido
+    add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
+    remove_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'remove'), None)
+
+    if not add_schedule or not remove_schedule:
+        return jsonify({'error': 'Agendamento de início ou fim não encontrado para este ID.'}), 404
+
+    # Atualiza as datas
+    add_schedule['execution_date'] = start_date
+    remove_schedule['execution_date'] = end_date
+
+    save_group_schedules(schedules)
+    return jsonify({'success': True, 'message': 'Agendamento atualizado com sucesso.'})
 
 @app.route('/admin/permissions', methods=['GET', 'POST'])
 def permissions():
