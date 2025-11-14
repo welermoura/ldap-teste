@@ -19,7 +19,7 @@
     </div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-striped table-hover">
+            <table class="table table-striped table-hover glass-table">
                 <thead>
                     <tr>
                         <th>Usuário</th>
@@ -55,19 +55,48 @@
     </div>
   </div>
 </div>
+
+<!-- Modal de Edição -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editScheduleModalLabel">Editar Agendamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-schedule-id">
+        <div class="mb-3">
+          <label for="edit-start-date" class="form-label">Início do Acesso</label>
+          <input type="date" class="form-control" id="edit-start-date">
+        </div>
+        <div class="mb-3">
+          <label for="edit-end-date" class="form-label">Fim do Acesso</label>
+          <input type="date" class="form-control" id="edit-end-date">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="save-changes-btn">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const tableBody = document.getElementById('schedules-table-body');
+    const editModal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
     let schedulesData = [];
-    let scheduleToDeleteId = null;
+    let scheduleId = null; // Para delete e edit
 
     // Mapeia os nomes das ações para uma melhor exibição
     const actionDisplayNames = {
-        'add': 'Adicionar ao Grupo',
-        'remove': 'Remover do Grupo'
+        'add': 'Início do Acesso',
+        'remove': 'Fim do Acesso'
     };
 
     function renderTable() {
@@ -77,54 +106,37 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Agrupa os agendamentos por ID
         const groupedSchedules = schedulesData.reduce((acc, schedule) => {
             if (!acc[schedule.id]) {
-                acc[schedule.id] = [];
+                acc[schedule.id] = {};
             }
-            acc[schedule.id].push(schedule);
+            acc[schedule.id][schedule.action] = schedule;
+            if (!acc[schedule.id].details) {
+                 acc[schedule.id].details = { user_sam: schedule.user_sam, group_name: schedule.group_name };
+            }
             return acc;
         }, {});
 
-        // Cria as linhas da tabela
-        Object.values(groupedSchedules).forEach(group => {
-            // Ordena para garantir que a remoção (data de fim) venha depois da adição (data de início) se as datas forem diferentes
-            group.sort((a, b) => new Date(a.execution_date) - new Date(b.execution_date));
+        Object.entries(groupedSchedules).forEach(([id, group]) => {
+             const tr = document.createElement('tr');
+             const startDate = group.add ? new Date(group.add.execution_date + 'T00:00:00-03:00').toLocaleDateString('pt-BR') : 'N/A';
+             const endDate = group.remove ? new Date(group.remove.execution_date + 'T00:00:00-03:00').toLocaleDateString('pt-BR') : 'N/A';
 
-            group.forEach((schedule, index) => {
-                const tr = document.createElement('tr');
-                const executionDate = new Date(schedule.execution_date + 'T00:00:00-03:00'); // Considera a data como local
-                const formattedDate = executionDate.toLocaleDateString('pt-BR');
-
-                // Na primeira linha do grupo, mostra usuário e grupo com rowspan
-                if (index === 0) {
-                    tr.innerHTML += `<td rowspan="${group.length}">${schedule.user_sam}</td>`;
-                    tr.innerHTML += `<td rowspan="${group.length}">${schedule.group_name}</td>`;
-                }
-
-                tr.innerHTML += `
-                    <td>
-                        <span class="badge ${schedule.action === 'add' ? 'bg-success' : 'bg-danger'}">
-                            ${actionDisplayNames[schedule.action] || schedule.action}
-                        </span>
-                    </td>
-                    <td>
-                        <input type="date" class="form-control form-control-sm" value="${schedule.execution_date}" data-id="${schedule.id}" data-action="${schedule.action}" style="max-width: 150px;">
-                    </td>
-                `;
-
-                // Botão de cancelar apenas na primeira linha do grupo
-                if (index === 0) {
-                    tr.innerHTML += `
-                        <td rowspan="${group.length}" class="align-middle">
-                            <button class="btn btn-danger btn-sm delete-btn" data-id="${schedule.id}" title="Cancelar Agendamento">
-                                <i class="fas fa-trash-alt"></i> Cancelar
-                            </button>
-                        </td>`;
-                }
-
-                tableBody.appendChild(tr);
-            });
+             tr.innerHTML = `
+                <td>${group.details.user_sam}</td>
+                <td>${group.details.group_name}</td>
+                <td><span class="badge bg-success">${startDate}</span></td>
+                <td><span class="badge bg-danger">${endDate}</span></td>
+                <td>
+                    <button class="btn btn-primary btn-sm edit-btn" data-id="${id}" title="Editar Agendamento">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button class="btn btn-danger btn-sm delete-btn" data-id="${id}" title="Cancelar Agendamento">
+                        <i class="fas fa-trash-alt"></i> Cancelar
+                    </button>
+                </td>
+             `;
+             tableBody.appendChild(tr);
         });
     }
 
@@ -136,7 +148,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     showToast(data.error, 'error');
                     return;
                 }
-                // Ordena os dados por data de execução
                 schedulesData = data.sort((a, b) => new Date(a.execution_date) - new Date(b.execution_date));
                 renderTable();
             })
@@ -146,27 +157,86 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // Delegação de eventos para os botões de cancelar
+    // Delegação de Eventos para Abrir Modais
     tableBody.addEventListener('click', function(event) {
-        if (event.target.closest('.delete-btn')) {
-            scheduleToDeleteId = event.target.closest('.delete-btn').dataset.id;
-            const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        const target = event.target;
+        const editBtn = target.closest('.edit-btn');
+        const deleteBtn = target.closest('.delete-btn');
+
+        if (editBtn) {
+            scheduleId = editBtn.dataset.id;
+            const scheduleGroup = schedulesData.filter(s => s.id === scheduleId);
+            const addSchedule = scheduleGroup.find(s => s.action === 'add');
+            const removeSchedule = scheduleGroup.find(s => s.action === 'remove');
+
+            document.getElementById('edit-schedule-id').value = scheduleId;
+            document.getElementById('edit-start-date').value = addSchedule ? addSchedule.execution_date : '';
+            document.getElementById('edit-end-date').value = removeSchedule ? removeSchedule.execution_date : '';
+
+            // Define o título do modal
+            const modalTitle = document.getElementById('editScheduleModalLabel');
+            if (addSchedule && removeSchedule) {
+                modalTitle.textContent = `Editando Acesso de ${addSchedule.user_sam} a ${addSchedule.group_name}`;
+            } else {
+                modalTitle.textContent = 'Editar Agendamento';
+            }
+
+            editModal.show();
+        }
+
+        if (deleteBtn) {
+            scheduleId = deleteBtn.dataset.id;
             deleteModal.show();
         }
     });
 
-    // Ação de confirmação do modal de exclusão
-    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-        if (!scheduleToDeleteId) return;
+    // Salvar alterações do Modal de Edição
+    document.getElementById('save-changes-btn').addEventListener('click', function() {
+        const id = document.getElementById('edit-schedule-id').value;
+        const startDate = document.getElementById('edit-start-date').value;
+        const endDate = document.getElementById('edit-end-date').value;
 
-        fetch(`/api/schedules/${scheduleToDeleteId}`, {
-            method: 'DELETE',
+        if (!id || !startDate || !endDate) {
+            showToast('As datas de início e fim são obrigatórias.', 'error');
+            return;
+        }
+
+        if (new Date(startDate) > new Date(endDate)) {
+            showToast('A data de início não pode ser posterior à data de fim.', 'error');
+            return;
+        }
+
+        fetch(`/api/schedules/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ start_date: startDate, end_date: endDate })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 showToast(data.message, 'success');
-                fetchSchedules(); // Atualiza a tabela
+                fetchSchedules();
+                editModal.hide();
+            } else {
+                showToast(data.error || 'Falha ao atualizar agendamento.', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao salvar alterações:', error);
+            showToast('Ocorreu um erro ao salvar as alterações.', 'error');
+        });
+    });
+
+    // Confirmar exclusão do Modal de Cancelamento
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        if (!scheduleId) return;
+
+        fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                fetchSchedules();
             } else {
                 showToast(data.error, 'error');
             }
@@ -176,66 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast('Falha ao cancelar o agendamento.', 'error');
         })
         .finally(() => {
-            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
             deleteModal.hide();
-            scheduleToDeleteId = null;
+            scheduleId = null;
         });
-    });
-
-    // Delegação de eventos para os inputs de data
-    tableBody.addEventListener('change', function(event) {
-        if (event.target.matches('input[type="date"]')) {
-            const scheduleId = event.target.dataset.id;
-            const newDate = event.target.value;
-            const action = event.target.dataset.action;
-
-            // Encontrar o agendamento correspondente para validação
-            const scheduleGroup = schedulesData.filter(s => s.id === scheduleId);
-            const addSchedule = scheduleGroup.find(s => s.action === 'add');
-            const removeSchedule = scheduleGroup.find(s => s.action === 'remove');
-
-            let startDate, endDate;
-
-            if (action === 'add') {
-                startDate = newDate;
-                endDate = removeSchedule ? removeSchedule.execution_date : null;
-            } else { // action === 'remove'
-                startDate = addSchedule ? addSchedule.execution_date : null;
-                endDate = newDate;
-            }
-
-            // Validar se a data de início é anterior à data de fim
-            if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
-                 showToast('Erro: A data de início não pode ser posterior à data de fim.', 'error');
-                 event.target.value = schedulesData.find(s => s.id === scheduleId && s.action === action).execution_date; // Reverte a alteração
-                 return;
-            }
-
-
-            fetch(`/api/schedules/${scheduleId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ execution_date: newDate, action: action })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showToast(data.message, 'success');
-                    fetchSchedules(); // Atualiza a tabela para refletir a mudança
-                } else {
-                    showToast(data.error || 'Falha ao atualizar a data.', 'error');
-                    // Reverte a alteração no input se a API falhar
-                    event.target.value = schedulesData.find(s => s.id === scheduleId).execution_date;
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao atualizar data:', error);
-                showToast('Um erro ocorreu ao tentar atualizar a data.', 'error');
-                event.target.value = schedulesData.find(s => s.id === scheduleId).execution_date;
-            });
-        }
     });
 
     // Carrega os dados iniciais

@@ -2501,28 +2501,34 @@ def update_schedule(schedule_id):
         return jsonify({'error': 'Não autorizado'}), 401
 
     data = request.get_json()
-    new_date = data.get('execution_date')
-    action_to_update = data.get('action') # 'add' or 'remove'
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
 
-    if not new_date:
-        return jsonify({'error': 'Nova data de execução é obrigatória.'}), 400
-    if not action_to_update:
-        return jsonify({'error': 'A ação específica (add/remove) é obrigatória para a atualização.'}), 400
+    if not start_date or not end_date:
+        return jsonify({'error': 'Datas de início e fim são obrigatórias.'}), 400
+
+    try:
+        # Validação do formato da data
+        date.fromisoformat(start_date)
+        date.fromisoformat(end_date)
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
 
     schedules = load_group_schedules()
-    schedule_found = False
-    for schedule in schedules:
-        # A condição agora verifica tanto o ID quanto a ação
-        if schedule.get('id') == schedule_id and schedule.get('action') == action_to_update:
-            schedule['execution_date'] = new_date
-            schedule_found = True
-            break # Encontrou e atualizou a entrada específica, pode parar
 
-    if schedule_found:
-        save_group_schedules(schedules)
-        return jsonify({'success': True, 'message': 'Data do agendamento atualizada com sucesso.'})
-    else:
-        return jsonify({'error': 'Agendamento específico não encontrado.'}), 404
+    # Encontra as entradas de 'add' e 'remove' para o ID fornecido
+    add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
+    remove_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'remove'), None)
+
+    if not add_schedule or not remove_schedule:
+        return jsonify({'error': 'Agendamento de início ou fim não encontrado para este ID.'}), 404
+
+    # Atualiza as datas
+    add_schedule['execution_date'] = start_date
+    remove_schedule['execution_date'] = end_date
+
+    save_group_schedules(schedules)
+    return jsonify({'success': True, 'message': 'Agendamento atualizado com sucesso.'})
 
 @app.route('/admin/permissions', methods=['GET', 'POST'])
 def permissions():

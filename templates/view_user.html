@@ -249,7 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allUserGroups = [];
     let tabLoaded = false;
     let searchTimeout;
-    let selectedGroupForTempAdd = null; // Guarda o nome do grupo selecionado para adição temporária
+    let selectedGroupForTempAdd = null;
+    let currentConfirmAction = () => {}; // Holds the action for the current confirmation
 
     // === Funções de Renderização ===
     function renderGroups(groups) {
@@ -322,20 +323,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function setupConfirmationModal(title, body, onConfirm) {
+    function setupConfirmationModal(title, body, onConfirmCallback) {
         confirmationModalLabel.textContent = title;
         confirmationModalBody.textContent = body;
-
-        // Remove previous listener to avoid multiple executions
-        const newConfirmBtn = confirmActionBtn.cloneNode(true);
-        confirmActionBtn.parentNode.replaceChild(newConfirmBtn, confirmActionBtn);
-        confirmActionBtn = newConfirmBtn;
-
-        confirmActionBtn.addEventListener('click', function() {
-            onConfirm();
-            confirmationModal.hide();
-        });
-
+        currentConfirmAction = onConfirmCallback; // Set the action
         confirmationModal.show();
     }
 
@@ -523,6 +514,14 @@ document.addEventListener('DOMContentLoaded', function() {
         toast.show();
         toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
     }
+
+    // Single, persistent event listener on the confirmation button
+    confirmActionBtn.addEventListener('click', function() {
+        if (typeof currentConfirmAction === 'function') {
+            currentConfirmAction();
+        }
+        confirmationModal.hide();
+    });
 
     // --- Ações da Página com Modal de Confirmação ---
     if(deactivateBtn) {
