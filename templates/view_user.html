@@ -501,14 +501,6 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmationModal.hide();
     });
 
-    // Single, persistent event listener on the confirmation button
-    confirmActionBtn.addEventListener('click', function() {
-        if (typeof currentConfirmAction === 'function') {
-            currentConfirmAction();
-        }
-        confirmationModal.hide();
-    });
-
     // --- Ações da Página com Modal de Confirmação ---
     if(deactivateBtn) {
         deactivateBtn.addEventListener('click', function(e) {
