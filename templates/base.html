@@ -11,6 +11,52 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     {% block head %}{% endblock %}
+    {% block scripts %}
+    <script>
+        // Força o recarregamento da página ao navegar de volta usando o cache (bfcache)
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
+        });
+
+        // Função para exibir toasts (notificações)
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                console.error('Toast container not found!');
+                return;
+            }
+
+            const toastId = 'toast-' + Date.now();
+            // Define a cor do ícone e do cabeçalho com base no tipo
+            const context = {
+                'success': { icon: 'fa-check-circle', color: 'text-success' },
+                'error':   { icon: 'fa-exclamation-triangle', color: 'text-danger' },
+                'warning': { icon: 'fa-exclamation-circle', color: 'text-warning' },
+                'info':    { icon: 'fa-info-circle', color: 'text-info' }
+            };
+            const toastContext = context[type] || context['info'];
+
+            const toastHTML = `
+                <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000">
+                    <div class="toast-header">
+                        <strong class="me-auto ${toastContext.color}"><i class="fas ${toastContext.icon} me-2"></i>Notificação</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>`;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+            toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
+        }
+    </script>
+    {% endblock %}
 </head>
 <body>
 
@@ -88,7 +134,7 @@
         const themeToggleIcon = themeToggle.querySelector('i');
 
         const applyTheme = (theme) => {
-            docElement.setAttribute('data-theme', theme);
+            docElement.setAttribute('data-bs-theme', theme); // Alterado para data-bs-theme
             localStorage.setItem('theme', theme);
             if (theme === 'light') {
                 themeToggleIcon.className = 'fas fa-moon';
@@ -100,7 +146,7 @@
         };
 
         const toggleTheme = () => {
-            const currentTheme = docElement.getAttribute('data-theme') || 'light';
+            const currentTheme = docElement.getAttribute('data-bs-theme') || 'light'; // Alterado para data-bs-theme
             const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             applyTheme(newTheme);
         };
@@ -118,15 +164,24 @@
     })();
     </script>
 
-    {% block scripts %}
-    <script>
-        // Força o recarregamento da página ao navegar de volta usando o cache (bfcache)
-        window.addEventListener('pageshow', function(event) {
-            if (event.persisted) {
-                window.location.reload();
-            }
-        });
-    </script>
-    {% endblock %}
+    <!-- Modal de Confirmação Genérico -->
+    <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="confirmationModalBody">
+            ...
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 </body>
 </html>
