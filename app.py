@@ -2495,6 +2495,43 @@ def delete_schedule(schedule_id):
         return jsonify({'error': 'Não autorizado'}), 401
 
     schedules = load_group_schedules()
+
+    # Encontra o agendamento de 'add' para obter os detalhes e verificar a data
+    add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
+
+    if not add_schedule:
+        return jsonify({'error': 'Agendamento de adição correspondente não encontrado.'}), 404
+
+    try:
+        execution_date = date.fromisoformat(add_schedule.get('execution_date'))
+        today = date.today()
+
+        # Se a data de execução já passou, a associação ao grupo deve estar ativa
+        if execution_date <= today:
+            user_sam = add_schedule.get('user_sam')
+            group_name = add_schedule.get('group_name')
+
+            # Conecta-se ao AD para remover o usuário do grupo
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+            group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+            if not user or not group:
+                logging.warning(f"Cancelamento de agendamento: Usuário '{user_sam}' ou grupo '{group_name}' não encontrado no AD. Removendo apenas o agendamento.")
+            else:
+                conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                if conn.result['description'] == 'success':
+                    logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' devido ao cancelamento de agendamento por '{session.get('master_admin')}'.")
+                else:
+                    # Se a remoção falhar, ainda prosseguimos para remover o agendamento, mas registramos o erro
+                    logging.error(f"Falha ao remover '{user_sam}' do grupo '{group_name}' durante o cancelamento do agendamento: {conn.result['message']}")
+                    # Decide-se não retornar um erro aqui para garantir que o agendamento seja removido da UI
+
+    except Exception as e:
+        logging.error(f"Erro durante o processamento do cancelamento do agendamento (ID: {schedule_id}): {e}", exc_info=True)
+        # Não retorna erro ao cliente, para que a remoção do agendamento na UI não seja bloqueada
+
+    # Remove todos os agendamentos (add e remove) com o mesmo ID
     original_count = len(schedules)
     schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
 
@@ -2502,6 +2539,7 @@ def delete_schedule(schedule_id):
         save_group_schedules(schedules_to_keep)
         return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
     else:
+        # Este caso não deve acontecer se o add_schedule foi encontrado, mas é um fallback
         return jsonify({'error': 'Agendamento não encontrado.'}), 404
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
