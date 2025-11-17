@@ -16,20 +16,22 @@
 {% block content %}
 <!-- Card da Lista de Membros -->
 <div class="card glass-card">
-    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
-        <h5 class="mb-0">Membros Atuais</h5>
-        <div class="d-flex align-items-center mt-2 mt-md-0">
-            <div class="me-2 flex-grow-1" style="min-width: 200px;">
-                <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros atuais...">
-            </div>
-            <div class="btn-group">
-                <a href="{{ url_for('export_group_members', group_name=group.cn.value) }}" class="btn btn-sm btn-secondary" title="Exportar Membros">
-                    <i class="fas fa-file-csv"></i>
-                </a>
-                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal" title="Adicionar Usuário">
-                    <i class="fas fa-user-plus"></i>
-                </button>
-            </div>
+    <div class="card-header d-flex flex-column align-items-stretch">
+        <h5 class="mb-3">Membros Atuais</h5> <!-- Aumenta a margem inferior para separar do conteúdo abaixo -->
+
+        <!-- Ações do Card -->
+        <div class="d-flex justify-content-start gap-2 mb-3">
+            <a href="{{ url_for('export_group_members', group_name=group.cn.value) }}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-file-csv me-1"></i> Exportar Membros
+            </a>
+            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                <i class="fas fa-user-plus me-1"></i> Adicionar Usuário
+            </button>
+        </div>
+
+        <!-- Filtro -->
+        <div class="flex-grow-1" style="min-width: 250px;">
+            <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros atuais...">
         </div>
     </div>
     <div class="card-body p-0">
