@@ -92,6 +92,7 @@
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_pending_reactivations" {% if views.get('can_view_pending_reactivations') %}checked{% endif %}><label class="form-check-label">Card: Reativações Pendentes</label></div>
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_pending_deactivations" {% if views.get('can_view_pending_deactivations') %}checked{% endif %}><label class="form-check-label">Card: Desativações Agendadas</label></div>
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_expiring_passwords" {% if views.get('can_view_expiring_passwords') %}checked{% endif %}><label class="form-check-label">Card: Senhas Expirando</label></div>
+                                <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_manage_schedules" {% if views.get('can_manage_schedules') %}checked{% endif %}><label class="form-check-label">Pode Gerenciar Agendamentos</label></div>
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_export_data" {% if views.get('can_export_data') %}checked{% endif %}><label class="form-check-label">Pode Exportar Dados</label></div>
                             </div>
 
