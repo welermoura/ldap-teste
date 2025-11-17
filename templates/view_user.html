@@ -493,28 +493,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // Função para exibir toasts (notificações) - requer um container no base.html
-    function showToast(title, message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
-
-        const toastId = 'toast-' + Date.now();
-        const toastHTML = `
-            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="me-auto text-${type}">${title}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-                <div class="toast-body">${message}</div>
-            </div>`;
-
-        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-        const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-        toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
-    }
-
     // Single, persistent event listener on the confirmation button
     confirmActionBtn.addEventListener('click', function() {
         if (typeof currentConfirmAction === 'function') {
