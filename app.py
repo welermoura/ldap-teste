@@ -2548,31 +2548,55 @@ def update_schedule(schedule_id):
         return jsonify({'error': 'Não autorizado'}), 401
 
     data = request.get_json()
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
+    new_start_date_str = data.get('start_date')
+    new_end_date_str = data.get('end_date')
 
-    if not start_date or not end_date:
+    if not new_start_date_str or not new_end_date_str:
         return jsonify({'error': 'Datas de início e fim são obrigatórias.'}), 400
 
     try:
-        # Validação do formato da data
-        date.fromisoformat(start_date)
-        date.fromisoformat(end_date)
+        new_start_date = date.fromisoformat(new_start_date_str)
+        date.fromisoformat(new_end_date_str) # Apenas para validação
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
 
     schedules = load_group_schedules()
-
-    # Encontra as entradas de 'add' e 'remove' para o ID fornecido
     add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
     remove_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'remove'), None)
 
     if not add_schedule or not remove_schedule:
         return jsonify({'error': 'Agendamento de início ou fim não encontrado para este ID.'}), 404
 
-    # Atualiza as datas
-    add_schedule['execution_date'] = start_date
-    remove_schedule['execution_date'] = end_date
+    original_start_date = date.fromisoformat(add_schedule['execution_date'])
+    today = date.today()
+
+    # Caso de uso: agendamento estava ativo e foi movido para o futuro
+    if original_start_date <= today and new_start_date > today:
+        try:
+            user_sam = add_schedule.get('user_sam')
+            group_name = add_schedule.get('group_name')
+
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+            group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+            if user and group:
+                conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                if conn.result['description'] == 'success':
+                    logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' pois o agendamento ativo foi adiado por '{session.get('master_admin')}'.")
+                else:
+                    logging.error(f"Falha ao remover '{user_sam}' do grupo '{group_name}' ao adiar agendamento: {conn.result['message']}")
+                    # Considera-se não bloquear a UI, mas o log registrará a falha.
+            else:
+                logging.warning(f"Ao adiar agendamento, não foi possível encontrar o usuário '{user_sam}' ou o grupo '{group_name}' para remoção imediata.")
+
+        except Exception as e:
+            logging.error(f"Erro ao tentar remover usuário do grupo durante a atualização do agendamento (ID: {schedule_id}): {e}", exc_info=True)
+
+
+    # Atualiza as datas no registro de agendamento
+    add_schedule['execution_date'] = new_start_date_str
+    remove_schedule['execution_date'] = new_end_date_str
 
     save_group_schedules(schedules)
     return jsonify({'success': True, 'message': 'Agendamento atualizado com sucesso.'})
