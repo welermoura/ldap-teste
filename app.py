@@ -2518,24 +2518,23 @@ def admin_logs():
 
     return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
 
-@app.route('/admin/manage_schedules')
+@app.route('/manage_schedules')
+@require_auth
+@require_permission(action='can_manage_groups')
 def manage_schedules():
-    if 'master_admin' not in session:
-        return redirect(url_for('admin_login'))
-    return render_template('admin/manage_schedules.html')
+    return render_template('manage_schedules.html')
 
 @app.route('/api/schedules', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
 def get_schedules():
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
     schedules = load_group_schedules()
     return jsonify(schedules)
 
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
 def delete_schedule(schedule_id):
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
-
     schedules = load_group_schedules()
 
     # Encontra o agendamento de 'add' para obter os detalhes e verificar a data
@@ -2585,10 +2584,9 @@ def delete_schedule(schedule_id):
         return jsonify({'error': 'Agendamento não encontrado.'}), 404
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
 def update_schedule(schedule_id):
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
-
     data = request.get_json()
     new_start_date_str = data.get('start_date')
     new_end_date_str = data.get('end_date')
