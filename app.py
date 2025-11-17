@@ -1216,7 +1216,18 @@ def api_remove_user_from_group():
         conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
 
         if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido permanentemente do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+
+            # Limpa quaisquer agendamentos temporários pendentes para este usuário/grupo
+            try:
+                schedules = load_group_schedules()
+                schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
+                if len(schedules_to_keep) < len(schedules):
+                    save_group_schedules(schedules_to_keep)
+                    logging.info(f"Agendamentos pendentes para '{username}' no grupo '{group_name}' foram removidos devido à remoção permanente.")
+            except Exception as e:
+                logging.error(f"Erro ao limpar agendamentos para '{username}' no grupo '{group_name}': {e}")
+
             return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
@@ -1246,7 +1257,18 @@ def api_add_user_to_group():
         conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
 
         if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+
+            # Limpa quaisquer agendamentos temporários pendentes para este usuário/grupo
+            try:
+                schedules = load_group_schedules()
+                schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
+                if len(schedules_to_keep) < len(schedules):
+                    save_group_schedules(schedules_to_keep)
+                    logging.info(f"Agendamentos pendentes para '{username}' no grupo '{group_name}' foram removidos devido à adição permanente.")
+            except Exception as e:
+                logging.error(f"Erro ao limpar agendamentos para '{username}' no grupo '{group_name}': {e}")
+
             return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
@@ -1858,7 +1880,17 @@ def add_member(group_name):
             conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+
+                # Limpa quaisquer agendamentos temporários pendentes
+                try:
+                    schedules = load_group_schedules()
+                    schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
+                    if len(schedules_to_keep) < len(schedules):
+                        save_group_schedules(schedules_to_keep)
+                        logging.info(f"Agendamentos pendentes para '{user_sam}' no grupo '{group_name}' foram removidos devido à adição permanente.")
+                except Exception as e:
+                    logging.error(f"Erro ao limpar agendamentos para '{user_sam}' no grupo '{group_name}': {e}")
             else:
                 flash(f"Falha ao adicionar usuário: {conn.result['message']}", 'error')
         else:
@@ -1882,7 +1914,17 @@ def remove_member(group_name, user_sam):
             conn.extend.microsoft.remove_members_from_groups([user_to_remove.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido permanentemente do grupo '{group_name}' por '{session.get('ad_user')}'.")
+
+                # Limpa quaisquer agendamentos temporários pendentes
+                try:
+                    schedules = load_group_schedules()
+                    schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
+                    if len(schedules_to_keep) < len(schedules):
+                        save_group_schedules(schedules_to_keep)
+                        logging.info(f"Agendamentos pendentes para '{user_sam}' no grupo '{group_name}' foram removidos devido à remoção permanente.")
+                except Exception as e:
+                    logging.error(f"Erro ao limpar agendamentos para '{user_sam}' no grupo '{group_name}': {e}")
             else:
                 flash(f"Falha ao remover usuário: {conn.result['message']}", 'error')
         else:
@@ -1924,25 +1966,34 @@ def api_add_user_to_group_temp():
         schedules = load_group_schedules()
         schedule_id = str(uuid.uuid4()) # Gera um ID único para o par de agendamentos
 
-        # Se a data de início for hoje ou no passado, adiciona imediatamente.
+        # Garante que o registro de "add" seja sempre criado para consistência da UI.
+        add_schedule = {
+            'id': schedule_id,
+            'user_sam': username,
+            'group_name': group_name,
+            'action': 'add',
+            'execution_date': start_date.isoformat()
+        }
+        schedules.append(add_schedule)
+
+        # Se a data de início for hoje ou no passado, adiciona o usuário imediatamente.
         if start_date <= today:
-            conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
-            if conn.result['description'] != 'success':
-                raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
+            try:
+                conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
+                if conn.result['description'] != 'success':
+                    raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
+                logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
+            except Exception as e:
+                # Se a adição imediata falhar, remove o agendamento recém-adicionado para evitar inconsistência.
+                schedules.pop()
+                save_group_schedules(schedules)
+                raise e # Propaga a exceção original
         else:
-            # Se for no futuro, agenda a adição.
-            add_schedule = {
-                'id': schedule_id,
-                'user_sam': username,
-                'group_name': group_name,
-                'action': 'add',
-                'execution_date': start_date.isoformat()
-            }
-            schedules.append(add_schedule)
+            # Se for no futuro, apenas registra que a adição foi agendada.
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
-        # Agenda a remoção para a data de fim.
+
+        # Agenda a remoção para a data de fim em todos os casos.
         remove_schedule = {
             'id': schedule_id,
             'user_sam': username,
@@ -2467,25 +2518,64 @@ def admin_logs():
 
     return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
 
-@app.route('/admin/manage_schedules')
+@app.route('/manage_schedules')
+@require_auth
+@require_permission(view='can_manage_schedules')
 def manage_schedules():
-    if 'master_admin' not in session:
-        return redirect(url_for('admin_login'))
-    return render_template('admin/manage_schedules.html')
+    return render_template('manage_schedules.html')
 
 @app.route('/api/schedules', methods=['GET'])
+@require_auth
 def get_schedules():
-    if 'master_admin' not in session:
+    if not check_permission(view='can_manage_schedules'):
         return jsonify({'error': 'Não autorizado'}), 401
     schedules = load_group_schedules()
     return jsonify(schedules)
 
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+@require_auth
 def delete_schedule(schedule_id):
-    if 'master_admin' not in session:
+    if not check_permission(view='can_manage_schedules'):
         return jsonify({'error': 'Não autorizado'}), 401
 
     schedules = load_group_schedules()
+
+    # Encontra o agendamento de 'add' para obter os detalhes e verificar a data
+    add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
+
+    if not add_schedule:
+        return jsonify({'error': 'Agendamento de adição correspondente não encontrado.'}), 404
+
+    try:
+        execution_date = date.fromisoformat(add_schedule.get('execution_date'))
+        today = date.today()
+
+        # Se a data de execução já passou, a associação ao grupo deve estar ativa
+        if execution_date <= today:
+            user_sam = add_schedule.get('user_sam')
+            group_name = add_schedule.get('group_name')
+
+            # Conecta-se ao AD para remover o usuário do grupo
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+            group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+            if not user or not group:
+                logging.warning(f"Cancelamento de agendamento: Usuário '{user_sam}' ou grupo '{group_name}' não encontrado no AD. Removendo apenas o agendamento.")
+            else:
+                conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                if conn.result['description'] == 'success':
+                    logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' devido ao cancelamento de agendamento por '{session.get('master_admin')}'.")
+                else:
+                    # Se a remoção falhar, ainda prosseguimos para remover o agendamento, mas registramos o erro
+                    logging.error(f"Falha ao remover '{user_sam}' do grupo '{group_name}' durante o cancelamento do agendamento: {conn.result['message']}")
+                    # Decide-se não retornar um erro aqui para garantir que o agendamento seja removido da UI
+
+    except Exception as e:
+        logging.error(f"Erro durante o processamento do cancelamento do agendamento (ID: {schedule_id}): {e}", exc_info=True)
+        # Não retorna erro ao cliente, para que a remoção do agendamento na UI não seja bloqueada
+
+    # Remove todos os agendamentos (add e remove) com o mesmo ID
     original_count = len(schedules)
     schedules_to_keep = [s for s in schedules if s.get('id') != schedule_id]
 
@@ -2493,39 +2583,65 @@ def delete_schedule(schedule_id):
         save_group_schedules(schedules_to_keep)
         return jsonify({'success': True, 'message': 'Agendamento cancelado com sucesso.'})
     else:
+        # Este caso não deve acontecer se o add_schedule foi encontrado, mas é um fallback
         return jsonify({'error': 'Agendamento não encontrado.'}), 404
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+@require_auth
 def update_schedule(schedule_id):
-    if 'master_admin' not in session:
+    if not check_permission(view='can_manage_schedules'):
         return jsonify({'error': 'Não autorizado'}), 401
 
     data = request.get_json()
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
+    new_start_date_str = data.get('start_date')
+    new_end_date_str = data.get('end_date')
 
-    if not start_date or not end_date:
+    if not new_start_date_str or not new_end_date_str:
         return jsonify({'error': 'Datas de início e fim são obrigatórias.'}), 400
 
     try:
-        # Validação do formato da data
-        date.fromisoformat(start_date)
-        date.fromisoformat(end_date)
+        new_start_date = date.fromisoformat(new_start_date_str)
+        date.fromisoformat(new_end_date_str) # Apenas para validação
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
 
     schedules = load_group_schedules()
-
-    # Encontra as entradas de 'add' e 'remove' para o ID fornecido
     add_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'add'), None)
     remove_schedule = next((s for s in schedules if s.get('id') == schedule_id and s.get('action') == 'remove'), None)
 
     if not add_schedule or not remove_schedule:
         return jsonify({'error': 'Agendamento de início ou fim não encontrado para este ID.'}), 404
 
-    # Atualiza as datas
-    add_schedule['execution_date'] = start_date
-    remove_schedule['execution_date'] = end_date
+    original_start_date = date.fromisoformat(add_schedule['execution_date'])
+    today = date.today()
+
+    # Caso de uso: agendamento estava ativo e foi movido para o futuro
+    if original_start_date <= today and new_start_date > today:
+        try:
+            user_sam = add_schedule.get('user_sam')
+            group_name = add_schedule.get('group_name')
+
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+            group = get_group_by_name(conn, group_name, ['distinguishedName'])
+
+            if user and group:
+                conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                if conn.result['description'] == 'success':
+                    logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' pois o agendamento ativo foi adiado por '{session.get('master_admin')}'.")
+                else:
+                    logging.error(f"Falha ao remover '{user_sam}' do grupo '{group_name}' ao adiar agendamento: {conn.result['message']}")
+                    # Considera-se não bloquear a UI, mas o log registrará a falha.
+            else:
+                logging.warning(f"Ao adiar agendamento, não foi possível encontrar o usuário '{user_sam}' ou o grupo '{group_name}' para remoção imediata.")
+
+        except Exception as e:
+            logging.error(f"Erro ao tentar remover usuário do grupo durante a atualização do agendamento (ID: {schedule_id}): {e}", exc_info=True)
+
+
+    # Atualiza as datas no registro de agendamento
+    add_schedule['execution_date'] = new_start_date_str
+    remove_schedule['execution_date'] = new_end_date_str
 
     save_group_schedules(schedules)
     return jsonify({'success': True, 'message': 'Agendamento atualizado com sucesso.'})
@@ -2586,6 +2702,7 @@ def permissions():
                         'can_view_pending_reactivations': f'{group}_can_view_pending_reactivations' in request.form,
                         'can_view_pending_deactivations': f'{group}_can_view_pending_deactivations' in request.form,
                         'can_view_expiring_passwords': f'{group}_can_view_expiring_passwords' in request.form,
+                        'can_manage_schedules': f'{group}_can_manage_schedules' in request.form,
                     }
                     fields = [field for field in available_fields if f'{group}_field_{field}' in request.form]
                     permissions_data[group] = {'type': 'custom', 'actions': actions, 'fields': fields, 'views': views}
