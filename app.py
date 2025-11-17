@@ -1216,7 +1216,18 @@ def api_remove_user_from_group():
         conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
 
         if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido permanentemente do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+
+            # Limpa quaisquer agendamentos temporários pendentes para este usuário/grupo
+            try:
+                schedules = load_group_schedules()
+                schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
+                if len(schedules_to_keep) < len(schedules):
+                    save_group_schedules(schedules_to_keep)
+                    logging.info(f"Agendamentos pendentes para '{username}' no grupo '{group_name}' foram removidos devido à remoção permanente.")
+            except Exception as e:
+                logging.error(f"Erro ao limpar agendamentos para '{username}' no grupo '{group_name}': {e}")
+
             return jsonify({'success': True, 'message': 'Usuário removido do grupo com sucesso.'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
@@ -1246,7 +1257,18 @@ def api_add_user_to_group():
         conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
 
         if conn.result['description'] == 'success':
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+
+            # Limpa quaisquer agendamentos temporários pendentes para este usuário/grupo
+            try:
+                schedules = load_group_schedules()
+                schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
+                if len(schedules_to_keep) < len(schedules):
+                    save_group_schedules(schedules_to_keep)
+                    logging.info(f"Agendamentos pendentes para '{username}' no grupo '{group_name}' foram removidos devido à adição permanente.")
+            except Exception as e:
+                logging.error(f"Erro ao limpar agendamentos para '{username}' no grupo '{group_name}': {e}")
+
             return jsonify({'success': True, 'message': 'Usuário adicionado ao grupo com sucesso.'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
@@ -1858,7 +1880,17 @@ def add_member(group_name):
             conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+
+                # Limpa quaisquer agendamentos temporários pendentes
+                try:
+                    schedules = load_group_schedules()
+                    schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
+                    if len(schedules_to_keep) < len(schedules):
+                        save_group_schedules(schedules_to_keep)
+                        logging.info(f"Agendamentos pendentes para '{user_sam}' no grupo '{group_name}' foram removidos devido à adição permanente.")
+                except Exception as e:
+                    logging.error(f"Erro ao limpar agendamentos para '{user_sam}' no grupo '{group_name}': {e}")
             else:
                 flash(f"Falha ao adicionar usuário: {conn.result['message']}", 'error')
         else:
@@ -1882,7 +1914,17 @@ def remove_member(group_name, user_sam):
             conn.extend.microsoft.remove_members_from_groups([user_to_remove.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' com sucesso.", 'success')
-                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido do grupo '{group_name}' por '{session.get('ad_user')}'.")
+                logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido permanentemente do grupo '{group_name}' por '{session.get('ad_user')}'.")
+
+                # Limpa quaisquer agendamentos temporários pendentes
+                try:
+                    schedules = load_group_schedules()
+                    schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
+                    if len(schedules_to_keep) < len(schedules):
+                        save_group_schedules(schedules_to_keep)
+                        logging.info(f"Agendamentos pendentes para '{user_sam}' no grupo '{group_name}' foram removidos devido à remoção permanente.")
+                except Exception as e:
+                    logging.error(f"Erro ao limpar agendamentos para '{user_sam}' no grupo '{group_name}': {e}")
             else:
                 flash(f"Falha ao remover usuário: {conn.result['message']}", 'error')
         else:
