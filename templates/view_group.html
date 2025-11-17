@@ -243,13 +243,13 @@ document.addEventListener('DOMContentLoaded', function() {
             fetchMembers(memberListPage, memberListQuery);
             addUserModal.hide();
         } catch (error) {
-            showToast('Erro', `Falha ao adicionar: ${error.message}`, 'error');
+            showToast(`Falha ao adicionar: ${error.message}`, 'error', 'Erro');
         }
     }
 
     async function addMemberTemp(username, startDate, endDate) {
         if (!startDate || !endDate) {
-            showToast('Erro', 'Data de início e fim são obrigatórias.', 'error');
+            showToast('Data de início e fim são obrigatórias.', 'error', 'Erro de Validação');
             return;
         }
         try {
@@ -260,11 +260,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
-            showToast('Sucesso', result.message, 'success');
+            showToast(result.message, 'success', 'Sucesso');
             addTempUserModal.hide();
             addUserModal.hide();
         } catch (error) {
-            showToast('Erro', `Falha ao adicionar temporariamente: ${error.message}`, 'error');
+            showToast(`Falha ao adicionar temporariamente: ${error.message}`, 'error', 'Erro');
         }
     }
 
@@ -278,10 +278,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
-                showToast('Sucesso', 'Usuário removido do grupo.', 'success');
+                showToast('Usuário removido do grupo.', 'success', 'Sucesso');
                 fetchMembers(memberListPage, memberListQuery);
             } catch (error) {
-                showToast('Erro', `Falha ao remover: ${error.message}`, 'error');
+                showToast(`Falha ao remover: ${error.message}`, 'error', 'Erro');
             }
         });
     }
