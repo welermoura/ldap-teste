@@ -2,11 +2,11 @@
 
 /**
  * Exibe uma notificação toast.
- * @param {string} [title='Notificação'] - O título do toast.
- * @param {string} message - A mensagem a ser exibida.
+ * @param {string} title - O título do toast.
+ * * @param {string} message - A mensagem a ser exibida.
  * @param {string} [type='info'] - O tipo de toast ('info', 'success', 'error').
  */
-function showToast(title = 'Notificação', message, type = 'info') {
+function showToast(title, message, type = 'info') {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) {
         console.error('Toast container not found!');
