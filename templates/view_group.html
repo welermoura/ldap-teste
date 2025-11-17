@@ -16,12 +16,11 @@
 {% block content %}
 <!-- Card da Lista de Membros -->
 <div class="card glass-card">
-    <div class="card-header d-flex flex-column align-items-stretch">
-        <h5 class="mb-3">Membros Atuais</h5> <!-- Aumenta a margem inferior para separar do conteúdo abaixo -->
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h5 class="mb-0 me-3">Membros Atuais</h5>
 
-        <!-- Ações do Card -->
-        <div class="d-flex justify-content-start gap-2 mb-3">
-            <a href="{{ url_for('export_group_members', group_name=group.cn.value) }}" class="btn btn-sm btn-secondary">
+        <div class="d-flex gap-2 flex-wrap">
+             <a href="{{ url_for('export_group_members', group_name=group.cn.value) }}" class="btn btn-sm btn-secondary">
                 <i class="fas fa-file-csv me-1"></i> Exportar Membros
             </a>
             <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
@@ -29,9 +28,8 @@
             </button>
         </div>
 
-        <!-- Filtro -->
-        <div class="flex-grow-1" style="min-width: 250px;">
-            <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros atuais...">
+        <div class="ms-auto" style="min-width: 200px; max-width: 250px;">
+            <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros...">
         </div>
     </div>
     <div class="card-body p-0">
