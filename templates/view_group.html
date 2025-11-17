@@ -238,8 +238,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
-            showToast('Usuário adicionado ao grupo.', 'success', 'Sucesso');
-            fetchMembers(1, '');
+            showToast('Sucesso', 'Usuário adicionado ao grupo.', 'success');
+            // Recarrega a lista de membros mantendo a página e o filtro atuais
+            fetchMembers(memberListPage, memberListQuery);
             addUserModal.hide();
         } catch (error) {
             showToast(`Falha ao adicionar: ${error.message}`, 'error', 'Erro');
