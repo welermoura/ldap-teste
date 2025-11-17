@@ -1924,25 +1924,34 @@ def api_add_user_to_group_temp():
         schedules = load_group_schedules()
         schedule_id = str(uuid.uuid4()) # Gera um ID único para o par de agendamentos
 
-        # Se a data de início for hoje ou no passado, adiciona imediatamente.
+        # Garante que o registro de "add" seja sempre criado para consistência da UI.
+        add_schedule = {
+            'id': schedule_id,
+            'user_sam': username,
+            'group_name': group_name,
+            'action': 'add',
+            'execution_date': start_date.isoformat()
+        }
+        schedules.append(add_schedule)
+
+        # Se a data de início for hoje ou no passado, adiciona o usuário imediatamente.
         if start_date <= today:
-            conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
-            if conn.result['description'] != 'success':
-                raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
-            logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
+            try:
+                conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
+                if conn.result['description'] != 'success':
+                    raise Exception(f"Falha do LDAP ao adicionar usuário: {conn.result['message']}")
+                logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado IMEDIATAMENTE ao grupo '{group_name}' (agendamento temporário) por '{session.get('user_display_name')}'.")
+            except Exception as e:
+                # Se a adição imediata falhar, remove o agendamento recém-adicionado para evitar inconsistência.
+                schedules.pop()
+                save_group_schedules(schedules)
+                raise e # Propaga a exceção original
         else:
-            # Se for no futuro, agenda a adição.
-            add_schedule = {
-                'id': schedule_id,
-                'user_sam': username,
-                'group_name': group_name,
-                'action': 'add',
-                'execution_date': start_date.isoformat()
-            }
-            schedules.append(add_schedule)
+            # Se for no futuro, apenas registra que a adição foi agendada.
             logging.info(f"[AGENDAMENTO] Adição de '{username}' ao grupo '{group_name}' agendada para {start_date_str} por '{session.get('user_display_name')}'.")
 
-        # Agenda a remoção para a data de fim.
+
+        # Agenda a remoção para a data de fim em todos os casos.
         remove_schedule = {
             'id': schedule_id,
             'user_sam': username,
