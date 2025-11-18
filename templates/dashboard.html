@@ -171,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let modalNextCookie = null;
         let modalIsLoading = false;
         let modalCurrentCategory = '';
+        let currentConfirmAction = () => {};
 
         const modalContent = document.getElementById('modalContent');
         const modalTitle = document.getElementById('dataModalLabel');
@@ -229,7 +230,33 @@ document.addEventListener('DOMContentLoaded', function() {
                     samInfo.textContent = `Login: ${item.sam}`;
                     a.appendChild(samInfo);
                 }
-                modalContent.appendChild(a);
+
+                // Wrapper para o item da lista e o botão
+                const itemWrapper = document.createElement('div');
+                itemWrapper.className = 'list-group-item-wrapper d-flex align-items-center';
+
+                // O link 'a' agora ocupa a maior parte do espaço
+                a.style.flexGrow = '1';
+                itemWrapper.appendChild(a);
+
+
+                // Adiciona o botão de cancelar apenas para a categoria de desativações agendadas
+                if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'btn btn-sm btn-warning ms-2';
+                    cancelBtn.innerHTML = '<i class="fas fa-calendar-times"></i>';
+                    cancelBtn.title = 'Cancelar Agendamento';
+                    cancelBtn.dataset.username = item.sam;
+                    cancelBtn.addEventListener('click', (e) => {
+                        e.preventDefault(); // Impede a navegação
+                        e.stopPropagation(); // Impede que o clique se propague para o link 'a'
+                        handleCancelAbsence(item.sam);
+                    });
+                    itemWrapper.appendChild(cancelBtn);
+                }
+
+
+                modalContent.appendChild(itemWrapper);
             });
         }
 
@@ -431,6 +458,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Renderização inicial
     renderList();
+
+    // Listener para o botão de confirmação do modal genérico
+    const confirmActionBtn = document.getElementById('confirmActionBtn');
+    if (confirmActionBtn) {
+        confirmActionBtn.addEventListener('click', function() {
+            if (typeof currentConfirmAction === 'function') {
+                currentConfirmAction();
+            }
+            const confirmationModal = bootstrap.Modal.getInstance(document.getElementById('confirmationModal'));
+            confirmationModal.hide();
+        });
+    }
 });
 </script>
 
@@ -450,4 +489,23 @@ document.addEventListener('DOMContentLoaded', function() {
         font-size: 0.875em;
     }
 </style>
+
+<!-- Modal de Confirmação Genérico para o Dashboard -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmationModalBody">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

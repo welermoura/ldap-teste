@@ -24,6 +24,24 @@
             </div>
         </div>
 
+        {% if absence_scheduled %}
+        <div class="card glass-card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Ausência Agendada</h5>
+            </div>
+            <div class="card-body">
+                <p>Uma ausência está agendada para este usuário.</p>
+                <p><strong>Início:</strong> {{ absence_info.deactivation }}</p>
+                <p><strong>Fim:</strong> {{ absence_info.reactivation }}</p>
+                {% if check_permission(action='can_disable') %}
+                    <button id="cancel-absence-btn" class="btn btn-warning w-100 mt-2">
+                        <i class="fas fa-calendar-times me-2"></i>Cancelar Agendamento
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card glass-card mt-4">
             <div class="card-header">
                 <h5 class="mb-0">Ações Rápidas</h5>
@@ -242,6 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let confirmActionBtn = document.getElementById('confirmActionBtn');
     const deactivateBtn = document.getElementById('deactivate-btn');
     const resetPasswordBtn = document.getElementById('reset-password-btn');
+    const cancelAbsenceBtn = document.getElementById('cancel-absence-btn');
 
     // === Variáveis de Estado ===
     const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
@@ -520,6 +539,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Confirmar Reset de Senha',
                 'Tem certeza que deseja resetar a senha deste usuário para a padrão?',
                 () => document.getElementById('reset-password-form').submit()
+            );
+        });
+    }
+
+    if(cancelAbsenceBtn) {
+        cancelAbsenceBtn.addEventListener('click', function() {
+            setupConfirmationModal(
+                'Confirmar Cancelamento',
+                'Tem certeza que deseja cancelar o agendamento de ausência para este usuário? A conta será reativada imediatamente se o período de ausência já tiver começado.',
+                async () => {
+                    try {
+                        const response = await fetch(`/api/cancel_absence/${username}`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken }
+                        });
+                        const result = await response.json();
+                        if (!response.ok) {
+                            throw new Error(result.error || 'Erro desconhecido');
+                        }
+                        showToast('Agendamento cancelado com sucesso!', 'success', 'Sucesso');
+                        // Recarrega a página para refletir a mudança de status
+                        setTimeout(() => window.location.reload(), 1500);
+                    } catch (error) {
+                        showToast(`Falha ao cancelar agendamento: ${error.message}`, 'error', 'Erro');
+                        console.error('Erro ao cancelar agendamento:', error);
+                    }
+                }
             );
         });
     }
