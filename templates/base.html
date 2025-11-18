@@ -83,10 +83,13 @@
 
     <script>
     // Lógica para o seletor de tema
-    (function() {
+    document.addEventListener('DOMContentLoaded', function() {
         const docElement = document.documentElement;
         const themeToggle = document.getElementById('theme-toggle');
-        if (!themeToggle) return;
+        if (!themeToggle) {
+            console.warn('Theme toggle button not found.');
+            return;
+        }
 
         const themeToggleIcon = themeToggle.querySelector('i');
 
@@ -118,7 +121,7 @@
         } else {
             applyTheme(prefersDark ? 'dark' : 'light');
         }
-    })();
+    });
     </script>
 
     {% block scripts %}
