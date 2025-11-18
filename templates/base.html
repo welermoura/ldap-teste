@@ -103,18 +103,27 @@
                 themeToggleIcon.className = 'fa-regular fa-sun';
                 themeToggle.classList.add('theme-icon-sun');
             }
+            // Define 'dark' como padrão se nenhuma preferência for encontrada
+            return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
         };
 
-        const toggleTheme = () => {
-            const currentTheme = docElement.getAttribute('data-bs-theme') || 'light'; // Alterado para data-bs-theme
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            applyTheme(newTheme);
+        const setTheme = theme => {
+            document.documentElement.setAttribute('data-bs-theme', theme);
         };
 
-        themeToggle.addEventListener('click', toggleTheme);
+        const updateToggleButton = (theme) => {
+            const themeToggle = document.getElementById('theme-toggle');
+            if (!themeToggle) return;
 
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const themeToggleIcon = themeToggle.querySelector('i');
+            if (theme === 'dark') {
+                themeToggleIcon.className = 'fa-regular fa-sun';
+                themeToggle.classList.add('theme-icon-sun');
+            } else {
+                themeToggleIcon.className = 'fas fa-moon';
+                themeToggle.classList.remove('theme-icon-sun');
+            }
+        };
 
         if (savedTheme) {
             applyTheme(savedTheme);
