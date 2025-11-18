@@ -9,6 +9,9 @@
 {% endblock %}
 
 {% block content %}
+<form method="POST" action="">
+    {{ form.hidden_tag() }}
+</form>
 {% set show_quick_actions = check_permission(action='can_create') or check_permission(action='can_edit') or check_permission(action='can_manage_groups') or check_permission(view='can_export_data') %}
 {% if show_quick_actions %}
 <div class="card glass-card mb-4">
@@ -173,6 +176,50 @@ document.addEventListener('DOMContentLoaded', function() {
         let modalCurrentCategory = '';
         let currentConfirmAction = () => {};
 
+        function handleCancelAbsence(username) {
+            const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
+            const modalBody = document.getElementById('confirmationModalBody');
+            const confirmBtn = document.getElementById('confirmActionBtn');
+            const modalLabel = document.getElementById('confirmationModalLabel');
+
+            modalLabel.textContent = 'Confirmar Cancelamento';
+            modalBody.textContent = `Você tem certeza que deseja cancelar o agendamento de ausência para ${username}? O usuário será reativado imediatamente se a ausência já tiver começado.`;
+            confirmBtn.className = 'btn btn-danger';
+            confirmBtn.textContent = 'Confirmar Cancelamento';
+
+            currentConfirmAction = async () => {
+                try {
+                    // Adiciona o token CSRF ao cabeçalho do request
+                    const csrfToken = document.querySelector('input[name="csrf_token"]');
+                    const headers = {
+                        'Content-Type': 'application/json'
+                    };
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken.value;
+                    }
+
+                    const response = await fetch(`/api/cancel_absence/${username}`, {
+                        method: 'POST',
+                        headers: headers
+                    });
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('Sucesso', result.message, 'success');
+
+                        // Remove from the visual list and the underlying data array
+                        allModalData = allModalData.filter(item => item.sam !== username);
+                        filterAndRender(); // Re-render the list from the filtered data
+
+                    } else {
+                        throw new Error(result.error || 'Falha ao cancelar agendamento.');
+                    }
+                } catch (error) {
+                    showToast('Erro', error.message, 'error');
+                }
+            };
+
+            confirmationModal.show();
+        }
         const modalContent = document.getElementById('modalContent');
         const modalTitle = document.getElementById('dataModalLabel');
         const modalSearchInput = document.getElementById('modalSearchInput');
@@ -231,32 +278,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     a.appendChild(samInfo);
                 }
 
-                // Wrapper para o item da lista e o botão
-                const itemWrapper = document.createElement('div');
-                itemWrapper.className = 'list-group-item-wrapper d-flex align-items-center';
-
-                // O link 'a' agora ocupa a maior parte do espaço
-                a.style.flexGrow = '1';
-                itemWrapper.appendChild(a);
-
-
-                // Adiciona o botão de cancelar apenas para a categoria de desativações agendadas
+                // Adiciona o botão de cancelar abaixo do conteúdo
                 if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'mt-2'; // Adiciona um espaço acima
+
                     const cancelBtn = document.createElement('button');
-                    cancelBtn.className = 'btn btn-sm btn-warning ms-2';
-                    cancelBtn.innerHTML = '<i class="fas fa-calendar-times"></i>';
-                    cancelBtn.title = 'Cancelar Agendamento';
+                    cancelBtn.className = 'btn btn-sm btn-warning';
+                    cancelBtn.textContent = 'Cancelar'; // Texto "Cancelar"
                     cancelBtn.dataset.username = item.sam;
                     cancelBtn.addEventListener('click', (e) => {
                         e.preventDefault(); // Impede a navegação
                         e.stopPropagation(); // Impede que o clique se propague para o link 'a'
                         handleCancelAbsence(item.sam);
                     });
-                    itemWrapper.appendChild(cancelBtn);
+                    buttonContainer.appendChild(cancelBtn);
+                    a.appendChild(buttonContainer);
                 }
 
-
-                modalContent.appendChild(itemWrapper);
+                modalContent.appendChild(a);
             });
         }
 
