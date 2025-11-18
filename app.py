@@ -672,6 +672,7 @@ def index():
 @app.route('/dashboard')
 @require_auth
 def dashboard():
+    form = FlaskForm()  # Cria uma instância de formulário vazia para o CSRF
     context = {
         'active_users': 0,
         'disabled_users': 0,
@@ -703,7 +704,7 @@ def dashboard():
     except Exception as e:
         flash(f"Erro ao carregar dados do dashboard: {e}", "error")
 
-    return render_template('dashboard.html', **context)
+    return render_template('dashboard.html', form=form, **context)
 
 @app.route('/create_user_form', methods=['GET', 'POST'])
 @require_auth
@@ -1563,6 +1564,65 @@ def api_schedule_absence(username):
         logging.error(f"Erro em api_schedule_absence para '{username}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao agendar ausência: {e}'}), 500
 
+@app.route('/api/cancel_absence/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def api_cancel_absence(username):
+    """Cancela um agendamento de ausência (desativação/reativação) para um usuário."""
+    try:
+        disable_schedules = load_disable_schedules()
+        reactivation_schedules = load_schedules()
+
+        # Verifica se há algum agendamento para este usuário
+        deactivation_scheduled = username in disable_schedules
+        reactivation_scheduled = username in reactivation_schedules
+
+        if not deactivation_scheduled and not reactivation_scheduled:
+            return jsonify({'error': 'Nenhum agendamento de ausência encontrado para este usuário.'}), 404
+
+        message = ""
+        today = date.today()
+
+        # Se havia uma desativação futura agendada, remove-a.
+        if deactivation_scheduled:
+            del disable_schedules[username]
+            save_disable_schedules(disable_schedules)
+            logging.info(f"[AGENDAMENTO CANCELADO] A desativação futura de '{username}' foi cancelada por '{session.get('user_display_name')}'.")
+            message += "Agendamento de desativação cancelado. "
+
+        # Se havia uma reativação agendada, significa que a desativação já ocorreu ou estava agendada.
+        # O usuário precisa ser reativado imediatamente.
+        if reactivation_scheduled:
+            del reactivation_schedules[username]
+            save_schedules(reactivation_schedules)
+
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
+            if not user:
+                 # Mesmo que o usuário não seja encontrado no AD, o agendamento é removido.
+                logging.warning(f"Usuário '{username}' não encontrado no AD durante o cancelamento da ausência, mas o agendamento foi removido.")
+            else:
+                uac = user.userAccountControl.value
+                # Verifica se a conta está desativada antes de tentar ativar
+                if uac & 2:
+                    new_uac = uac - 2
+                    conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
+                    if conn.result['description'] == 'success':
+                        logging.info(f"[ALTERAÇÃO] Conta de '{username}' foi reativada imediatamente devido ao cancelamento da ausência por '{session.get('user_display_name')}'.")
+                        message += "Usuário foi reativado. "
+                    else:
+                        # Se a reativação falhar, o agendamento ainda foi removido, mas um erro é logado.
+                        logging.error(f"Falha ao reativar '{username}' no AD durante o cancelamento da ausência: {conn.result['message']}")
+                        message += "Agendamento de reativação removido, mas falha ao reativar no AD. "
+                else:
+                    message += "Agendamento de reativação removido (usuário já estava ativo). "
+
+        return jsonify({'success': True, 'message': f'Agendamento de ausência cancelado. {message}'})
+
+    except Exception as e:
+        logging.error(f"Erro em api_cancel_absence para '{username}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao cancelar o agendamento: {e}'}), 500
+
 @app.route('/api/action_permissions')
 @require_auth
 def api_action_permissions():
@@ -2078,10 +2138,28 @@ def view_user(username):
             elif int(expiry_time_ft) == 9223372036854775807 or int(expiry_time_ft) == 0:
                  password_expiry_info = "A senha está configurada para nunca expirar."
 
+        # Verifica se há uma ausência agendada para este usuário
+        disable_schedules = load_disable_schedules()
+        reactivation_schedules = load_schedules()
+        absence_scheduled = username in disable_schedules and username in reactivation_schedules
+        absence_info = None
+        if absence_scheduled:
+            try:
+                deactivation_date = datetime.strptime(disable_schedules[username], '%Y-%m-%d').strftime('%d/%m/%Y')
+                reactivation_date = datetime.strptime(reactivation_schedules[username], '%Y-%m-%d').strftime('%d/%m/%Y')
+                absence_info = {
+                    'deactivation': deactivation_date,
+                    'reactivation': reactivation_date
+                }
+            except (ValueError, KeyError):
+                # Se houver um erro de formato de data ou a chave não existir, ignora
+                absence_scheduled = False
+
+
         # Passa ambos os formulários para o template
         form = EditUserForm() # Para os formulários existentes
         delete_form = DeleteUserForm() # Para o modal de exclusão
-        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info)
+        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info)
     except Exception as e:
         flash(f"Erro ao buscar detalhes do usuário: {e}", "error")
         logging.error(f"Erro ao buscar detalhes do usuário para {username}: {e}", exc_info=True)
@@ -2518,23 +2596,23 @@ def admin_logs():
 
     return render_template('admin/logs.html', logs=logs_categorized, search_form=search_form, active_tab=active_tab)
 
-@app.route('/admin/manage_schedules')
+@app.route('/manage_schedules')
+@require_auth
+@require_permission(action='can_manage_groups')
 def manage_schedules():
-    if 'master_admin' not in session:
-        return redirect(url_for('admin_login'))
-    return render_template('admin/manage_schedules.html')
+    return render_template('manage_schedules.html')
 
 @app.route('/api/schedules', methods=['GET'])
+@require_auth
+@require_permission(action='can_manage_groups')
 def get_schedules():
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
     schedules = load_group_schedules()
     return jsonify(schedules)
 
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
+@require_auth
+@require_permission(action='can_manage_groups')
 def delete_schedule(schedule_id):
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
 
     schedules = load_group_schedules()
 
@@ -2585,9 +2663,9 @@ def delete_schedule(schedule_id):
         return jsonify({'error': 'Agendamento não encontrado.'}), 404
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
+@require_auth
+@require_permission(action='can_manage_groups')
 def update_schedule(schedule_id):
-    if 'master_admin' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
 
     data = request.get_json()
     new_start_date_str = data.get('start_date')
