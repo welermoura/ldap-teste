@@ -217,29 +217,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
                     const rightColumn = document.createElement('div');
-                    rightColumn.className = 'text-end';
+                    rightColumn.className = 'd-flex flex-column align-items-end';
 
                     const dateBadge = document.createElement('span');
-                    dateBadge.className = 'badge bg-dark mb-2';
+                    dateBadge.className = 'badge bg-dark';
                     dateBadge.textContent = `Data: ${item.scheduled_date}`;
                     rightColumn.appendChild(dateBadge);
 
-                    const cancelBtn = document.createElement('button');
-                    cancelBtn.className = 'btn btn-sm btn-warning';
-                    cancelBtn.textContent = 'Cancelar';
-                    cancelBtn.dataset.username = item.sam;
-
-                    cancelBtn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-                        handleCancelAbsence(item.sam, csrfToken, () => {
-                            allModalData = allModalData.filter(d => d.sam !== item.sam);
-                            filterAndRender();
-                        });
-                    });
-
-                    rightColumn.appendChild(cancelBtn);
                     wrapper.appendChild(rightColumn);
                 }
 
@@ -446,17 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Renderização inicial
     renderList();
 
-    // Listener para o botão de confirmação do modal genérico
-    const confirmActionBtn = document.getElementById('confirmActionBtn');
-    if (confirmActionBtn) {
-        confirmActionBtn.addEventListener('click', function() {
-            if (typeof currentConfirmAction === 'function') {
-                currentConfirmAction();
-            }
-            const confirmationModal = bootstrap.Modal.getInstance(document.getElementById('confirmationModal'));
-            confirmationModal.hide();
-        });
-    }
+    // A lógica do botão de confirmação do modal genérico já está em base.html
 });
 </script>
 

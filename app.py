@@ -2604,15 +2604,16 @@ def manage_schedules():
 
 @app.route('/api/schedules', methods=['GET'])
 @require_auth
-@require_api_permission(action='can_manage_groups')
+@require_permission(action='can_manage_groups')
 def get_schedules():
     schedules = load_group_schedules()
     return jsonify(schedules)
 
 @app.route('/api/schedules/<schedule_id>', methods=['DELETE'])
 @require_auth
-@require_api_permission(action='can_manage_groups')
+@require_permission(action='can_manage_groups')
 def delete_schedule(schedule_id):
+
     schedules = load_group_schedules()
 
     # Encontra o agendamento de 'add' para obter os detalhes e verificar a data
@@ -2663,8 +2664,9 @@ def delete_schedule(schedule_id):
 
 @app.route('/api/schedules/<schedule_id>', methods=['PUT'])
 @require_auth
-@require_api_permission(action='can_manage_groups')
+@require_permission(action='can_manage_groups')
 def update_schedule(schedule_id):
+
     data = request.get_json()
     new_start_date_str = data.get('start_date')
     new_end_date_str = data.get('end_date')
