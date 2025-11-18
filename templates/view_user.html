@@ -545,28 +545,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if(cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
-            setupConfirmationModal(
-                'Confirmar Cancelamento',
-                'Tem certeza que deseja cancelar o agendamento de ausência para este usuário? A conta será reativada imediatamente se o período de ausência já tiver começado.',
-                async () => {
-                    try {
-                        const response = await fetch(`/api/cancel_absence/${username}`, {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken }
-                        });
-                        const result = await response.json();
-                        if (!response.ok) {
-                            throw new Error(result.error || 'Erro desconhecido');
-                        }
-                        showToast('Agendamento cancelado com sucesso!', 'success', 'Sucesso');
-                        // Recarrega a página para refletir a mudança de status
-                        setTimeout(() => window.location.reload(), 1500);
-                    } catch (error) {
-                        showToast(`Falha ao cancelar agendamento: ${error.message}`, 'error', 'Erro');
-                        console.error('Erro ao cancelar agendamento:', error);
-                    }
-                }
-            );
+            // Chama a função global de base.html, passando o callback para recarregar a página
+            handleCancelAbsence(username, csrfToken, () => {
+                setTimeout(() => window.location.reload(), 1500);
+            });
         });
     }
 });

@@ -174,52 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let modalNextCookie = null;
         let modalIsLoading = false;
         let modalCurrentCategory = '';
-        let currentConfirmAction = () => {};
-
-        function handleCancelAbsence(username) {
-            const confirmationModal = new bootstrap.Modal(document.getElementById('confirmationModal'));
-            const modalBody = document.getElementById('confirmationModalBody');
-            const confirmBtn = document.getElementById('confirmActionBtn');
-            const modalLabel = document.getElementById('confirmationModalLabel');
-
-            modalLabel.textContent = 'Confirmar Cancelamento';
-            modalBody.textContent = `Você tem certeza que deseja cancelar o agendamento de ausência para ${username}? O usuário será reativado imediatamente se a ausência já tiver começado.`;
-            confirmBtn.className = 'btn btn-danger';
-            confirmBtn.textContent = 'Confirmar Cancelamento';
-
-            currentConfirmAction = async () => {
-                try {
-                    // Adiciona o token CSRF ao cabeçalho do request
-                    const csrfToken = document.querySelector('input[name="csrf_token"]');
-                    const headers = {
-                        'Content-Type': 'application/json'
-                    };
-                    if (csrfToken) {
-                        headers['X-CSRFToken'] = csrfToken.value;
-                    }
-
-                    const response = await fetch(`/api/cancel_absence/${username}`, {
-                        method: 'POST',
-                        headers: headers
-                    });
-                    const result = await response.json();
-                    if (response.ok && result.success) {
-                        showToast('Sucesso', result.message, 'success');
-
-                        // Remove from the visual list and the underlying data array
-                        allModalData = allModalData.filter(item => item.sam !== username);
-                        filterAndRender(); // Re-render the list from the filtered data
-
-                    } else {
-                        throw new Error(result.error || 'Falha ao cancelar agendamento.');
-                    }
-                } catch (error) {
-                    showToast('Erro', error.message, 'error');
-                }
-            };
-
-            confirmationModal.show();
-        }
         const modalContent = document.getElementById('modalContent');
         const modalTitle = document.getElementById('dataModalLabel');
         const modalSearchInput = document.getElementById('modalSearchInput');
@@ -236,67 +190,60 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             data.forEach(item => {
-                const a = document.createElement('a');
-                a.href = `/view_user/${item.sam}`;
-                a.className = 'list-group-item list-group-item-action flex-column align-items-start';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'list-group-item d-flex justify-content-between align-items-center';
 
-                const mainInfo = document.createElement('div');
-                mainInfo.className = 'd-flex w-100 justify-content-between';
+                const leftColumn = document.createElement('a');
+                leftColumn.href = `/view_user/${item.sam}`;
+                leftColumn.className = 'text-decoration-none text-reset flex-grow-1';
 
                 const name = document.createElement('h6');
                 name.className = 'mb-1';
                 name.textContent = item.cn || 'Nome não disponível';
-
-                const sam = document.createElement('small');
-                sam.className = 'text-muted';
-                sam.textContent = item.sam || '';
-
-                mainInfo.appendChild(name);
-
-                if (item.scheduled_date) {
-                    const dateBadge = document.createElement('span');
-                    dateBadge.className = 'badge bg-dark';
-                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
-                    mainInfo.appendChild(dateBadge);
-                } else {
-                    mainInfo.appendChild(sam);
-                }
-
-                const subInfo = document.createElement('p');
-                subInfo.className = 'mb-1 text-muted small';
+                leftColumn.appendChild(name);
 
                 const details = [item.title, item.department, item.location].filter(Boolean).join(' • ');
+                const subInfo = document.createElement('p');
+                subInfo.className = 'mb-1 text-muted small';
                 subInfo.textContent = details || 'Sem detalhes adicionais';
+                leftColumn.appendChild(subInfo);
 
-                a.appendChild(mainInfo);
-                a.appendChild(subInfo);
+                const samInfo = document.createElement('small');
+                samInfo.className = 'text-muted';
+                samInfo.textContent = `Login: ${item.sam}`;
+                leftColumn.appendChild(samInfo);
 
-                if (item.scheduled_date) {
-                    const samInfo = document.createElement('small');
-                    samInfo.className = 'text-muted';
-                    samInfo.textContent = `Login: ${item.sam}`;
-                    a.appendChild(samInfo);
-                }
+                wrapper.appendChild(leftColumn);
 
-                // Adiciona o botão de cancelar abaixo do conteúdo
                 if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
-                    const buttonContainer = document.createElement('div');
-                    buttonContainer.className = 'mt-2'; // Adiciona um espaço acima
+                    const rightColumn = document.createElement('div');
+                    rightColumn.className = 'text-end';
+
+                    const dateBadge = document.createElement('span');
+                    dateBadge.className = 'badge bg-dark mb-2';
+                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
+                    rightColumn.appendChild(dateBadge);
 
                     const cancelBtn = document.createElement('button');
                     cancelBtn.className = 'btn btn-sm btn-warning';
-                    cancelBtn.textContent = 'Cancelar'; // Texto "Cancelar"
+                    cancelBtn.textContent = 'Cancelar';
                     cancelBtn.dataset.username = item.sam;
+
                     cancelBtn.addEventListener('click', (e) => {
-                        e.preventDefault(); // Impede a navegação
-                        e.stopPropagation(); // Impede que o clique se propague para o link 'a'
-                        handleCancelAbsence(item.sam);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                        handleCancelAbsence(item.sam, csrfToken, () => {
+                            allModalData = allModalData.filter(d => d.sam !== item.sam);
+                            filterAndRender();
+                        });
                     });
-                    buttonContainer.appendChild(cancelBtn);
-                    a.appendChild(buttonContainer);
+
+                    rightColumn.appendChild(cancelBtn);
+                    wrapper.appendChild(rightColumn);
                 }
 
-                modalContent.appendChild(a);
+                modalContent.appendChild(wrapper);
             });
         }
 
