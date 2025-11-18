@@ -9,6 +9,9 @@
 {% endblock %}
 
 {% block content %}
+<form method="POST" action="">
+    {{ form.hidden_tag() }}
+</form>
 {% set show_quick_actions = check_permission(action='can_create') or check_permission(action='can_edit') or check_permission(action='can_manage_groups') or check_permission(view='can_export_data') %}
 {% if show_quick_actions %}
 <div class="card glass-card mb-4">
@@ -171,7 +174,6 @@ document.addEventListener('DOMContentLoaded', function() {
         let modalNextCookie = null;
         let modalIsLoading = false;
         let modalCurrentCategory = '';
-
         const modalContent = document.getElementById('modalContent');
         const modalTitle = document.getElementById('dataModalLabel');
         const modalSearchInput = document.getElementById('modalSearchInput');
@@ -188,48 +190,60 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             data.forEach(item => {
-                const a = document.createElement('a');
-                a.href = `/view_user/${item.sam}`;
-                a.className = 'list-group-item list-group-item-action flex-column align-items-start';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'list-group-item d-flex justify-content-between align-items-center';
 
-                const mainInfo = document.createElement('div');
-                mainInfo.className = 'd-flex w-100 justify-content-between';
+                const leftColumn = document.createElement('a');
+                leftColumn.href = `/view_user/${item.sam}`;
+                leftColumn.className = 'text-decoration-none text-reset flex-grow-1';
 
                 const name = document.createElement('h6');
                 name.className = 'mb-1';
                 name.textContent = item.cn || 'Nome não disponível';
-
-                const sam = document.createElement('small');
-                sam.className = 'text-muted';
-                sam.textContent = item.sam || '';
-
-                mainInfo.appendChild(name);
-
-                if (item.scheduled_date) {
-                    const dateBadge = document.createElement('span');
-                    dateBadge.className = 'badge bg-dark';
-                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
-                    mainInfo.appendChild(dateBadge);
-                } else {
-                    mainInfo.appendChild(sam);
-                }
-
-                const subInfo = document.createElement('p');
-                subInfo.className = 'mb-1 text-muted small';
+                leftColumn.appendChild(name);
 
                 const details = [item.title, item.department, item.location].filter(Boolean).join(' • ');
+                const subInfo = document.createElement('p');
+                subInfo.className = 'mb-1 text-muted small';
                 subInfo.textContent = details || 'Sem detalhes adicionais';
+                leftColumn.appendChild(subInfo);
 
-                a.appendChild(mainInfo);
-                a.appendChild(subInfo);
+                const samInfo = document.createElement('small');
+                samInfo.className = 'text-muted';
+                samInfo.textContent = `Login: ${item.sam}`;
+                leftColumn.appendChild(samInfo);
 
-                if (item.scheduled_date) {
-                    const samInfo = document.createElement('small');
-                    samInfo.className = 'text-muted';
-                    samInfo.textContent = `Login: ${item.sam}`;
-                    a.appendChild(samInfo);
+                wrapper.appendChild(leftColumn);
+
+                if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
+                    const rightColumn = document.createElement('div');
+                    rightColumn.className = 'd-flex flex-column align-items-end';
+
+                    const dateBadge = document.createElement('span');
+                    dateBadge.className = 'badge bg-dark mb-2';
+                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
+                    rightColumn.appendChild(dateBadge);
+
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'btn btn-sm btn-warning';
+                    cancelBtn.textContent = 'Cancelar';
+                    cancelBtn.dataset.username = item.sam;
+
+                    cancelBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                        handleCancelAbsence(item.sam, csrfToken, () => {
+                            allModalData = allModalData.filter(d => d.sam !== item.sam);
+                            filterAndRender();
+                        });
+                    });
+
+                    rightColumn.appendChild(cancelBtn);
+                    wrapper.appendChild(rightColumn);
                 }
-                modalContent.appendChild(a);
+
+                modalContent.appendChild(wrapper);
             });
         }
 
@@ -431,6 +445,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Renderização inicial
     renderList();
+
+    // A lógica do botão de confirmação do modal genérico já está em base.html
 });
 </script>
 
@@ -450,4 +466,23 @@ document.addEventListener('DOMContentLoaded', function() {
         font-size: 0.875em;
     }
 </style>
+
+<!-- Modal de Confirmação Genérico para o Dashboard -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmationModalBody">
+        ...
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

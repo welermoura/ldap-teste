@@ -131,6 +131,65 @@
         });
 
         // Função para exibir toasts (notificações)
+        let currentConfirmAction = () => {};
+
+        function setupConfirmationModal(title, body, onConfirmCallback) {
+            const confirmationModalEl = document.getElementById('confirmationModal');
+            if (!confirmationModalEl) {
+                console.error('Confirmation modal element not found!');
+                return;
+            }
+            const confirmationModal = bootstrap.Modal.getOrCreateInstance(confirmationModalEl);
+            const modalLabel = document.getElementById('confirmationModalLabel');
+            const modalBody = document.getElementById('confirmationModalBody');
+
+            modalLabel.textContent = title;
+            modalBody.textContent = body;
+            currentConfirmAction = onConfirmCallback;
+            confirmationModal.show();
+        }
+
+        async function handleCancelAbsence(username, csrfToken, callback) {
+            setupConfirmationModal(
+                'Confirmar Cancelamento',
+                `Tem certeza que deseja cancelar o agendamento de ausência para ${username}? A conta será reativada imediatamente se o período de ausência já tiver começado.`,
+                async () => {
+                    try {
+                        const response = await fetch(`/api/cancel_absence/${username}`, {
+                            method: 'POST',
+                            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+                        });
+                        const result = await response.json();
+                        if (!response.ok) {
+                            throw new Error(result.error || 'Erro desconhecido');
+                        }
+                        showToast('Sucesso', 'Agendamento cancelado com sucesso!', 'success');
+
+                        if (typeof callback === 'function') {
+                            callback();
+                        }
+                    } catch (error) {
+                        showToast('Erro', `Falha ao cancelar agendamento: ${error.message}`, 'error');
+                        console.error('Erro ao cancelar agendamento:', error);
+                    }
+                }
+            );
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmActionBtn = document.getElementById('confirmActionBtn');
+            if (confirmActionBtn) {
+                confirmActionBtn.addEventListener('click', function() {
+                    if (typeof currentConfirmAction === 'function') {
+                        currentConfirmAction();
+                    }
+                    const confirmationModalEl = document.getElementById('confirmationModal');
+                    const confirmationModal = bootstrap.Modal.getInstance(confirmationModalEl);
+                    confirmationModal.hide();
+                });
+            }
+        });
+
         function showToast(message, type = 'info', title = 'Notificação') {
             const toastContainer = document.getElementById('toast-container');
             if (!toastContainer) {
