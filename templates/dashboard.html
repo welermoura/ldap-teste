@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
                     const rightColumn = document.createElement('div');
-                    rightColumn.className = 'd-flex flex-column align-items-end';
+                    rightColumn.className = 'text-end';
 
                     const dateBadge = document.createElement('span');
                     dateBadge.className = 'badge bg-dark mb-2';
@@ -446,7 +446,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Renderização inicial
     renderList();
 
-    // A lógica do botão de confirmação do modal genérico já está em base.html
+    // Listener para o botão de confirmação do modal genérico
+    const confirmActionBtn = document.getElementById('confirmActionBtn');
+    if (confirmActionBtn) {
+        confirmActionBtn.addEventListener('click', function() {
+            if (typeof currentConfirmAction === 'function') {
+                currentConfirmAction();
+            }
+            const confirmationModal = bootstrap.Modal.getInstance(document.getElementById('confirmationModal'));
+            confirmationModal.hide();
+        });
+    }
 });
 </script>
 
