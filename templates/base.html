@@ -82,17 +82,26 @@
     </script>
 
     <script>
-    // Lógica para o seletor de tema - Versão Refatorada
-    (() => {
-        'use strict';
+    // Lógica para o seletor de tema
+    document.addEventListener('DOMContentLoaded', function() {
+        const docElement = document.documentElement;
+        const themeToggle = document.getElementById('theme-toggle');
+        if (!themeToggle) {
+            console.warn('Theme toggle button not found.');
+            return;
+        }
 
-        const getStoredTheme = () => localStorage.getItem('theme');
-        const setStoredTheme = theme => localStorage.setItem('theme', theme);
+        const themeToggleIcon = themeToggle.querySelector('i');
 
-        const getPreferredTheme = () => {
-            const storedTheme = getStoredTheme();
-            if (storedTheme) {
-                return storedTheme;
+        const applyTheme = (theme) => {
+            docElement.setAttribute('data-bs-theme', theme); // Alterado para data-bs-theme
+            localStorage.setItem('theme', theme);
+            if (theme === 'light') {
+                themeToggleIcon.className = 'fas fa-moon';
+                themeToggle.classList.remove('theme-icon-sun');
+            } else {
+                themeToggleIcon.className = 'fa-regular fa-sun';
+                themeToggle.classList.add('theme-icon-sun');
             }
             // Define 'dark' como padrão se nenhuma preferência for encontrada
             return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -116,26 +125,12 @@
             }
         };
 
-        // Aplica o tema imediatamente ao carregar o script
-        const initialTheme = getPreferredTheme();
-        setTheme(initialTheme);
-
-        // Atualiza a UI após o carregamento do DOM
-        document.addEventListener('DOMContentLoaded', () => {
-            updateToggleButton(initialTheme);
-
-            const themeToggle = document.getElementById('theme-toggle');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', () => {
-                    const currentTheme = getPreferredTheme();
-                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                    setStoredTheme(newTheme);
-                    setTheme(newTheme);
-                    updateToggleButton(newTheme);
-                });
-            }
-        });
-    })();
+        if (savedTheme) {
+            applyTheme(savedTheme);
+        } else {
+            applyTheme(prefersDark ? 'dark' : 'light');
+        }
+    });
     </script>
 
     {% block scripts %}
