@@ -672,6 +672,7 @@ def index():
 @app.route('/dashboard')
 @require_auth
 def dashboard():
+    form = FlaskForm()  # Cria uma instância de formulário vazia para o CSRF
     context = {
         'active_users': 0,
         'disabled_users': 0,
@@ -703,7 +704,7 @@ def dashboard():
     except Exception as e:
         flash(f"Erro ao carregar dados do dashboard: {e}", "error")
 
-    return render_template('dashboard.html', **context)
+    return render_template('dashboard.html', form=form, **context)
 
 @app.route('/create_user_form', methods=['GET', 'POST'])
 @require_auth
