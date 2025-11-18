@@ -1,2 +1,0 @@
-# m h  dom mon dow   user   command
-0 4,15 * * * root  sh -c "/usr/bin/flock -n /tmp/cron.lockfile /app/venv/bin/python /app/schedule_manager.py >> /app/logs/cron_execution.log 2>&1"
