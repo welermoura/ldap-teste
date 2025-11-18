@@ -15,20 +15,27 @@
     <div class="col-lg-4 mb-4">
         <div class="accordion" id="userActionsAccordion">
 
-            <!-- Status da Conta -->
-            <div class="accordion-item glass-card">
-                <h2 class="accordion-header" id="headingStatus">
-                    <button class="accordion-button glass-accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseStatus" aria-expanded="true" aria-controls="collapseStatus">
-                        Status da Conta
+        {% if absence_scheduled %}
+        <div class="card glass-card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Ausência Agendada</h5>
+            </div>
+            <div class="card-body">
+                <p>Uma ausência está agendada para este usuário.</p>
+                <p><strong>Início:</strong> {{ absence_info.deactivation }}</p>
+                <p><strong>Fim:</strong> {{ absence_info.reactivation }}</p>
+                {% if check_permission(action='can_disable') %}
+                    <button id="cancel-absence-btn" class="btn btn-warning w-100 mt-2">
+                        <i class="fas fa-calendar-times me-2"></i>Cancelar Agendamento
                     </button>
-                </h2>
-                <div id="collapseStatus" class="accordion-collapse collapse show" aria-labelledby="headingStatus" data-bs-parent="#userActionsAccordion">
-                    <div class="accordion-body">
-                        {% set status = get_user_status(user) %}
-                        <p><strong>Status:</strong> <span class="badge rounded-pill bg-{{ 'success' if status == 'Ativo' else 'danger' }} fs-6">{{ status }}</span></p>
-                        <p class="mt-3"><strong>Expiração da Senha:</strong><br><span class="text-highlight">{{ password_expiry_info }}</span></p>
-                    </div>
-                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card glass-card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Ações Rápidas</h5>
             </div>
 
             <!-- Ausência Agendada -->
