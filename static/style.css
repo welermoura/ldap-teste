@@ -22,7 +22,7 @@
     --datepicker-filter: invert(1);
 }
 
-html[data-theme='light'] {
+[data-bs-theme="light"] {
     --primary-color: #0d6efd;
     --primary-hover-color: #0b5ed7;
     --secondary-color: #6c757d;
@@ -155,8 +155,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: var(--datepicker
 .btn-outline-secondary { background-color: transparent !important; border-color: var(--secondary-color) !important; color: var(--text-muted-color) !important; }
 .btn-outline-secondary:hover { background-color: var(--secondary-color) !important; color: #fff !important; }
 
-html[data-theme='light'] .btn-outline-primary,
-html[data-theme='light'] .btn-outline-secondary {
+[data-bs-theme="light"] .btn-outline-primary,
+[data-bs-theme="light"] .btn-outline-secondary {
     color: #000 !important;
 }
 .btn-success { background-color: #28a745 !important; border-color: #28a745 !important; }
