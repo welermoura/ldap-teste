@@ -3,7 +3,7 @@ import json
 import logging
 from ldap3 import Server, Connection, ALL, ALL_ATTRIBUTES
 from ldap3.utils.log import set_library_log_detail_level, EXTENDED
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from ldap3.utils.conv import escape_filter_chars
 
 # Habilita o logging detalhado para a biblioteca ldap3 para depuração
@@ -56,8 +56,9 @@ def load_config():
             if k in SENSITIVE_KEYS and v:
                 try:
                     config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception:
-                    config[k] = v
+                except (InvalidToken, TypeError):
+                    logging.warning(f"Falha ao descriptografar a chave '{k}' do config.json. O valor pode estar em texto plano ou a 'secret.key' pode ter sido alterada. Retornando None para esta chave.")
+                    config[k] = None
             else:
                 config[k] = v
         return config
