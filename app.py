@@ -1428,7 +1428,8 @@ def api_reset_password(username):
         if not default_password:
             return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
 
-        conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
+        new_password_encoded = f'"{default_password}"'.encode('utf-16-le')
+        conn.modify(user.distinguishedName.value, {'unicodePwd': [(ldap3.MODIFY_REPLACE, [new_password_encoded])]})
         if conn.result['description'] != 'success':
              raise Exception(f"Erro do LDAP ao modificar a senha: {conn.result['message']}")
 
@@ -1440,8 +1441,17 @@ def api_reset_password(username):
         return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
 
     except Exception as e:
-        logging.error(f"Erro ao resetar senha para '{username}' via API: {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao resetar a senha: {e}'}), 500
+        error_message = str(e)
+        # Verifica a causa provável do erro "WILL_NOT_PERFORM"
+        if "WILL_NOT_PERFORM" in error_message:
+            config = load_config()
+            if not config.get('USE_LDAPS'):
+                specific_error = "O servidor Active Directory recusou a operação. Isso geralmente ocorre porque a alteração de senhas exige uma conexão segura (LDAPS). Por favor, habilite a opção 'Usar LDAPS (SSL)' na página de configuração do administrador."
+                logging.error(f"Erro 'WILL_NOT_PERFORM' ao resetar senha para '{username}': Conexão LDAPS não está em uso.")
+                return jsonify({'error': specific_error}), 500
+
+        logging.error(f"Erro ao resetar senha para '{username}' via API: {error_message}", exc_info=True)
+        return jsonify({'error': f'Falha ao resetar a senha: {error_message}'}), 500
 
 @app.route('/api/delete_object', methods=['DELETE'])
 @require_auth
@@ -2322,7 +2332,8 @@ def reset_password(username):
             flash("A senha padrão não está definida na configuração.", "error")
             return redirect(url_for('view_user', username=username))
 
-        conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
+        new_password_encoded = f'"{default_password}"'.encode('utf-16-le')
+        conn.modify(user.distinguishedName.value, {'unicodePwd': [(ldap3.MODIFY_REPLACE, [new_password_encoded])]})
         if conn.result['description'] != 'success':
             raise Exception(f"Erro do LDAP ao modificar a senha: {conn.result['message']}")
 
@@ -2333,8 +2344,18 @@ def reset_password(username):
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
         flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
     except Exception as e:
-        flash(f"Erro ao resetar a senha: {e}", "error")
-        logging.error(f"Erro em reset_password para {username}: {e}", exc_info=True)
+        error_message = str(e)
+        # Verifica a causa provável do erro "WILL_NOT_PERFORM"
+        if "WILL_NOT_PERFORM" in error_message:
+            config = load_config()
+            if not config.get('USE_LDAPS'):
+                specific_error = "O servidor Active Directory recusou a operação. Isso geralmente ocorre porque a alteração de senhas exige uma conexão segura (LDAPS). Por favor, habilite a opção 'Usar LDAPS (SSL)' na página de configuração do administrador."
+                flash(specific_error, "error")
+                logging.error(f"Erro 'WILL_NOT_PERFORM' ao resetar senha para '{username}': Conexão LDAPS não está em uso.")
+                return redirect(url_for('view_user', username=username))
+
+        flash(f"Erro ao resetar a senha: {error_message}", "error")
+        logging.error(f"Erro em reset_password para {username}: {error_message}", exc_info=True)
     return redirect(url_for('view_user', username=username))
 
 @app.route('/edit_user/<username>', methods=['GET', 'POST'])

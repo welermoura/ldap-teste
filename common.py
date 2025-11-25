@@ -3,7 +3,7 @@ import json
 import logging
 from ldap3 import Server, Connection, ALL, ALL_ATTRIBUTES
 from ldap3.utils.log import set_library_log_detail_level, EXTENDED
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from ldap3.utils.conv import escape_filter_chars
 
 # Habilita o logging detalhado para a biblioteca ldap3 para depuração
@@ -56,8 +56,9 @@ def load_config():
             if k in SENSITIVE_KEYS and v:
                 try:
                     config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception:
-                    config[k] = v
+                except (InvalidToken, TypeError):
+                    logging.warning(f"Falha ao descriptografar a chave '{k}' do config.json. O valor pode estar em texto plano ou a 'secret.key' pode ter sido alterada. Retornando None para esta chave.")
+                    config[k] = None
             else:
                 config[k] = v
         return config
@@ -94,35 +95,36 @@ def get_ldap_connection(user=None, password=None):
 
     server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
 
-    # Conexão para um usuário final (login) usa sempre autenticação simples
+    # Conexão padrão para login de usuário final
     if user and password:
-        logging.info(f"Tentando autenticação simples para o usuário: {user}")
         return Connection(server, user=user, password=password, auto_bind=True)
 
-    # Conexão com a conta de serviço
+    # Conexão da conta de serviço
     service_user = config.get('SERVICE_ACCOUNT_USER')
     service_password = config.get('SERVICE_ACCOUNT_PASSWORD')
     if not service_user or not service_password:
         raise Exception("Conta de serviço não configurada.")
 
-    # Tenta a conexão segura com Kerberos/GSSAPI primeiro para a conta de serviço
-    try:
-        logging.info(f"Tentando conexão SASL/GSSAPI (Kerberos) com sealing para: {service_user}")
-        conn = Connection(server, user=service_user, password=service_password,
-                          authentication='SASL', sasl_mechanism='GSSAPI', sasl_seal=True,
-                          auto_bind=True)
-        logging.info("Conexão SASL/GSSAPI com sealing bem-sucedida.")
-        return conn
-    except Exception as e_sasl:
-        logging.warning(f"Falha na conexão SASL/GSSAPI com sealing: {e_sasl}. Tentando autenticação simples como fallback.")
-        # Se a conexão SASL falhar, tenta a autenticação simples como fallback
+    # Se LDAPS não estiver habilitado, tenta usar SASL GSSAPI com assinatura para proteger a conexão.
+    # Isso pode ser suficiente para o AD permitir alterações de senha.
+    if not use_ldaps:
         try:
-            conn = Connection(server, user=service_user, password=service_password, auto_bind=True)
-            logging.info("Conexão de fallback com autenticação simples bem-sucedida.")
-            return conn
-        except Exception as e_simple:
-            logging.error(f"Falha na conexão de fallback com autenticação simples: {e_simple}")
-            raise Exception(f"Falha em ambas as tentativas de conexão (SASL e Simples): SASL Error: {e_sasl}, Simple Auth Error: {e_simple}")
+            logging.info("Tentando conexão com SASL/GSSAPI e assinatura (seal).")
+            # Para GSSAPI, o 'user' geralmente não é necessário se o Kerberos está configurado corretamente
+            # no ambiente onde o script está rodando. ldap3 usará o ticket do ambiente.
+            # Se a autenticação falhar, pode ser necessário um kinit manual ou configuração do krb5.conf.
+            conn = Connection(server, authentication='SASL', sasl_mechanism='GSSAPI', sasl_seal=True, auto_bind=True)
+            if conn.bound:
+                logging.info("Conexão com SASL/GSSAPI bem-sucedida.")
+                return conn
+            else:
+                logging.warning("Falha ao vincular com SASL/GSSAPI, tentando autenticação simples.")
+        except Exception as e:
+            logging.warning(f"Falha na conexão SASL/GSSAPI: {e}. Tentando autenticação simples como fallback.")
+
+    # Fallback para autenticação simples (PLAIN) se LDAPS estiver ativado ou se GSSAPI falhar.
+    logging.info("Tentando conexão com autenticação simples (PLAIN).")
+    return Connection(server, user=service_user, password=service_password, auto_bind=True)
 
 def is_recycle_bin_enabled(conn):
     """Verifica se a Lixeira do Active Directory está habilitada."""
