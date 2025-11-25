@@ -484,6 +484,24 @@ def get_upn_suffix_from_base(search_base):
         return None
     return '@' + '.'.join(dc_parts)
 
+def get_password_reset_error_message(conn, ldap_error_message):
+    """
+    Analisa um erro de LDAP durante o reset de senha e retorna uma mensagem mais
+    clara se o problema for a falta de uma conexão segura.
+    """
+    # A propriedade 'sasl_sealed' não existe diretamente no objeto de conexão,
+    # mas a ausência de SSL/TLS é um bom indicador. A lógica em common.py
+    # já tenta a conexão selada, então se chegarmos aqui com erro, é provável
+    # que a conexão seja simples.
+    is_secure_connection = conn.server.ssl or conn.tls_started
+
+    if "WILL_NOT_PERFORM" in ldap_error_message and not is_secure_connection:
+        return ("O servidor Active Directory recusou a operação. Isso geralmente ocorre "
+                "porque a alteração de senhas exige uma conexão segura (LDAPS). Por favor, "
+                "habilite a opção 'Usar LDAPS (SSL)' na página de configuração do administrador.")
+    return f"Erro do LDAP: {ldap_error_message}"
+
+
 def create_ad_user(conn, form_data, model_attrs):
     config = load_config()
     first_name = form_data['first_name']
@@ -1417,6 +1435,7 @@ def api_toggle_object_status():
 @require_api_permission(action='can_reset_password')
 def api_reset_password(username):
     """Reseta a senha de um usuário para a padrão e retorna a senha em JSON."""
+    conn = None
     try:
         conn = get_service_account_connection()
         user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
@@ -1429,17 +1448,20 @@ def api_reset_password(username):
             return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-
         if conn.result['description'] != 'success':
-             raise Exception(f"Erro do LDAP: {conn.result['message']}")
+             raise Exception(conn.result['message'])
+
+        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+        if conn.result['description'] != 'success':
+             raise Exception(conn.result['message'])
 
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
 
     except Exception as e:
         logging.error(f"Erro ao resetar senha para '{username}' via API: {e}", exc_info=True)
-        return jsonify({'error': f'Falha ao resetar a senha: {e}'}), 500
+        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
+        return jsonify({'error': error_message}), 500
 
 @app.route('/api/delete_object', methods=['DELETE'])
 @require_auth
@@ -2308,6 +2330,7 @@ def delete_user(username):
 @require_auth
 @require_permission(action='can_reset_password')
 def reset_password(username):
+    conn = None
     try:
         conn = get_service_account_connection()
         user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
@@ -2321,12 +2344,19 @@ def reset_password(username):
             return redirect(url_for('view_user', username=username))
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
+        if conn.result['description'] != 'success':
+            raise Exception(conn.result['message'])
+
         conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+        if conn.result['description'] != 'success':
+            raise Exception(conn.result['message'])
+
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
         flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
     except Exception as e:
-        flash(f"Erro ao resetar a senha: {e}", "error")
         logging.error(f"Erro em reset_password para {username}: {e}", exc_info=True)
+        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
+        flash(error_message, "error")
     return redirect(url_for('view_user', username=username))
 
 @app.route('/edit_user/<username>', methods=['GET', 'POST'])
