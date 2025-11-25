@@ -352,6 +352,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    extensionAttribute1 = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -2393,7 +2394,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2446,7 +2448,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
