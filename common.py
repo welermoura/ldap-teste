@@ -107,14 +107,11 @@ def get_ldap_connection(user=None, password=None):
 
     # Tenta a conexão segura com Kerberos/GSSAPI primeiro para a conta de serviço
     try:
-        logging.info(f"Tentando conexão SASL/GSSAPI (Kerberos) para: {service_user}")
-        # A biblioteca ldap3 delega a negociação de "sealing" para a
-        # configuração do Kerberos no nível do sistema. O parâmetro 'sasl_seal'
-        # não é válido. Apenas solicitar GSSAPI é o suficiente.
+        logging.info(f"Tentando conexão SASL/GSSAPI (Kerberos) com sealing para: {service_user}")
         conn = Connection(server, user=service_user, password=service_password,
-                          authentication='SASL', sasl_mechanism='GSSAPI',
+                          authentication='SASL', sasl_mechanism='GSSAPI', sasl_seal=True,
                           auto_bind=True)
-        logging.info("Conexão SASL/GSSAPI bem-sucedida.")
+        logging.info("Conexão SASL/GSSAPI com sealing bem-sucedida.")
         return conn
     except Exception as e_sasl:
         logging.warning(f"Falha na conexão SASL/GSSAPI com sealing: {e_sasl}. Tentando autenticação simples como fallback.")
