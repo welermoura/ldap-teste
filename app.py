@@ -1429,10 +1429,12 @@ def api_reset_password(username):
             return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-
         if conn.result['description'] != 'success':
-             raise Exception(f"Erro do LDAP: {conn.result['message']}")
+             raise Exception(f"Erro do LDAP ao modificar a senha: {conn.result['message']}")
+
+        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+        if conn.result['description'] != 'success':
+             raise Exception(f"Erro do LDAP ao definir 'pwdLastSet': {conn.result['message']}")
 
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
@@ -2321,7 +2323,13 @@ def reset_password(username):
             return redirect(url_for('view_user', username=username))
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP ao modificar a senha: {conn.result['message']}")
+
         conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+        if conn.result['description'] != 'success':
+            raise Exception(f"Erro do LDAP ao definir 'pwdLastSet': {conn.result['message']}")
+
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
         flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
     except Exception as e:
