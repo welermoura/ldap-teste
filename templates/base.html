@@ -16,6 +16,9 @@
 
     {% block body_content %}
         <main class="container-fluid">
+            <div id="theme-toggle" class="theme-toggle-button" title="Mudar tema">
+                <i class="fas fa-moon"></i>
+            </div>
             {% block page_title %}{% endblock %}
 
             {# Flashed messages will now appear here with the correct styling #}
@@ -81,49 +84,6 @@
             }
             e.target.value = formattedValue;
         }
-    });
-    </script>
-
-    <script>
-    // Lógica consolidada e corrigida para o seletor de tema
-    document.addEventListener('DOMContentLoaded', function() {
-        const themeToggle = document.getElementById('theme-toggle');
-        if (!themeToggle) {
-            // Se não houver botão, apenas aplica o tema salvo ou padrão sem adicionar o listener
-            const savedTheme = localStorage.getItem('theme');
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-            document.documentElement.setAttribute('data-bs-theme', currentTheme);
-            return;
-        }
-
-        const themeToggleIcon = themeToggle.querySelector('i');
-
-        // Função única para aplicar o tema e atualizar o ícone
-        const applyTheme = (theme) => {
-            document.documentElement.setAttribute('data-bs-theme', theme);
-            localStorage.setItem('theme', theme);
-            if (theme === 'dark') {
-                themeToggleIcon.className = 'fa-regular fa-sun';
-                themeToggle.classList.add('theme-icon-sun');
-            } else {
-                themeToggleIcon.className = 'fas fa-moon';
-                themeToggle.classList.remove('theme-icon-sun');
-            }
-        };
-
-        // Adiciona o listener de clique para o botão
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            applyTheme(newTheme);
-        });
-
-        // Define o tema inicial com base no localStorage ou preferência do sistema
-        const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-        applyTheme(initialTheme);
     });
     </script>
 

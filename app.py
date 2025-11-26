@@ -1566,9 +1566,10 @@ def api_schedule_absence(username):
 
 @app.route('/api/cancel_absence/<username>', methods=['POST'])
 @require_auth
-@require_api_permission(action='can_disable')
 def api_cancel_absence(username):
     """Cancela um agendamento de ausência (desativação/reativação) para um usuário."""
+    if not (check_permission(action='can_disable') or check_permission(action='can_manage_groups')):
+        return jsonify({'error': 'Permissão negada.'}), 403
     try:
         disable_schedules = load_disable_schedules()
         reactivation_schedules = load_schedules()

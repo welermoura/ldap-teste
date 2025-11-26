@@ -460,6 +460,48 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (groupMembershipSearchInput) {
         groupMembershipSearchInput.addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        const filteredGroups = allUserGroups.filter(group =>
+            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+        );
+        renderGroups(filteredGroups);
+    });
+
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
+
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
+
+    if (groupSearchInput) {
+        groupSearchInput.addEventListener('keyup', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchGroups(groupSearchInput.value);
+        }, 300); // Debounce
+    });
+
+    groupSearchResults.addEventListener('click', function(e) {
+        const addBtn = e.target.closest('.add-group-btn');
+        if (addBtn) {
+            addGroup(addBtn.dataset.groupName);
+        }
+
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
             const query = this.value.toLowerCase();
             const filteredGroups = allUserGroups.filter(group =>
                 group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
