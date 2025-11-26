@@ -239,7 +239,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmationModal = new bootstrap.Modal(confirmationModalEl);
     const confirmationModalLabel = document.getElementById('confirmationModalLabel');
     const confirmationModalBody = document.getElementById('confirmationModalBody');
-    // Deve ser 'let' porque o botão é clonado e reatribuído para evitar listeners de eventos duplicados.
     let confirmActionBtn = document.getElementById('confirmActionBtn');
     const deactivateBtn = document.getElementById('deactivate-btn');
     const resetPasswordBtn = document.getElementById('reset-password-btn');
@@ -250,7 +249,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let allUserGroups = [];
     let tabLoaded = false;
     let searchTimeout;
-    let selectedGroupForTempAdd = null; // Guarda o nome do grupo selecionado para adição temporária
+    let selectedGroupForTempAdd = null;
+    let currentConfirmAction = () => {}; // Holds the action for the current confirmation
 
     // === Funções de Renderização ===
     function renderGroups(groups) {
@@ -323,20 +323,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function setupConfirmationModal(title, body, onConfirm) {
+    function setupConfirmationModal(title, body, onConfirmCallback) {
         confirmationModalLabel.textContent = title;
         confirmationModalBody.textContent = body;
-
-        // Remove previous listener to avoid multiple executions
-        const newConfirmBtn = confirmActionBtn.cloneNode(true);
-        confirmActionBtn.parentNode.replaceChild(newConfirmBtn, confirmActionBtn);
-        confirmActionBtn = newConfirmBtn;
-
-        confirmActionBtn.addEventListener('click', function() {
-            onConfirm();
-            confirmationModal.hide();
-        });
-
+        currentConfirmAction = onConfirmCallback; // Set the action
         confirmationModal.show();
     }
 
@@ -351,11 +341,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-                showToast('Sucesso', 'Usuário removido do grupo com sucesso.', 'success');
+                showToast('Usuário removido do grupo com sucesso.', 'success', 'Sucesso');
                 tabLoaded = false; // Força recarregamento
                 fetchUserGroups();
             } catch (error) {
-                showToast('Erro', `Falha ao remover do grupo: ${error.message}`, 'error');
+                showToast(`Falha ao remover do grupo: ${error.message}`, 'error', 'Erro');
                 console.error('Erro ao remover grupo:', error);
             }
         });
@@ -371,19 +361,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-            showToast('Sucesso', 'Usuário adicionado ao grupo com sucesso.', 'success');
+            showToast('Usuário adicionado ao grupo com sucesso.', 'success', 'Sucesso');
             tabLoaded = false; // Força recarregamento
             fetchUserGroups();
             addGroupModal.hide();
         } catch (error) {
-            showToast('Erro', `Falha ao adicionar ao grupo: ${error.message}`, 'error');
+            showToast(`Falha ao adicionar ao grupo: ${error.message}`, 'error', 'Erro');
             console.error('Erro ao adicionar grupo:', error);
         }
     }
 
     async function addGroupTemp(groupName, startDate, endDate) {
         if (!startDate || !endDate) {
-            showToast('Erro de Validação', 'Por favor, selecione data de início e fim.', 'error');
+            showToast('Por favor, selecione data de início e fim.', 'error', 'Erro de Validação');
             return;
         }
         try {
@@ -400,12 +390,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-            showToast('Sucesso', 'Usuário adicionado temporariamente ao grupo com sucesso.', 'success');
+            showToast('Usuário adicionado temporariamente ao grupo com sucesso.', 'success', 'Sucesso');
             tabLoaded = false; // Força recarregamento
             fetchUserGroups();
             addGroupModal.hide();
         } catch (error) {
-            showToast('Erro', `Falha ao adicionar temporariamente ao grupo: ${error.message}`, 'error');
+            showToast(`Falha ao adicionar temporariamente ao grupo: ${error.message}`, 'error', 'Erro');
             console.error('Erro ao adicionar grupo temporariamente:', error);
         }
     }
@@ -503,27 +493,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 
-    // Função para exibir toasts (notificações) - requer um container no base.html
-    function showToast(title, message, type = 'info') {
-        const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
-
-        const toastId = 'toast-' + Date.now();
-        const toastHTML = `
-            <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                <div class="toast-header">
-                    <strong class="me-auto text-${type}">${title}</strong>
-                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                </div>
-                <div class="toast-body">${message}</div>
-            </div>`;
-
-        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-        const toastElement = document.getElementById(toastId);
-        const toast = new bootstrap.Toast(toastElement);
-        toast.show();
-        toastElement.addEventListener('hidden.bs.toast', () => toastElement.remove());
-    }
+    // Single, persistent event listener on the confirmation button
+    confirmActionBtn.addEventListener('click', function() {
+        if (typeof currentConfirmAction === 'function') {
+            currentConfirmAction();
+        }
+        confirmationModal.hide();
+    });
 
     // --- Ações da Página com Modal de Confirmação ---
     if(deactivateBtn) {
