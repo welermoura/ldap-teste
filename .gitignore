@@ -10,9 +10,4 @@ app_server.log
 # Pastas de dados e logs
 data/
 logs/
-
-# Arquivos específicos para garantir que não sejam rastreados
-data/flask_secret.key
-data/secret.key
-logs/ad_creator.log
 secret.key
