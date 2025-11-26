@@ -454,24 +454,31 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // === Event Listeners ===
-    memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
 
-    groupMembershipSearchInput.addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        const filteredGroups = allUserGroups.filter(group =>
-            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
-        );
-        renderGroups(filteredGroups);
-    });
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
 
-    memberOfContainer.addEventListener('click', function(e) {
-        const removeBtn = e.target.closest('.remove-group-btn');
-        if (removeBtn) {
-            removeGroup(removeBtn.dataset.groupName);
-        }
-    });
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
 
-    groupSearchInput.addEventListener('keyup', () => {
+    if (groupSearchInput) {
+        groupSearchInput.addEventListener('keyup', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             searchGroups(groupSearchInput.value);
