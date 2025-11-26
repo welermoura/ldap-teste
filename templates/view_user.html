@@ -454,71 +454,102 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // === Event Listeners ===
-    memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
 
-    groupMembershipSearchInput.addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        const filteredGroups = allUserGroups.filter(group =>
-            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
-        );
-        renderGroups(filteredGroups);
-    });
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
 
-    memberOfContainer.addEventListener('click', function(e) {
-        const removeBtn = e.target.closest('.remove-group-btn');
-        if (removeBtn) {
-            removeGroup(removeBtn.dataset.groupName);
-        }
-    });
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
 
-    groupSearchInput.addEventListener('keyup', () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            searchGroups(groupSearchInput.value);
-        }, 300); // Debounce
-    });
+    if (groupSearchInput) {
+        groupSearchInput.addEventListener('keyup', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                searchGroups(groupSearchInput.value);
+            }, 300); // Debounce
+        });
+    }
 
-    groupSearchResults.addEventListener('click', function(e) {
-        const addBtn = e.target.closest('.add-group-btn');
-        if (addBtn) {
-            addGroup(addBtn.dataset.groupName);
-        }
+    if (groupSearchResults) {
+        groupSearchResults.addEventListener('click', function(e) {
+            const addBtn = e.target.closest('.add-group-btn');
+            if (addBtn) {
+                addGroup(addBtn.dataset.groupName);
+            }
 
-        const addTempBtn = e.target.closest('.add-group-temp-btn');
-        if (addTempBtn) {
-            selectedGroupForTempAdd = addTempBtn.dataset.groupName;
-            temporalFieldsContainer.style.display = 'block';
-            const today = new Date().toISOString().split('T')[0];
-            startDateInput.value = today;
-            endDateInput.value = '';
-            startDateInput.focus();
-        }
-    });
+            const addTempBtn = e.target.closest('.add-group-temp-btn');
+            if (addTempBtn) {
+                selectedGroupForTempAdd = addTempBtn.dataset.groupName;
+                if (temporalFieldsContainer) {
+                    temporalFieldsContainer.style.display = 'block';
+                }
+                const today = new Date().toISOString().split('T')[0];
+                if (startDateInput) {
+                    startDateInput.value = today;
+                    startDateInput.focus();
+                }
+                if (endDateInput) {
+                    endDateInput.value = '';
+                }
+            }
+        });
+    }
 
-    confirmTempAddBtn.addEventListener('click', function() {
-        if (selectedGroupForTempAdd) {
-            addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
-        }
-    });
+    if (confirmTempAddBtn) {
+        confirmTempAddBtn.addEventListener('click', function() {
+            if (selectedGroupForTempAdd) {
+                addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
+            }
+        });
+    }
 
-    // Limpa os campos de data quando o modal é fechado
-    addGroupModalEl.addEventListener('hidden.bs.modal', function() {
-        temporalFieldsContainer.style.display = 'none';
-        startDateInput.value = '';
-        endDateInput.value = '';
-        groupSearchInput.value = '';
-        groupSearchResults.innerHTML = '';
-        selectedGroupForTempAdd = null;
-    });
+    if (addGroupModalEl) {
+        // Limpa os campos de data quando o modal é fechado
+        addGroupModalEl.addEventListener('hidden.bs.modal', function() {
+            if (temporalFieldsContainer) {
+                temporalFieldsContainer.style.display = 'none';
+            }
+            if (startDateInput) {
+                startDateInput.value = '';
+            }
+            if (endDateInput) {
+                endDateInput.value = '';
+            }
+            if (groupSearchInput) {
+                groupSearchInput.value = '';
+            }
+            if (groupSearchResults) {
+                groupSearchResults.innerHTML = '';
+            }
+            selectedGroupForTempAdd = null;
+        });
+    }
 
-
-    // Single, persistent event listener on the confirmation button
-    confirmActionBtn.addEventListener('click', function() {
-        if (typeof currentConfirmAction === 'function') {
-            currentConfirmAction();
-        }
-        confirmationModal.hide();
-    });
+    if (confirmActionBtn) {
+        // Single, persistent event listener on the confirmation button
+        confirmActionBtn.addEventListener('click', function() {
+            if (typeof currentConfirmAction === 'function') {
+                currentConfirmAction();
+            }
+            confirmationModal.hide();
+        });
+    }
 
     // --- Ações da Página com Modal de Confirmação ---
     if(deactivateBtn) {
