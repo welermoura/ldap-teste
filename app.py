@@ -352,6 +352,8 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    extensionAttribute1 = StringField('Atributo Assinatura')
+    extensionAttribute5 = StringField('Matricula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -2393,7 +2395,9 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1',
+                'extensionAttribute5': 'extensionAttribute5'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2446,7 +2450,9 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1',
+                'extensionAttribute5': 'extensionAttribute5'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2767,7 +2773,8 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa'
+        'department': 'Departamento', 'company': 'Empresa',
+        'extensionAttribute1': 'Atributo Assinatura', 'extensionAttribute5': 'Matricula'
     }
 
     try:
