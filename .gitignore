@@ -1,4 +1,13 @@
 venv/
-data/flask_secret.key
-data/secret.key
-logs/ad_creator.log
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+app.log
+app_server.log
+.DS_Store
+
+# Pastas de dados e logs
+data/
+logs/
+secret.key
