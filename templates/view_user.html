@@ -467,14 +467,27 @@ document.addEventListener('DOMContentLoaded', function() {
         renderGroups(filteredGroups);
     });
 
-    memberOfContainer.addEventListener('click', function(e) {
-        const removeBtn = e.target.closest('.remove-group-btn');
-        if (removeBtn) {
-            removeGroup(removeBtn.dataset.groupName);
-        }
-    });
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
 
-    groupSearchInput.addEventListener('keyup', () => {
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
+
+    if (groupSearchInput) {
+        groupSearchInput.addEventListener('keyup', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             searchGroups(groupSearchInput.value);
