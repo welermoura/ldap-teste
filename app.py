@@ -352,6 +352,8 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    extensionAttribute1 = StringField('Atributo Assinatura')
+    extensionAttribute5 = StringField('Matricula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -1588,7 +1590,7 @@ def api_schedule_absence(username):
 
 @app.route('/api/cancel_absence/<username>', methods=['POST'])
 @require_auth
-@require_api_permission(action='can_disable')
+@require_api_permission(action='can_cancel_schedule')
 def api_cancel_absence(username):
     """Cancela um agendamento de ausência (desativação/reativação) para um usuário."""
     try:
@@ -2767,7 +2769,9 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa'
+        'department': 'Departamento', 'company': 'Empresa',
+        'extensionAttribute1': 'Atributo Assinatura',
+        'extensionAttribute5': 'Matricula'
     }
 
     try:

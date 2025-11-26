@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    showToast(data.error, 'error');
+                    showToast(data.error, 'error', 'Erro');
                     return;
                 }
                 schedulesData = data.sort((a, b) => new Date(a.execution_date) - new Date(b.execution_date));
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             })
             .catch(error => {
                 console.error('Erro ao buscar agendamentos:', error);
-                showToast('Falha ao carregar agendamentos.', 'error');
+                showToast('Falha ao carregar agendamentos.', 'error', 'Erro');
             });
     }
 
@@ -215,12 +215,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const endDate = document.getElementById('edit-end-date').value;
 
         if (!id || !startDate || !endDate) {
-            showToast('As datas de início e fim são obrigatórias.', 'error');
+            showToast('As datas de início e fim são obrigatórias.', 'error', 'Erro de Validação');
             return;
         }
 
         if (new Date(startDate) > new Date(endDate)) {
-            showToast('A data de início não pode ser posterior à data de fim.', 'error');
+            showToast('A data de início não pode ser posterior à data de fim.', 'error', 'Erro de Validação');
             return;
         }
 
@@ -232,16 +232,16 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast(data.message, 'success');
+                showToast(data.message, 'success', 'Sucesso');
                 fetchSchedules();
                 editModal.hide();
             } else {
-                showToast(data.error || 'Falha ao atualizar agendamento.', 'error');
+                showToast(data.error || 'Falha ao atualizar agendamento.', 'error', 'Erro');
             }
         })
         .catch(error => {
             console.error('Erro ao salvar alterações:', error);
-            showToast('Ocorreu um erro ao salvar as alterações.', 'error');
+            showToast('Ocorreu um erro ao salvar as alterações.', 'error', 'Erro');
         });
     });
 
@@ -253,15 +253,15 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showToast(data.message, 'success');
+                showToast(data.message, 'success', 'Sucesso');
                 fetchSchedules();
             } else {
-                showToast(data.error, 'error');
+                showToast(data.error, 'error', 'Erro');
             }
         })
         .catch(error => {
             console.error('Erro ao cancelar agendamento:', error);
-            showToast('Falha ao cancelar o agendamento.', 'error');
+            showToast('Falha ao cancelar o agendamento.', 'error', 'Erro');
         })
         .finally(() => {
             deleteModal.hide();

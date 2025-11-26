@@ -33,7 +33,7 @@
                 <p>Uma ausência está agendada para este usuário.</p>
                 <p><strong>Início:</strong> {{ absence_info.deactivation }}</p>
                 <p><strong>Fim:</strong> {{ absence_info.reactivation }}</p>
-                {% if check_permission(action='can_disable') %}
+                {% if check_permission(action='can_cancel_schedule') %}
                     <button id="cancel-absence-btn" class="btn btn-warning w-100 mt-2">
                         <i class="fas fa-calendar-times me-2"></i>Cancelar Agendamento
                     </button>
@@ -543,10 +543,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if(cancelAbsenceBtn) {
+    if (cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
-            // Chama a função global de base.html, passando o callback para recarregar a página
             handleCancelAbsence(username, csrfToken, () => {
+                // Recarrega a página após um pequeno atraso para o toast ser visível
                 setTimeout(() => window.location.reload(), 1500);
             });
         });
