@@ -454,9 +454,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // === Event Listeners ===
-    memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
 
-    groupMembershipSearchInput.addEventListener('keyup', function() {
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
         const query = this.value.toLowerCase();
         const filteredGroups = allUserGroups.filter(group =>
             group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
