@@ -81,51 +81,23 @@ def save_config(config):
 # Funções de Conexão e Lógica AD
 # ==============================================================================
 def get_ldap_connection(user=None, password=None):
-    """
-    Cria uma conexão LDAP. Para a conta de serviço, tenta primeiro uma conexão
-    segura com SASL/GSSAPI (Kerberos) e sealing, ideal para operações sensíveis
-    como reset de senha. Se falhar, recorre à autenticação simples.
-    """
+    """Cria uma conexão LDAP com base na configuração."""
     config = load_config()
     ad_server = config.get('AD_SERVER')
     use_ldaps = config.get('USE_LDAPS', False)
     if not ad_server:
         raise Exception("Servidor AD não configurado.")
 
-    server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
-
-    # Conexão para um usuário final (login) usa sempre autenticação simples
     if user and password:
-        logging.info(f"Tentando autenticação simples para o usuário: {user}")
+        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
         return Connection(server, user=user, password=password, auto_bind=True)
-
-    # Conexão com a conta de serviço
-    service_user = config.get('SERVICE_ACCOUNT_USER')
-    service_password = config.get('SERVICE_ACCOUNT_PASSWORD')
-    if not service_user or not service_password:
-        raise Exception("Conta de serviço não configurada.")
-
-    # Tenta a conexão segura com Kerberos/GSSAPI primeiro para a conta de serviço
-    try:
-        logging.info(f"Tentando conexão SASL/GSSAPI (Kerberos) para: {service_user}")
-        # A biblioteca ldap3 delega a negociação de "sealing" para a
-        # configuração do Kerberos no nível do sistema. O parâmetro 'sasl_seal'
-        # não é válido. Apenas solicitar GSSAPI é o suficiente.
-        conn = Connection(server, user=service_user, password=service_password,
-                          authentication='SASL', sasl_mechanism='GSSAPI',
-                          auto_bind=True)
-        logging.info("Conexão SASL/GSSAPI bem-sucedida.")
-        return conn
-    except Exception as e_sasl:
-        logging.warning(f"Falha na conexão SASL/GSSAPI com sealing: {e_sasl}. Tentando autenticação simples como fallback.")
-        # Se a conexão SASL falhar, tenta a autenticação simples como fallback
-        try:
-            conn = Connection(server, user=service_user, password=service_password, auto_bind=True)
-            logging.info("Conexão de fallback com autenticação simples bem-sucedida.")
-            return conn
-        except Exception as e_simple:
-            logging.error(f"Falha na conexão de fallback com autenticação simples: {e_simple}")
-            raise Exception(f"Falha em ambas as tentativas de conexão (SASL e Simples): SASL Error: {e_sasl}, Simple Auth Error: {e_simple}")
+    else:
+        service_user = config.get('SERVICE_ACCOUNT_USER')
+        service_password = config.get('SERVICE_ACCOUNT_PASSWORD')
+        if not service_user or not service_password:
+            raise Exception("Conta de serviço não configurada.")
+        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL)
+        return Connection(server, user=service_user, password=service_password, auto_bind=True)
 
 def is_recycle_bin_enabled(conn):
     """Verifica se a Lixeira do Active Directory está habilitada."""

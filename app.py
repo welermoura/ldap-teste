@@ -352,7 +352,6 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
-    extensionAttribute1 = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -484,24 +483,6 @@ def get_upn_suffix_from_base(search_base):
     if not dc_parts:
         return None
     return '@' + '.'.join(dc_parts)
-
-def get_password_reset_error_message(conn, ldap_error_message):
-    """
-    Analisa um erro de LDAP durante o reset de senha e retorna uma mensagem mais
-    clara se o problema for a falta de uma conexão segura.
-    """
-    # A propriedade 'sasl_sealed' não existe diretamente no objeto de conexão,
-    # mas a ausência de SSL/TLS é um bom indicador. A lógica em common.py
-    # já tenta a conexão selada, então se chegarmos aqui com erro, é provável
-    # que a conexão seja simples.
-    is_secure_connection = conn.server.ssl or conn.tls_started
-
-    if "WILL_NOT_PERFORM" in ldap_error_message and not is_secure_connection:
-        return ("O servidor Active Directory recusou a operação. Isso geralmente ocorre "
-                "porque a alteração de senhas exige uma conexão segura (LDAPS). Por favor, "
-                "habilite a opção 'Usar LDAPS (SSL)' na página de configuração do administrador.")
-    return f"Erro do LDAP: {ldap_error_message}"
-
 
 def create_ad_user(conn, form_data, model_attrs):
     config = load_config()
@@ -1436,7 +1417,6 @@ def api_toggle_object_status():
 @require_api_permission(action='can_reset_password')
 def api_reset_password(username):
     """Reseta a senha de um usuário para a padrão e retorna a senha em JSON."""
-    conn = None
     try:
         conn = get_service_account_connection()
         user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
@@ -1449,20 +1429,17 @@ def api_reset_password(username):
             return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        if conn.result['description'] != 'success':
-             raise Exception(conn.result['message'])
-
         conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+
         if conn.result['description'] != 'success':
-             raise Exception(conn.result['message'])
+             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
         return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
 
     except Exception as e:
         logging.error(f"Erro ao resetar senha para '{username}' via API: {e}", exc_info=True)
-        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
-        return jsonify({'error': error_message}), 500
+        return jsonify({'error': f'Falha ao resetar a senha: {e}'}), 500
 
 @app.route('/api/delete_object', methods=['DELETE'])
 @require_auth
@@ -1589,7 +1566,7 @@ def api_schedule_absence(username):
 
 @app.route('/api/cancel_absence/<username>', methods=['POST'])
 @require_auth
-@require_api_permission(action='can_cancel_schedule')
+@require_api_permission(action='can_disable')
 def api_cancel_absence(username):
     """Cancela um agendamento de ausência (desativação/reativação) para um usuário."""
     try:
@@ -2331,7 +2308,6 @@ def delete_user(username):
 @require_auth
 @require_permission(action='can_reset_password')
 def reset_password(username):
-    conn = None
     try:
         conn = get_service_account_connection()
         user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
@@ -2345,19 +2321,12 @@ def reset_password(username):
             return redirect(url_for('view_user', username=username))
 
         conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        if conn.result['description'] != 'success':
-            raise Exception(conn.result['message'])
-
         conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-        if conn.result['description'] != 'success':
-            raise Exception(conn.result['message'])
-
         logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
         flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
     except Exception as e:
+        flash(f"Erro ao resetar a senha: {e}", "error")
         logging.error(f"Erro em reset_password para {username}: {e}", exc_info=True)
-        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
-        flash(error_message, "error")
     return redirect(url_for('view_user', username=username))
 
 @app.route('/edit_user/<username>', methods=['GET', 'POST'])
@@ -2394,8 +2363,7 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company',
-                'extensionAttribute1': 'extensionAttribute1'
+                'title': 'title', 'department': 'department', 'company': 'company'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2448,8 +2416,7 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company',
-                'extensionAttribute1': 'extensionAttribute1'
+                'title': 'title', 'department': 'department', 'company': 'company'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2770,8 +2737,7 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa',
-        'extensionAttribute1': 'Atributo Assinatura', 'extensionAttribute5': 'Matricula'
+        'department': 'Departamento', 'company': 'Empresa'
     }
 
     try:
@@ -2803,7 +2769,6 @@ def permissions():
                         'can_manage_groups': f'{group}_can_manage_groups' in request.form,
                         'can_delete_user': f'{group}_can_delete_user' in request.form,
                         'can_move_user': f'{group}_can_move_user' in request.form,
-                        'can_cancel_schedule': f'{group}_can_cancel_schedule' in request.form,
                     }
                     views = {
                         'can_export_data': f'{group}_can_export_data' in request.form,
