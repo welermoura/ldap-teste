@@ -1,1 +1,4 @@
 venv/
+data/flask_secret.key
+data/secret.key
+logs/ad_creator.log
