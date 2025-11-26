@@ -460,6 +460,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (groupMembershipSearchInput) {
         groupMembershipSearchInput.addEventListener('keyup', function() {
+        const query = this.value.toLowerCase();
+        const filteredGroups = allUserGroups.filter(group =>
+            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+        );
+        renderGroups(filteredGroups);
+    });
+
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
             const query = this.value.toLowerCase();
             const filteredGroups = allUserGroups.filter(group =>
                 group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
