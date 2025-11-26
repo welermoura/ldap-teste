@@ -352,8 +352,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
-    extensionAttribute1 = StringField('Atributo Assinatura')
-    extensionAttribute5 = StringField('Matricula')
+    extensionAttribute1 = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -2396,8 +2395,7 @@ def edit_user(username):
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
                 'title': 'title', 'department': 'department', 'company': 'company',
-                'extensionAttribute1': 'extensionAttribute1',
-                'extensionAttribute5': 'extensionAttribute5'
+                'extensionAttribute1': 'extensionAttribute1'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2451,8 +2449,7 @@ def edit_user(username):
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
                 'title': 'title', 'department': 'department', 'company': 'company',
-                'extensionAttribute1': 'extensionAttribute1',
-                'extensionAttribute5': 'extensionAttribute5'
+                'extensionAttribute1': 'extensionAttribute1'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
