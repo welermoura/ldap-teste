@@ -352,8 +352,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
-    extensionAttribute1 = StringField('Atributo Assinatura')
-    extensionAttribute5 = StringField('Matricula')
+    extensionAttribute1 = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -2395,7 +2394,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2448,7 +2448,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'extensionAttribute1': 'extensionAttribute1'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2770,8 +2771,7 @@ def permissions():
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
         'department': 'Departamento', 'company': 'Empresa',
-        'extensionAttribute1': 'Atributo Assinatura',
-        'extensionAttribute5': 'Matricula'
+        'extensionAttribute1': 'Atributo Assinatura', 'extensionAttribute5': 'Matricula'
     }
 
     try:
@@ -2803,6 +2803,7 @@ def permissions():
                         'can_manage_groups': f'{group}_can_manage_groups' in request.form,
                         'can_delete_user': f'{group}_can_delete_user' in request.form,
                         'can_move_user': f'{group}_can_move_user' in request.form,
+                        'can_cancel_schedule': f'{group}_can_cancel_schedule' in request.form,
                     }
                     views = {
                         'can_export_data': f'{group}_can_export_data' in request.form,
