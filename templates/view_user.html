@@ -543,10 +543,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if(cancelAbsenceBtn) {
+    if (cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
-            // Chama a função global de base.html, passando o callback para recarregar a página
             handleCancelAbsence(username, csrfToken, () => {
+                // Recarrega a página após um pequeno atraso para o toast ser visível
                 setTimeout(() => window.location.reload(), 1500);
             });
         });
