@@ -1589,7 +1589,7 @@ def api_schedule_absence(username):
 
 @app.route('/api/cancel_absence/<username>', methods=['POST'])
 @require_auth
-@require_api_permission(action='can_disable')
+@require_api_permission(action='can_cancel_schedule')
 def api_cancel_absence(username):
     """Cancela um agendamento de ausência (desativação/reativação) para um usuário."""
     try:
@@ -2803,6 +2803,7 @@ def permissions():
                         'can_manage_groups': f'{group}_can_manage_groups' in request.form,
                         'can_delete_user': f'{group}_can_delete_user' in request.form,
                         'can_move_user': f'{group}_can_move_user' in request.form,
+                        'can_cancel_schedule': f'{group}_can_cancel_schedule' in request.form,
                     }
                     views = {
                         'can_export_data': f'{group}_can_export_data' in request.form,
