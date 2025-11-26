@@ -6,7 +6,12 @@
 {% from "_macros.html" import render_page_header %}
 
 {% block page_title %}
-    {{ render_page_header('<i class="fas fa-layer-group me-2"></i>Gerenciar Grupos') }}
+    {% set extra_actions_html %}
+        <a href="{{ url_for('manage_schedules') }}" class="btn btn-info">
+            <i class="fas fa-calendar-alt me-2"></i>Gerenciar Agendamentos
+        </a>
+    {% endset %}
+    {{ render_page_header('<i class="fas fa-layer-group me-2"></i>Gerenciar Grupos', extra_actions=extra_actions_html) }}
 {% endblock %}
 
 {% block content %}
