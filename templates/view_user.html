@@ -69,7 +69,6 @@
                     <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                         {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
-                    </form>
                     {% endif %}
 
                     {% if check_permission(action='can_edit') %}
@@ -536,22 +535,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // === Event Listeners ===
-    memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
 
-    groupMembershipSearchInput.addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        const filteredGroups = allUserGroups.filter(group =>
-            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
-        );
-        renderGroups(filteredGroups);
-    });
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
 
-    memberOfContainer.addEventListener('click', function(e) {
-        const removeBtn = e.target.closest('.remove-group-btn');
-        if (removeBtn) {
-            removeGroup(removeBtn.dataset.groupName);
-        }
-    });
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
 
     groupSearchInput.addEventListener('keyup', () => {
         clearTimeout(searchTimeout);
@@ -560,28 +565,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300); // Debounce
     });
 
-    groupSearchResults.addEventListener('click', function(e) {
-        const addBtn = e.target.closest('.add-group-btn');
-        if (addBtn) {
-            addGroup(addBtn.dataset.groupName);
-        }
+    if (groupSearchResults) {
+        groupSearchResults.addEventListener('click', function(e) {
+            const addBtn = e.target.closest('.add-group-btn');
+            if (addBtn) {
+                addGroup(addBtn.dataset.groupName);
+            }
 
-        const addTempBtn = e.target.closest('.add-group-temp-btn');
-        if (addTempBtn) {
-            selectedGroupForTempAdd = addTempBtn.dataset.groupName;
-            temporalFieldsContainer.style.display = 'block';
-            const today = new Date().toISOString().split('T')[0];
-            startDateInput.value = today;
-            endDateInput.value = '';
-            startDateInput.focus();
-        }
-    });
+            const addTempBtn = e.target.closest('.add-group-temp-btn');
+            if (addTempBtn) {
+                selectedGroupForTempAdd = addTempBtn.dataset.groupName;
+                temporalFieldsContainer.style.display = 'block';
+                const today = new Date().toISOString().split('T')[0];
+                startDateInput.value = today;
+                endDateInput.value = '';
+                startDateInput.focus();
+            }
+        });
+    }
 
-    confirmTempAddBtn.addEventListener('click', function() {
-        if (selectedGroupForTempAdd) {
-            addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
-        }
-    });
+    if (confirmTempAddBtn) {
+        confirmTempAddBtn.addEventListener('click', function() {
+            if (selectedGroupForTempAdd) {
+                addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
+            }
+        });
+    }
 
     // Limpa os campos de data quando o modal é fechado
     addGroupModalEl.addEventListener('hidden.bs.modal', function() {
