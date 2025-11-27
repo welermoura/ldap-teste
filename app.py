@@ -2332,6 +2332,7 @@ def delete_user(username):
 
     return redirect(url_for('view_user', username=username))
 
+
 @app.route('/edit_user/<username>', methods=['GET', 'POST'])
 @require_auth
 @require_permission(action='can_edit')
