@@ -66,6 +66,8 @@
                     {% endif %}
 
                     {% if check_permission(action='can_reset_password') %}
+                    <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                        {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
                     {% endif %}
 
@@ -296,6 +298,34 @@
 
 {% endblock %}
 
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 {{ super() }}
 <script>
@@ -411,11 +441,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-                showToast('Usuário removido do grupo com sucesso.', 'success', 'Sucesso');
+                showToast('Usuário removido do grupo com sucesso.', 'success');
                 tabLoaded = false; // Força recarregamento
                 fetchUserGroups();
             } catch (error) {
-                showToast(`Falha ao remover do grupo: ${error.message}`, 'error', 'Erro');
+                showToast(`Falha ao remover do grupo: ${error.message}`, 'error');
                 console.error('Erro ao remover grupo:', error);
             }
         });
@@ -431,19 +461,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-            showToast('Usuário adicionado ao grupo com sucesso.', 'success', 'Sucesso');
+            showToast('Usuário adicionado ao grupo com sucesso.', 'success');
             tabLoaded = false; // Força recarregamento
             fetchUserGroups();
             addGroupModal.hide();
         } catch (error) {
-            showToast(`Falha ao adicionar ao grupo: ${error.message}`, 'error', 'Erro');
+            showToast(`Falha ao adicionar ao grupo: ${error.message}`, 'error');
             console.error('Erro ao adicionar grupo:', error);
         }
     }
 
     async function addGroupTemp(groupName, startDate, endDate) {
         if (!startDate || !endDate) {
-            showToast('Por favor, selecione data de início e fim.', 'error', 'Erro de Validação');
+            showToast('Por favor, selecione data de início e fim.', 'error');
             return;
         }
         try {
@@ -460,12 +490,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
 
-            showToast('Usuário adicionado temporariamente ao grupo com sucesso.', 'success', 'Sucesso');
+            showToast('Usuário adicionado temporariamente ao grupo com sucesso.', 'success');
             tabLoaded = false; // Força recarregamento
             fetchUserGroups();
             addGroupModal.hide();
         } catch (error) {
-            showToast(`Falha ao adicionar temporariamente ao grupo: ${error.message}`, 'error', 'Erro');
+            showToast(`Falha ao adicionar temporariamente ao grupo: ${error.message}`, 'error');
             console.error('Erro ao adicionar grupo temporariamente:', error);
         }
     }
