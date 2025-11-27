@@ -11,3 +11,4 @@ app_server.log
 data/
 logs/
 secret.key
+__pycache__/
