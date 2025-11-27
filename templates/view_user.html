@@ -85,7 +85,7 @@
                     {% endif %}
 
                     {% if check_permission(action='can_reset_password') %}
-                    <form id="reset-password-form" action="{{ url_for('reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                    <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                         {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
                     </form>
@@ -256,6 +256,34 @@
 
 {% endblock %}
 
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block scripts %}
 {{ super() }}
 <script>
@@ -280,6 +308,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const deactivateBtn = document.getElementById('deactivate-btn');
     const resetPasswordBtn = document.getElementById('reset-password-btn');
     const cancelAbsenceBtn = document.getElementById('cancel-absence-btn');
+    const resetPasswordModalEl = document.getElementById('resetPasswordModal');
+    const resetPasswordModal = new bootstrap.Modal(resetPasswordModalEl);
+    const confirmResetPasswordBtn = document.getElementById('confirmResetPasswordBtn');
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
 
     // === Variáveis de Estado ===
     const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
@@ -554,13 +587,48 @@ document.addEventListener('DOMContentLoaded', function() {
     if(resetPasswordBtn) {
         resetPasswordBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            setupConfirmationModal(
-                'Confirmar Reset de Senha',
-                'Tem certeza que deseja resetar a senha deste usuário para a padrão?',
-                () => document.getElementById('reset-password-form').submit()
-            );
+            resetPasswordModal.show();
         });
     }
+
+    confirmResetPasswordBtn.addEventListener('click', async function() {
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        if (!newPassword || newPassword !== confirmPassword) {
+            showToast('As senhas não coincidem ou estão em branco.', 'error', 'Erro de Validação');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/reset_password/${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ new_password: newPassword })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Ocorreu um erro desconhecido.');
+            }
+
+            showToast(result.message || 'Senha resetada com sucesso!', 'success', 'Sucesso');
+            resetPasswordModal.hide();
+
+        } catch (error) {
+            showToast(`Falha ao resetar a senha: ${error.message}`, 'error', 'Erro');
+            console.error('Erro ao resetar senha:', error);
+        }
+    });
+
+    resetPasswordModalEl.addEventListener('hidden.bs.modal', function() {
+        newPasswordInput.value = '';
+        confirmPasswordInput.value = '';
+    });
 
     if(cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
