@@ -158,105 +158,12 @@
     {% block scripts %}
     <script>
         // Força o recarregamento da página ao navegar de volta usando o cache (bfcache)
+        // Isso previne o erro ERR_CACHE_MISS em alguns navegadores
         window.addEventListener('pageshow', function(event) {
             if (event.persisted) {
                 window.location.reload();
             }
         });
-
-        // Função para exibir toasts (notificações)
-        let currentConfirmAction = () => {};
-
-        function setupConfirmationModal(title, body, onConfirmCallback) {
-            const confirmationModalEl = document.getElementById('confirmationModal');
-            if (!confirmationModalEl) {
-                console.error('Confirmation modal element not found!');
-                return;
-            }
-            const confirmationModal = bootstrap.Modal.getOrCreateInstance(confirmationModalEl);
-            const modalLabel = document.getElementById('confirmationModalLabel');
-            const modalBody = document.getElementById('confirmationModalBody');
-
-            modalLabel.textContent = title;
-            modalBody.textContent = body;
-            currentConfirmAction = onConfirmCallback;
-            confirmationModal.show();
-        }
-
-        async function handleCancelAbsence(username, csrfToken, callback) {
-            setupConfirmationModal(
-                'Confirmar Cancelamento',
-                `Tem certeza que deseja cancelar o agendamento de ausência para ${username}? A conta será reativada imediatamente se o período de ausência já tiver começado.`,
-                async () => {
-                    try {
-                        const response = await fetch(`/api/cancel_absence/${username}`, {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
-                        });
-                        const result = await response.json();
-                        if (!response.ok) {
-                            throw new Error(result.error || 'Erro desconhecido');
-                        }
-                        showToast('Sucesso', 'Agendamento cancelado com sucesso!', 'success');
-
-                        if (typeof callback === 'function') {
-                            callback();
-                        }
-                    } catch (error) {
-                        showToast('Erro', `Falha ao cancelar agendamento: ${error.message}`, 'error');
-                        console.error('Erro ao cancelar agendamento:', error);
-                    }
-                }
-            );
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const confirmActionBtn = document.getElementById('confirmActionBtn');
-            if (confirmActionBtn) {
-                confirmActionBtn.addEventListener('click', function() {
-                    if (typeof currentConfirmAction === 'function') {
-                        currentConfirmAction();
-                    }
-                    const confirmationModalEl = document.getElementById('confirmationModal');
-                    const confirmationModal = bootstrap.Modal.getInstance(confirmationModalEl);
-                    confirmationModal.hide();
-                });
-            }
-        });
-
-        function showToast(message, type = 'info', title = 'Notificação') {
-            const toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                console.error('Toast container not found!');
-                return;
-            }
-
-            const toastId = 'toast-' + Date.now();
-            // Define a cor do texto com base no tipo para o cabeçalho
-            const title_color = (type === 'error') ? 'text-danger' : (type === 'success') ? 'text-success' : 'text-primary';
-
-            const toastHTML = `
-                <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-                    <div class="toast-header">
-                        <strong class="me-auto ${title_color}">${title}</strong>
-                        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
-                    </div>
-                    <div class="toast-body">
-                        ${message}
-                    </div>
-                </div>`;
-
-            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
-
-            const toastElement = document.getElementById(toastId);
-            const toast = new bootstrap.Toast(toastElement);
-            toast.show();
-
-            // Remove o elemento da DOM depois que o toast é escondido
-            toastElement.addEventListener('hidden.bs.toast', () => {
-                toastElement.remove();
-            });
-        }
     </script>
     {% endblock %}
 </body>
