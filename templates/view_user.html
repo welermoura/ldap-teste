@@ -11,25 +11,6 @@
 
 
 {% block content %}
-<!-- Modal de Confirmação Genérico -->
-<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="confirmationModalBody">
-        ...
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <div class="row">
     <div class="col-lg-4 mb-4">
         <div class="card glass-card">
@@ -85,10 +66,7 @@
                     {% endif %}
 
                     {% if check_permission(action='can_reset_password') %}
-                    <form id="reset-password-form" action="{{ url_for('reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
-                        {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
-                    </form>
                     {% endif %}
 
                     {% if check_permission(action='can_edit') %}
@@ -254,6 +232,68 @@
     </div>
 </div>
 
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Exclusão de Usuário -->
+{% if check_permission(action='can_delete_user') %}
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+        {{ delete_form.hidden_tag() }}
+        <div class="modal-body">
+          <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
+          <p>Para confirmar, por favor, digite o <strong>cargo</strong> e o <strong>login</strong> do usuário nos campos abaixo.</p>
+
+          <div class="mb-3">
+            <label for="confirm_title" class="form-label">Digite o Cargo: <strong class="text-highlight">{{ get_attr_value(user, 'title') or 'N/A' }}</strong></label>
+            {{ delete_form.confirm_title(class="form-control", autocomplete="off") }}
+          </div>
+          <div class="mb-3">
+            <label for="confirm_sam" class="form-label">Digite o Login: <strong class="text-highlight">{{ get_attr_value(user, 'sAMAccountName') }}</strong></label>
+            {{ delete_form.confirm_sam(class="form-control", autocomplete="off") }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          {{ delete_form.submit(class="btn btn-danger") }}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -272,14 +312,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const startDateInput = document.getElementById('add-group-start-date');
     const endDateInput = document.getElementById('add-group-end-date');
     const confirmTempAddBtn = document.getElementById('confirm-temp-add-btn');
-    const confirmationModalEl = document.getElementById('confirmationModal');
-    const confirmationModal = new bootstrap.Modal(confirmationModalEl);
-    const confirmationModalLabel = document.getElementById('confirmationModalLabel');
-    const confirmationModalBody = document.getElementById('confirmationModalBody');
-    let confirmActionBtn = document.getElementById('confirmActionBtn');
     const deactivateBtn = document.getElementById('deactivate-btn');
     const resetPasswordBtn = document.getElementById('reset-password-btn');
     const cancelAbsenceBtn = document.getElementById('cancel-absence-btn');
+    const resetPasswordModalEl = document.getElementById('resetPasswordModal');
+    const resetPasswordModal = new bootstrap.Modal(resetPasswordModalEl);
+    const confirmResetPasswordBtn = document.getElementById('confirmResetPasswordBtn');
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
 
     // === Variáveis de Estado ===
     const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
@@ -288,7 +328,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let tabLoaded = false;
     let searchTimeout;
     let selectedGroupForTempAdd = null;
-    let currentConfirmAction = () => {}; // Holds the action for the current confirmation
 
     // === Funções de Renderização ===
     function renderGroups(groups) {
@@ -359,13 +398,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showError(memberOfContainer, 'Não foi possível carregar os grupos.');
             console.error('Erro:', error);
         }
-    }
-
-    function setupConfirmationModal(title, body, onConfirmCallback) {
-        confirmationModalLabel.textContent = title;
-        confirmationModalBody.textContent = body;
-        currentConfirmAction = onConfirmCallback; // Set the action
-        confirmationModal.show();
     }
 
     async function removeGroup(groupName) {
@@ -473,22 +505,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // === Event Listeners ===
-    memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
 
-    groupMembershipSearchInput.addEventListener('keyup', function() {
-        const query = this.value.toLowerCase();
-        const filteredGroups = allUserGroups.filter(group =>
-            group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
-        );
-        renderGroups(filteredGroups);
-    });
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
 
-    memberOfContainer.addEventListener('click', function(e) {
-        const removeBtn = e.target.closest('.remove-group-btn');
-        if (removeBtn) {
-            removeGroup(removeBtn.dataset.groupName);
-        }
-    });
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
 
     groupSearchInput.addEventListener('keyup', () => {
         clearTimeout(searchTimeout);
@@ -497,28 +535,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300); // Debounce
     });
 
-    groupSearchResults.addEventListener('click', function(e) {
-        const addBtn = e.target.closest('.add-group-btn');
-        if (addBtn) {
-            addGroup(addBtn.dataset.groupName);
-        }
+    if (groupSearchResults) {
+        groupSearchResults.addEventListener('click', function(e) {
+            const addBtn = e.target.closest('.add-group-btn');
+            if (addBtn) {
+                addGroup(addBtn.dataset.groupName);
+            }
 
-        const addTempBtn = e.target.closest('.add-group-temp-btn');
-        if (addTempBtn) {
-            selectedGroupForTempAdd = addTempBtn.dataset.groupName;
-            temporalFieldsContainer.style.display = 'block';
-            const today = new Date().toISOString().split('T')[0];
-            startDateInput.value = today;
-            endDateInput.value = '';
-            startDateInput.focus();
-        }
-    });
+            const addTempBtn = e.target.closest('.add-group-temp-btn');
+            if (addTempBtn) {
+                selectedGroupForTempAdd = addTempBtn.dataset.groupName;
+                temporalFieldsContainer.style.display = 'block';
+                const today = new Date().toISOString().split('T')[0];
+                startDateInput.value = today;
+                endDateInput.value = '';
+                startDateInput.focus();
+            }
+        });
+    }
 
-    confirmTempAddBtn.addEventListener('click', function() {
-        if (selectedGroupForTempAdd) {
-            addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
-        }
-    });
+    if (confirmTempAddBtn) {
+        confirmTempAddBtn.addEventListener('click', function() {
+            if (selectedGroupForTempAdd) {
+                addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
+            }
+        });
+    }
 
     // Limpa os campos de data quando o modal é fechado
     addGroupModalEl.addEventListener('hidden.bs.modal', function() {
@@ -528,15 +570,6 @@ document.addEventListener('DOMContentLoaded', function() {
         groupSearchInput.value = '';
         groupSearchResults.innerHTML = '';
         selectedGroupForTempAdd = null;
-    });
-
-
-    // Single, persistent event listener on the confirmation button
-    confirmActionBtn.addEventListener('click', function() {
-        if (typeof currentConfirmAction === 'function') {
-            currentConfirmAction();
-        }
-        confirmationModal.hide();
     });
 
     // --- Ações da Página com Modal de Confirmação ---
@@ -554,13 +587,48 @@ document.addEventListener('DOMContentLoaded', function() {
     if(resetPasswordBtn) {
         resetPasswordBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            setupConfirmationModal(
-                'Confirmar Reset de Senha',
-                'Tem certeza que deseja resetar a senha deste usuário para a padrão?',
-                () => document.getElementById('reset-password-form').submit()
-            );
+            resetPasswordModal.show();
         });
     }
+
+    confirmResetPasswordBtn.addEventListener('click', async function() {
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        if (!newPassword || newPassword !== confirmPassword) {
+            showToast('As senhas não coincidem ou estão em branco.', 'error', 'Erro de Validação');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/reset_password/${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ new_password: newPassword })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Ocorreu um erro desconhecido.');
+            }
+
+            showToast(result.message || 'Senha resetada com sucesso!', 'success', 'Sucesso');
+            resetPasswordModal.hide();
+
+        } catch (error) {
+            showToast(`Falha ao resetar a senha: ${error.message}`, 'error', 'Erro');
+            console.error('Erro ao resetar senha:', error);
+        }
+    });
+
+    resetPasswordModalEl.addEventListener('hidden.bs.modal', function() {
+        newPasswordInput.value = '';
+        confirmPasswordInput.value = '';
+    });
 
     if(cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
@@ -596,39 +664,4 @@ document.addEventListener('DOMContentLoaded', function() {
     padding-bottom: 0.9rem;
 }
 </style>
-
-<!-- Modal de Exclusão de Usuário -->
-{% if check_permission(action='can_delete_user') %}
-<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
-        {{ delete_form.hidden_tag() }}
-        <div class="modal-body">
-          <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
-          <p>Para confirmar, por favor, digite o <strong>cargo</strong> e o <strong>login</strong> do usuário nos campos abaixo.</p>
-
-          <div class="mb-3">
-            <label for="confirm_title" class="form-label">Digite o Cargo: <strong class="text-highlight">{{ get_attr_value(user, 'title') or 'N/A' }}</strong></label>
-            {{ delete_form.confirm_title(class="form-control", autocomplete="off") }}
-          </div>
-          <div class="mb-3">
-            <label for="confirm_sam" class="form-label">Digite o Login: <strong class="text-highlight">{{ get_attr_value(user, 'sAMAccountName') }}</strong></label>
-            {{ delete_form.confirm_sam(class="form-control", autocomplete="off") }}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          {{ delete_form.submit(class="btn btn-danger") }}
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-{% endif %}
-
 {% endblock %}
