@@ -6,7 +6,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
 import ldap3
-from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL, ALL_ATTRIBUTES
+from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL, ALL_ATTRIBUTES, MODIFY_REPLACE
 from ldap3.utils.conv import escape_filter_chars
 from datetime import datetime, timedelta, date, timezone
 import json
@@ -1434,34 +1434,40 @@ def api_toggle_object_status():
 @require_auth
 @require_api_permission(action='can_reset_password')
 def api_reset_password(username):
-    """Reseta a senha de um usuário para a padrão e retorna a senha em JSON."""
-    conn = None
     try:
         conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+        if not conn:
+            return jsonify({'success': False, 'error': 'Não foi possível conectar ao servidor LDAP.'}), 500
+
+        user = get_user_by_samaccountname(conn, username)
         if not user:
-            return jsonify({'error': 'Usuário não encontrado.'}), 404
+            return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
 
-        config = load_config()
-        default_password = config.get('DEFAULT_PASSWORD')
-        if not default_password:
-            return jsonify({'error': 'A senha padrão não está definida na configuração.'}), 500
+        data = request.get_json()
+        new_password = data.get('new_password')
 
-        conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        if conn.result['description'] != 'success':
-             raise Exception(conn.result['message'])
+        if not new_password:
+            return jsonify({'success': False, 'error': 'A nova senha não pode estar em branco.'}), 400
 
-        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-        if conn.result['description'] != 'success':
-             raise Exception(conn.result['message'])
+        # Método robusto para alterar a senha no AD via unicodePwd
+        password_value = f'"{new_password}"'.encode('utf-16-le')
+        conn.modify(user.distinguishedName.value, {'unicodePwd': [(MODIFY_REPLACE, [password_value])]})
 
-        logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
-        return jsonify({'success': True, 'message': 'Senha resetada com sucesso.', 'new_password': default_password})
+        if conn.result['description'] == 'success':
+            # Forçar o usuário a trocar a senha no próximo login
+            conn.modify(user.distinguishedName.value, {'pwdLastSet': [(MODIFY_REPLACE, [0])]})
+            logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Senha resetada com sucesso.'})
+        else:
+            error_message = get_password_reset_error_message(conn, conn.result['message'])
+            logging.error(f"Falha ao resetar senha para {username} via unicodePwd. Detalhes: {conn.result}")
+            return jsonify({'success': False, 'error': error_message}), 500
 
     except Exception as e:
-        logging.error(f"Erro ao resetar senha para '{username}' via API: {e}", exc_info=True)
-        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
-        return jsonify({'error': error_message}), 500
+        logging.error(f"Exceção em api_reset_password para {username}: {e}", exc_info=True)
+        conn_for_error = conn if 'conn' in locals() else None
+        error_message = get_password_reset_error_message(conn_for_error, str(e))
+        return jsonify({'success': False, 'error': error_message}), 500
 
 @app.route('/api/delete_object', methods=['DELETE'])
 @require_auth
@@ -2324,39 +2330,6 @@ def delete_user(username):
         # Se a validação do formulário falhar (ex: CSRF inválido), exibe uma mensagem de erro.
         flash("Erro de validação do formulário. A exclusão foi cancelada.", "danger")
 
-    return redirect(url_for('view_user', username=username))
-
-@app.route('/reset_password/<username>', methods=['POST'])
-@require_auth
-@require_permission(action='can_reset_password')
-def reset_password(username):
-    conn = None
-    try:
-        conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
-        if not user:
-            flash("Usuário não encontrado.", "error")
-            return redirect(url_for('manage_users'))
-        config = load_config()
-        default_password = config.get('DEFAULT_PASSWORD')
-        if not default_password:
-            flash("A senha padrão não está definida na configuração.", "error")
-            return redirect(url_for('view_user', username=username))
-
-        conn.extend.microsoft.modify_password(user.distinguishedName.value, default_password)
-        if conn.result['description'] != 'success':
-            raise Exception(conn.result['message'])
-
-        conn.modify(user.distinguishedName.value, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
-        if conn.result['description'] != 'success':
-            raise Exception(conn.result['message'])
-
-        logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada por '{session.get('ad_user')}'.")
-        flash(f"Senha do usuário resetada com sucesso. A nova senha temporária é: {default_password}", "success")
-    except Exception as e:
-        logging.error(f"Erro em reset_password para {username}: {e}", exc_info=True)
-        error_message = get_password_reset_error_message(conn, str(e)) if conn else f'Falha ao conectar ao servidor: {e}'
-        flash(error_message, "error")
     return redirect(url_for('view_user', username=username))
 
 @app.route('/edit_user/<username>', methods=['GET', 'POST'])
