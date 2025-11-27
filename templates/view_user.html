@@ -555,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const confirmPassword = confirmPasswordInput.value;
 
         if (!newPassword || newPassword !== confirmPassword) {
-            showToast('As senhas não coincidem ou estão em branco.', 'error');
+            showToast('As senhas não coincidem ou estão em branco.', 'error', 'Erro de Validação');
             return;
         }
 
@@ -575,11 +575,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(result.error || 'Ocorreu um erro desconhecido.');
             }
 
-            showToast(result.message || 'Senha resetada com sucesso!', 'success');
+            showToast(result.message || 'Senha resetada com sucesso!', 'success', 'Sucesso');
             resetPasswordModal.hide();
 
         } catch (error) {
-            showToast(`Falha ao resetar a senha: ${error.message}`, 'error');
+            showToast(`Falha ao resetar a senha: ${error.message}`, 'error', 'Erro');
             console.error('Erro ao resetar senha:', error);
         }
     });
