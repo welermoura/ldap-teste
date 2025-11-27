@@ -235,6 +235,68 @@
     </div>
 </div>
 
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Exclusão de Usuário -->
+{% if check_permission(action='can_delete_user') %}
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+        {{ delete_form.hidden_tag() }}
+        <div class="modal-body">
+          <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
+          <p>Para confirmar, por favor, digite o <strong>cargo</strong> e o <strong>login</strong> do usuário nos campos abaixo.</p>
+
+          <div class="mb-3">
+            <label for="confirm_title" class="form-label">Digite o Cargo: <strong class="text-highlight">{{ get_attr_value(user, 'title') or 'N/A' }}</strong></label>
+            {{ delete_form.confirm_title(class="form-control", autocomplete="off") }}
+          </div>
+          <div class="mb-3">
+            <label for="confirm_sam" class="form-label">Digite o Login: <strong class="text-highlight">{{ get_attr_value(user, 'sAMAccountName') }}</strong></label>
+            {{ delete_form.confirm_sam(class="form-control", autocomplete="off") }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          {{ delete_form.submit(class="btn btn-danger") }}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 <!-- Modal Resetar Senha -->
@@ -623,39 +685,4 @@ document.addEventListener('DOMContentLoaded', function() {
     padding-bottom: 0.9rem;
 }
 </style>
-
-<!-- Modal de Exclusão de Usuário -->
-{% if check_permission(action='can_delete_user') %}
-<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
-        {{ delete_form.hidden_tag() }}
-        <div class="modal-body">
-          <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
-          <p>Para confirmar, por favor, digite o <strong>cargo</strong> e o <strong>login</strong> do usuário nos campos abaixo.</p>
-
-          <div class="mb-3">
-            <label for="confirm_title" class="form-label">Digite o Cargo: <strong class="text-highlight">{{ get_attr_value(user, 'title') or 'N/A' }}</strong></label>
-            {{ delete_form.confirm_title(class="form-control", autocomplete="off") }}
-          </div>
-          <div class="mb-3">
-            <label for="confirm_sam" class="form-label">Digite o Login: <strong class="text-highlight">{{ get_attr_value(user, 'sAMAccountName') }}</strong></label>
-            {{ delete_form.confirm_sam(class="form-control", autocomplete="off") }}
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          {{ delete_form.submit(class="btn btn-danger") }}
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-{% endif %}
-
 {% endblock %}
