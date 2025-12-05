@@ -352,6 +352,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    matricula = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -413,7 +414,8 @@ def search_general_users(conn, query):
     try:
         config = load_config()
         search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
-        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{query.replace('*', '')}*)(sAMAccountName=*{query.replace('*', '')}*)))"
+        safe_query = query.replace('*', '')
+        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
         # Adicionando 'name' e 'mail' para corrigir a busca de usuários.
         attributes_to_get = ['displayName', 'name', 'mail', 'sAMAccountName', 'title', 'l', 'userAccountControl', 'distinguishedName']
         conn.search(search_base, search_filter, SUBTREE, attributes=attributes_to_get)
@@ -1308,7 +1310,7 @@ def api_user_details(username):
             'physicalDeliveryOfficeName', 'telephoneNumber', 'mail', 'wWWHomePage',
             'streetAddress', 'postOfficeBox', 'l', 'st', 'postalCode',
             'homePhone', 'pager', 'mobile', 'facsimileTelephoneNumber',
-            'title', 'department', 'company'
+            'title', 'department', 'company', 'extensionAttribute4'
         ]
 
         user = get_user_by_samaccountname(conn, username, attributes=attributes_to_fetch)
@@ -1349,7 +1351,8 @@ def api_edit_user(username):
             'streetAddress': 'streetAddress', 'postOfficeBox': 'postOfficeBox', 'l': 'l',
             'st': 'st', 'postalCode': 'postalCode', 'homePhone': 'homePhone',
             'pager': 'pager', 'mobile': 'mobile', 'facsimileTelephoneNumber': 'facsimileTelephoneNumber',
-            'title': 'title', 'department': 'department', 'company': 'company'
+            'title': 'title', 'department': 'department', 'company': 'company',
+            'matricula': 'extensionAttribute4'
         }
 
         changes_to_log = []
@@ -1815,7 +1818,7 @@ def api_search_ad():
         safe_query = escape_filter_chars(query)
 
         # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
-        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
+        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
 
         attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
 
@@ -2367,7 +2370,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2420,7 +2424,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2741,7 +2746,7 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa'
+        'department': 'Departamento', 'company': 'Empresa', 'matricula': 'Matrícula'
     }
 
     try:
