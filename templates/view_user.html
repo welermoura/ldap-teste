@@ -143,6 +143,7 @@
                             <tr><td style="width: 30%;"><strong>Cargo:</strong></td><td>{{ get_attr_value(user, 'title') }}</td></tr>
                             <tr><td><strong>Departamento:</strong></td><td>{{ get_attr_value(user, 'department') }}</td></tr>
                             <tr><td><strong>Empresa:</strong></td><td>{{ get_attr_value(user, 'company') }}</td></tr>
+                            <tr><td><strong>Matrícula:</strong></td><td>{{ get_attr_value(user, 'extensionAttribute4') }}</td></tr>
                         </table>
                     </div>
                     {% if check_permission(action='can_manage_groups') %}
