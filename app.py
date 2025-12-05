@@ -414,7 +414,8 @@ def search_general_users(conn, query):
     try:
         config = load_config()
         search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
-        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{query.replace('*', '')}*)(sAMAccountName=*{query.replace('*', '')}*)))"
+        safe_query = query.replace('*', '')
+        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
         # Adicionando 'name' e 'mail' para corrigir a busca de usuários.
         attributes_to_get = ['displayName', 'name', 'mail', 'sAMAccountName', 'title', 'l', 'userAccountControl', 'distinguishedName']
         conn.search(search_base, search_filter, SUBTREE, attributes=attributes_to_get)
@@ -1817,7 +1818,7 @@ def api_search_ad():
         safe_query = escape_filter_chars(query)
 
         # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
-        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
+        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
 
         attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
 
