@@ -352,6 +352,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    matricula = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -1308,7 +1309,7 @@ def api_user_details(username):
             'physicalDeliveryOfficeName', 'telephoneNumber', 'mail', 'wWWHomePage',
             'streetAddress', 'postOfficeBox', 'l', 'st', 'postalCode',
             'homePhone', 'pager', 'mobile', 'facsimileTelephoneNumber',
-            'title', 'department', 'company'
+            'title', 'department', 'company', 'extensionAttribute4'
         ]
 
         user = get_user_by_samaccountname(conn, username, attributes=attributes_to_fetch)
@@ -1349,7 +1350,8 @@ def api_edit_user(username):
             'streetAddress': 'streetAddress', 'postOfficeBox': 'postOfficeBox', 'l': 'l',
             'st': 'st', 'postalCode': 'postalCode', 'homePhone': 'homePhone',
             'pager': 'pager', 'mobile': 'mobile', 'facsimileTelephoneNumber': 'facsimileTelephoneNumber',
-            'title': 'title', 'department': 'department', 'company': 'company'
+            'title': 'title', 'department': 'department', 'company': 'company',
+            'matricula': 'extensionAttribute4'
         }
 
         changes_to_log = []
@@ -2367,7 +2369,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2420,7 +2423,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2741,7 +2745,7 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa'
+        'department': 'Departamento', 'company': 'Empresa', 'matricula': 'Matrícula'
     }
 
     try:
