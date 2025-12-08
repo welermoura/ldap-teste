@@ -82,33 +82,51 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('form');
-    const matriculaInput = document.getElementById('matricula');
     const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
     const validationModalBody = document.getElementById('validationModalBody');
 
-    if (form && matriculaInput) {
+    if (form) {
+        // Campos obrigatórios e seus labels
+        const requiredFields = [
+            { id: 'first_name', label: 'Primeiro Nome' },
+            { id: 'last_name', label: 'Sobrenome' },
+            { id: 'sam_account', label: 'Login de Usuário' },
+            { id: 'matricula', label: 'Matrícula', numeric: true },
+            { id: 'model_name', label: 'Nome do Usuário Modelo' }
+        ];
+
         form.addEventListener('submit', function(event) {
-            const matriculaValue = matriculaInput.value.trim();
+            for (const field of requiredFields) {
+                const inputElement = document.getElementById(field.id);
+                if (inputElement) {
+                    const value = inputElement.value.trim();
 
-            if (!matriculaValue) {
-                event.preventDefault();
-                validationModalBody.textContent = 'O campo "Matrícula" deve ser preenchido.';
-                validationModal.show();
-                return;
-            }
+                    if (!value) {
+                        event.preventDefault();
+                        validationModalBody.textContent = `O campo "${field.label}" deve ser preenchido.`;
+                        validationModal.show();
+                        inputElement.focus();
+                        return; // Para a validação no primeiro erro
+                    }
 
-            if (!/^\d+$/.test(matriculaValue)) {
-                event.preventDefault();
-                validationModalBody.textContent = 'O campo "Matrícula" aceita apenas números.';
-                validationModal.show();
-                return;
+                    if (field.numeric && !/^\d+$/.test(value)) {
+                        event.preventDefault();
+                        validationModalBody.textContent = `O campo "${field.label}" aceita apenas números.`;
+                        validationModal.show();
+                        inputElement.focus();
+                        return;
+                    }
+                }
             }
         });
 
-        // Opcional: Impedir a digitação de não-números em tempo real
-        matriculaInput.addEventListener('input', function(e) {
-            this.value = this.value.replace(/\D/g, '');
-        });
+        // Validação em tempo real para campos numéricos
+        const matriculaInput = document.getElementById('matricula');
+        if (matriculaInput) {
+            matriculaInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '');
+            });
+        }
     }
 });
 </script>
