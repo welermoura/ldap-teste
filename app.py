@@ -286,6 +286,7 @@ class CreateUserForm(FlaskForm):
     first_name = StringField('Primeiro Nome', validators=[DataRequired()])
     last_name = StringField('Sobrenome', validators=[DataRequired()])
     sam_account = StringField('Login de Usuário (máx 20 caracteres)', validators=[DataRequired(), Length(max=20), validate_sam_account])
+    matricula = StringField('Matrícula', validators=[DataRequired()])
     model_name = StringField('Nome do Usuário Modelo', validators=[DataRequired()])
     telephone = StringField('Telefone (opcional)')
     submit = SubmitField('Buscar Modelo')
@@ -539,7 +540,7 @@ def create_ad_user(conn, form_data, model_attrs):
         if '@' in email_str: email_domain = email_str.split('@')[1]
     email = f"{first_name.lower()}.{last_name_part.lower()}@{email_domain}"
 
-    user_attributes = {'samAccountName': sam, 'userPrincipalName': upn, 'givenName': first_name, 'sn': last_name, 'displayName': display_name, 'name': display_name, 'mail': email, 'initials': initials}
+    user_attributes = {'samAccountName': sam, 'userPrincipalName': upn, 'givenName': first_name, 'sn': last_name, 'displayName': display_name, 'name': display_name, 'mail': email, 'initials': initials, 'extensionAttribute4': form_data.get('matricula', '')}
     model_attributes_to_copy = ['title', 'department', 'company', 'description', 'manager', 'physicalDeliveryOfficeName', 'streetAddress', 'l', 'st', 'postalCode', 'c', 'telephoneNumber', 'homePhone', 'wWWHomePage', 'postOfficeBox', 'pager', 'mobile', 'facsimileTelephoneNumber']
     for attr in model_attributes_to_copy:
         if attr in model_attrs and model_attrs[attr]: user_attributes[attr] = str(model_attrs[attr])
@@ -746,6 +747,7 @@ def create_user_form():
                 'first_name': form.first_name.data,
                 'last_name': form.last_name.data,
                 'sam_account': form.sam_account.data,
+                'matricula': form.matricula.data,
                 'telephone': form.telephone.data
             }
             session['found_users_sams'] = [u.sAMAccountName.value for u in users]
