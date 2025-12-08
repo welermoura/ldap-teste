@@ -32,6 +32,11 @@
                         {{ render_field(form.sam_account) }}
                     </div>
                     <div class="col-md-6 mb-3">
+                        {{ render_field(form.matricula) }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
                         {{ render_field(form.telephone) }}
                     </div>
                 </div>
@@ -47,9 +52,64 @@
             </fieldset>
 
             <div class="mt-4 text-end">
-                {{ form.submit(class="btn btn-primary btn-lg") }}
+                {{ form.submit(class="btn btn-primary btn-lg", id="submitBtn") }}
             </div>
         </form>
     </div>
 </div>
+
+<!-- Modal de Alerta para Validação -->
+<div class="modal fade" id="validationModal" tabindex="-1" aria-labelledby="validationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="validationModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Atenção</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="validationModalBody">
+        <!-- Mensagem de erro será inserida aqui -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const matriculaInput = document.getElementById('matricula');
+    const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
+    const validationModalBody = document.getElementById('validationModalBody');
+
+    if (form && matriculaInput) {
+        form.addEventListener('submit', function(event) {
+            const matriculaValue = matriculaInput.value.trim();
+
+            if (!matriculaValue) {
+                event.preventDefault();
+                validationModalBody.textContent = 'O campo "Matrícula" deve ser preenchido.';
+                validationModal.show();
+                return;
+            }
+
+            if (!/^\d+$/.test(matriculaValue)) {
+                event.preventDefault();
+                validationModalBody.textContent = 'O campo "Matrícula" aceita apenas números.';
+                validationModal.show();
+                return;
+            }
+        });
+
+        // Opcional: Impedir a digitação de não-números em tempo real
+        matriculaInput.addEventListener('input', function(e) {
+            this.value = this.value.replace(/\D/g, '');
+        });
+    }
+});
+</script>
 {% endblock %}

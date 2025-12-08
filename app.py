@@ -4,7 +4,7 @@ import logging
 from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response, send_from_directory
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
-from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
+from wtforms.validators import DataRequired, ValidationError, Length, EqualTo, Regexp
 import ldap3
 from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL, ALL_ATTRIBUTES, MODIFY_REPLACE
 from ldap3.utils.conv import escape_filter_chars
@@ -286,6 +286,7 @@ class CreateUserForm(FlaskForm):
     first_name = StringField('Primeiro Nome', validators=[DataRequired()])
     last_name = StringField('Sobrenome', validators=[DataRequired()])
     sam_account = StringField('Login de Usuário (máx 20 caracteres)', validators=[DataRequired(), Length(max=20), validate_sam_account])
+    matricula = StringField('Matrícula', validators=[DataRequired(), Regexp(r'^\d+$', message="A matrícula deve conter apenas números.")])
     model_name = StringField('Nome do Usuário Modelo', validators=[DataRequired()])
     telephone = StringField('Telefone (opcional)')
     submit = SubmitField('Buscar Modelo')
@@ -352,6 +353,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    matricula = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
 class DeleteUserForm(FlaskForm):
@@ -413,7 +415,8 @@ def search_general_users(conn, query):
     try:
         config = load_config()
         search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
-        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{query.replace('*', '')}*)(sAMAccountName=*{query.replace('*', '')}*)))"
+        safe_query = query.replace('*', '')
+        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
         # Adicionando 'name' e 'mail' para corrigir a busca de usuários.
         attributes_to_get = ['displayName', 'name', 'mail', 'sAMAccountName', 'title', 'l', 'userAccountControl', 'distinguishedName']
         conn.search(search_base, search_filter, SUBTREE, attributes=attributes_to_get)
@@ -537,7 +540,7 @@ def create_ad_user(conn, form_data, model_attrs):
         if '@' in email_str: email_domain = email_str.split('@')[1]
     email = f"{first_name.lower()}.{last_name_part.lower()}@{email_domain}"
 
-    user_attributes = {'samAccountName': sam, 'userPrincipalName': upn, 'givenName': first_name, 'sn': last_name, 'displayName': display_name, 'name': display_name, 'mail': email, 'initials': initials}
+    user_attributes = {'samAccountName': sam, 'userPrincipalName': upn, 'givenName': first_name, 'sn': last_name, 'displayName': display_name, 'name': display_name, 'mail': email, 'initials': initials, 'extensionAttribute4': form_data.get('matricula', '')}
     model_attributes_to_copy = ['title', 'department', 'company', 'description', 'manager', 'physicalDeliveryOfficeName', 'streetAddress', 'l', 'st', 'postalCode', 'c', 'telephoneNumber', 'homePhone', 'wWWHomePage', 'postOfficeBox', 'pager', 'mobile', 'facsimileTelephoneNumber']
     for attr in model_attributes_to_copy:
         if attr in model_attrs and model_attrs[attr]: user_attributes[attr] = str(model_attrs[attr])
@@ -744,6 +747,7 @@ def create_user_form():
                 'first_name': form.first_name.data,
                 'last_name': form.last_name.data,
                 'sam_account': form.sam_account.data,
+                'matricula': form.matricula.data,
                 'telephone': form.telephone.data
             }
             session['found_users_sams'] = [u.sAMAccountName.value for u in users]
@@ -1308,7 +1312,7 @@ def api_user_details(username):
             'physicalDeliveryOfficeName', 'telephoneNumber', 'mail', 'wWWHomePage',
             'streetAddress', 'postOfficeBox', 'l', 'st', 'postalCode',
             'homePhone', 'pager', 'mobile', 'facsimileTelephoneNumber',
-            'title', 'department', 'company'
+            'title', 'department', 'company', 'extensionAttribute4'
         ]
 
         user = get_user_by_samaccountname(conn, username, attributes=attributes_to_fetch)
@@ -1349,7 +1353,8 @@ def api_edit_user(username):
             'streetAddress': 'streetAddress', 'postOfficeBox': 'postOfficeBox', 'l': 'l',
             'st': 'st', 'postalCode': 'postalCode', 'homePhone': 'homePhone',
             'pager': 'pager', 'mobile': 'mobile', 'facsimileTelephoneNumber': 'facsimileTelephoneNumber',
-            'title': 'title', 'department': 'department', 'company': 'company'
+            'title': 'title', 'department': 'department', 'company': 'company',
+            'matricula': 'extensionAttribute4'
         }
 
         changes_to_log = []
@@ -1815,7 +1820,7 @@ def api_search_ad():
         safe_query = escape_filter_chars(query)
 
         # O filtro busca por usuários ou computadores que correspondam à query em vários atributos
-        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)))"
+        search_filter = f"(&(|(objectClass=user)(objectClass=computer))(|(cn=*{safe_query}*)(displayName=*{safe_query}*)(sAMAccountName=*{safe_query}*)(extensionAttribute4=*{safe_query}*)))"
 
         attributes = ['objectClass', 'name', 'cn', 'sAMAccountName', 'distinguishedName']
 
@@ -2367,7 +2372,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
 
             # Itera SOMENTE sobre os campos que o usuário tem permissão para editar.
@@ -2420,7 +2426,8 @@ def edit_user(username):
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
-                'title': 'title', 'department': 'department', 'company': 'company'
+                'title': 'title', 'department': 'department', 'company': 'company',
+                'matricula': 'extensionAttribute4'
             }
             attr_name = field_to_attr.get(field.name)
             if attr_name:
@@ -2741,7 +2748,7 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa'
+        'department': 'Departamento', 'company': 'Empresa', 'matricula': 'Matrícula'
     }
 
     try:
