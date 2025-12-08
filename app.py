@@ -4,7 +4,7 @@ import logging
 from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response, send_from_directory
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
-from wtforms.validators import DataRequired, ValidationError, Length, EqualTo
+from wtforms.validators import DataRequired, ValidationError, Length, EqualTo, Regexp
 import ldap3
 from ldap3 import Server, Connection, ALL, SUBTREE, BASE, LEVEL, ALL_ATTRIBUTES, MODIFY_REPLACE
 from ldap3.utils.conv import escape_filter_chars
