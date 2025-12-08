@@ -286,7 +286,7 @@ class CreateUserForm(FlaskForm):
     first_name = StringField('Primeiro Nome', validators=[DataRequired()])
     last_name = StringField('Sobrenome', validators=[DataRequired()])
     sam_account = StringField('Login de Usuário (máx 20 caracteres)', validators=[DataRequired(), Length(max=20), validate_sam_account])
-    matricula = StringField('Matrícula', validators=[DataRequired(), Regexp(r'^\d+$', message="A matrícula deve conter apenas números.")])
+    matricula = StringField('Matrícula', validators=[DataRequired()])
     model_name = StringField('Nome do Usuário Modelo', validators=[DataRequired()])
     telephone = StringField('Telefone (opcional)')
     submit = SubmitField('Buscar Modelo')
