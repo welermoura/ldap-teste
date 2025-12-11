@@ -498,11 +498,15 @@ const ADExplorerPage = () => {
         setMembers([]);
     };
 
-    useEffect(() => {
+    const fetchOUs = useCallback(() => {
         axios.get('/api/ous')
           .then(response => setTreeData(response.data))
           .catch(error => console.error("Error fetching OUs:", error));
     }, []);
+
+    useEffect(() => {
+        fetchOUs();
+    }, [fetchOUs]);
 
     const getIcon = (type, isDeleted = false) => {
         const iconClasses = {
@@ -522,6 +526,12 @@ const ADExplorerPage = () => {
             <div className="ad-explorer-container" onClick={() => setContextMenu({ ...contextMenu, show: false })}>
                 <div className="panels-container">
                     <div className="tree-panel">
+                        <div className="tree-header-controls" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', borderBottom: '1px solid var(--glass-border-color)' }}>
+                            <h5 style={{ margin: 0, color: 'var(--text-color)' }}>Estrutura AD</h5>
+                            <button onClick={fetchOUs} className="btn btn-sm btn-outline-secondary" title="Atualizar Árvore">
+                                <i className="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                         <div className="search-container">
                             <form onSubmit={handleSearchSubmit} className="search-form">
                                 <input
