@@ -434,7 +434,7 @@ def get_all_ous(conn):
 
     # Filtro para buscar tanto Unidades Organizacionais quanto Containers padrão.
     ldap_filter = "(|(objectClass=organizationalUnit)(objectClass=container))"
-    conn.search(search_base, ldap_filter, SUBTREE, attributes=['ou', 'cn', 'distinguishedName', 'objectClass'])
+    conn.search(search_base, ldap_filter, SUBTREE, attributes=['ou', 'cn', 'distinguishedName', 'objectClass'], paged_size=1000)
 
     if not conn.entries:
         return []
