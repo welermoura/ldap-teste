@@ -432,29 +432,57 @@ def get_all_ous(conn):
     if not search_base:
         return []
 
-    # Filtro para buscar tanto Unidades Organizacionais quanto Containers padrão.
-    ldap_filter = "(|(objectClass=organizationalUnit)(objectClass=container))"
-    conn.search(search_base, ldap_filter, SUBTREE, attributes=['ou', 'cn', 'distinguishedName', 'objectClass'], paged_size=1000)
-
-    if not conn.entries:
-        return []
+    # Filtro expandido para garantir que pegamos todos os tipos de containers relevantes
+    ldap_filter = "(|(objectClass=organizationalUnit)(objectClass=container)(objectClass=builtinDomain))"
 
     nodes = {}
-    # Primeira passada: cria todos os objetos de nó e os armazena em um dicionário pelo seu DN.
-    for entry in conn.entries:
-        # Pula o container "ForeignSecurityPrincipals" que geralmente não é relevante para gerenciamento.
-        if 'ForeignSecurityPrincipals' in str(entry.cn):
-            continue
+    count = 0
 
-        dn = str(entry.distinguishedName)
-        # O nome vem do atributo 'ou' para OUs e 'cn' para Containers.
-        node_name = str(entry.ou) if 'organizationalUnit' in entry.objectClass else str(entry.cn)
+    try:
+        # Usa paged_search para garantir que todos os resultados sejam retornados, superando o limite de 1000
+        # generator=True retorna um iterador de dicionários
+        entry_generator = conn.extend.standard.paged_search(
+            search_base=search_base,
+            search_filter=ldap_filter,
+            search_scope=SUBTREE,
+            attributes=['ou', 'cn', 'distinguishedName', 'objectClass'],
+            paged_size=1000,
+            generator=True
+        )
 
-        nodes[dn] = {
-            'text': node_name,
-            'dn': dn,
-            'nodes': []
-        }
+        for entry in entry_generator:
+            if entry['type'] != 'searchResEntry':
+                continue
+
+            count += 1
+            dn = entry['dn']
+            attrs = entry['attributes']
+
+            cn_val = attrs.get('cn')
+            if isinstance(cn_val, list): cn_val = cn_val[0] if cn_val else ''
+
+            # Pula o container "ForeignSecurityPrincipals"
+            if 'ForeignSecurityPrincipals' in str(cn_val):
+                continue
+
+            obj_class = attrs.get('objectClass', [])
+            ou_val = attrs.get('ou')
+            if isinstance(ou_val, list): ou_val = ou_val[0] if ou_val else ''
+
+            # O nome vem do atributo 'ou' para OUs e 'cn' para Containers/Builtin
+            node_name = str(ou_val) if 'organizationalUnit' in obj_class else str(cn_val)
+
+            nodes[dn] = {
+                'text': node_name,
+                'dn': dn,
+                'nodes': []
+            }
+
+        logging.info(f"Total de OUs/Containers recuperados: {count}")
+
+    except Exception as e:
+        logging.error(f"Erro durante a busca de OUs (paged_search): {e}", exc_info=True)
+        return []
 
     tree_roots = []
     # Second pass: link nodes together.
@@ -471,7 +499,7 @@ def get_all_ous(conn):
 
     # Sort the tree and all sub-nodes alphabetically by 'text' for a clean UI.
     def sort_tree_nodes_recursively(node_list):
-        node_list.sort(key=lambda x: x['text'])
+        node_list.sort(key=lambda x: x['text'].lower())
         for node in node_list:
             if node['nodes']:
                 sort_tree_nodes_recursively(node['nodes'])
