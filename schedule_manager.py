@@ -133,12 +133,35 @@ def process_group_membership_changes(conn, search_base):
                 continue
 
             try:
+                success = False
                 if action == 'add':
                     conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
+                    # Verifica sucesso ou se o usuário já é membro (código 68: entryAlreadyExists)
+                    if conn.result['description'] == 'success' or conn.result['result'] == 68:
+                        success = True
+                        if conn.result['result'] == 68:
+                            logging.info(f"Usuário '{user_sam}' já era membro do grupo '{group_name}'. Agendamento de adição considerado concluído.")
                 elif action == 'remove':
                     conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
+                    # Verifica sucesso ou se o usuário não é membro (códigos 53: unwillingToPerform ou outros que indicam que a operação não foi necessária)
+                    # Para remoção, se falhar, verificamos se o usuário ainda é membro. Se não for, sucesso.
+                    if conn.result['description'] == 'success':
+                        success = True
+                    else:
+                        # Verifica se o usuário ainda está no grupo para confirmar se precisamos retentar
+                        user_check = get_user_by_samaccountname(conn, user_sam, attributes=['memberOf'])
+                        if user_check:
+                            is_member = False
+                            if 'memberOf' in user_check and user_check.memberOf:
+                                for group_dn in user_check.memberOf:
+                                    if group.distinguishedName.value.lower() == group_dn.lower():
+                                        is_member = True
+                                        break
+                            if not is_member:
+                                logging.info(f"Usuário '{user_sam}' não é membro do grupo '{group_name}'. Agendamento de remoção considerado concluído.")
+                                success = True
 
-                if conn.result['description'] == 'success':
+                if success:
                     logging.info(f"Sucesso ao executar a ação '{action}' para '{user_sam}' no grupo '{group_name}'.")
                 else:
                     logging.error(f"Falha na ação '{action}' para '{user_sam}': {conn.result['message']}. Mantendo agendamento.")
