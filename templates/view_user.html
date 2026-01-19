@@ -69,6 +69,7 @@
                     <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                         {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
+                    </form>
                     {% endif %}
 
                     {% if check_permission(action='can_edit') %}
