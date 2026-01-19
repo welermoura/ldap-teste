@@ -143,8 +143,30 @@
                             <tr><td style="width: 30%;"><strong>Cargo:</strong></td><td>{{ get_attr_value(user, 'title') }}</td></tr>
                             <tr><td><strong>Departamento:</strong></td><td>{{ get_attr_value(user, 'department') }}</td></tr>
                             <tr><td><strong>Empresa:</strong></td><td>{{ get_attr_value(user, 'company') }}</td></tr>
+                            <tr><td><strong>Gerente:</strong></td>
+                                <td>
+                                    {% if manager_info %}
+                                        <a href="{{ url_for('view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
                             <tr><td><strong>Matrícula:</strong></td><td>{{ get_attr_value(user, 'extensionAttribute4') }}</td></tr>
                         </table>
+
+                        <h6 class="mt-4 mb-3 border-bottom pb-2">Supervisiona:</h6>
+                        {% if direct_reports_info %}
+                            <div class="list-group glass-list-group" style="max-height: 200px; overflow-y: auto;">
+                                {% for dr in direct_reports_info %}
+                                    <a href="{{ url_for('view_user', username=dr.sam) }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 ps-0">
+                                        <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Não supervisiona ninguém.</p>
+                        {% endif %}
                     </div>
                     {% if check_permission(action='can_manage_groups') %}
                     <div class="tab-pane fade" id="memberof" role="tabpanel" aria-labelledby="memberof-tab">
