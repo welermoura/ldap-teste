@@ -353,6 +353,7 @@ class EditUserForm(FlaskForm):
     title = StringField('Cargo')
     department = StringField('Departamento')
     company = StringField('Empresa')
+    manager = StringField('Gerente (Login)')
     matricula = StringField('Matrícula')
     submit = SubmitField('Salvar Alterações')
 
@@ -2217,10 +2218,46 @@ def view_user(username):
                 absence_scheduled = False
 
 
+        # Busca informações do gerente e subordinados (Manager e Direct Reports)
+        manager_info = None
+        direct_reports_info = []
+        try:
+            # 1. Manager
+            manager_dn = get_attr_value(user, 'manager')
+            if manager_dn:
+                m_entry = get_user_by_dn(conn, manager_dn, ['displayName', 'sAMAccountName'])
+                if m_entry:
+                    manager_info = {
+                        'name': get_attr_value(m_entry, 'displayName') or 'N/A',
+                        'sam': get_attr_value(m_entry, 'sAMAccountName')
+                    }
+
+            # 2. Direct Reports
+            direct_reports_dns = []
+            if 'directReports' in user and user.directReports:
+                if isinstance(user.directReports.value, list):
+                    direct_reports_dns = user.directReports.value
+                else:
+                    direct_reports_dns = [user.directReports.value]
+
+            # Limita a 50 para evitar sobrecarga em users com muitos subordinados
+            for dr_dn in direct_reports_dns[:50]:
+                dr_entry = get_user_by_dn(conn, dr_dn, ['displayName', 'sAMAccountName'])
+                if dr_entry:
+                    direct_reports_info.append({
+                        'name': get_attr_value(dr_entry, 'displayName') or 'N/A',
+                        'sam': get_attr_value(dr_entry, 'sAMAccountName')
+                    })
+
+            direct_reports_info.sort(key=lambda x: x['name'])
+
+        except Exception as e:
+            logging.error(f"Erro ao buscar info de hierarquia para {username}: {e}")
+
         # Passa ambos os formulários para o template
         form = EditUserForm() # Para os formulários existentes
         delete_form = DeleteUserForm() # Para o modal de exclusão
-        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info)
+        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info, manager_info=manager_info, direct_reports_info=direct_reports_info)
     except Exception as e:
         flash(f"Erro ao buscar detalhes do usuário: {e}", "error")
         logging.error(f"Erro ao buscar detalhes do usuário para {username}: {e}", exc_info=True)
@@ -2392,6 +2429,26 @@ def edit_user(username):
             service_conn = get_service_account_connection()
             changes = {}
 
+            # MANAGER LOGIC
+            if 'manager' in editable_fields:
+                manager_sam = form.manager.data
+                if manager_sam:
+                    m_user = get_user_by_samaccountname(service_conn, manager_sam, ['distinguishedName'])
+                    if not m_user:
+                        flash(f"Gerente '{manager_sam}' não encontrado. Alteração cancelada.", 'error')
+                        return redirect(url_for('edit_user', username=username))
+
+                    new_manager_dn = m_user.distinguishedName.value
+                    current_manager_dn = get_attr_value(user, 'manager')
+                    if new_manager_dn != current_manager_dn:
+                        changes['manager'] = [(ldap3.MODIFY_REPLACE, [new_manager_dn])]
+                        changes_to_log.append(f"manager: alterado para '{manager_sam}'")
+                else:
+                    current_manager_dn = get_attr_value(user, 'manager')
+                    if current_manager_dn:
+                        changes['manager'] = [(ldap3.MODIFY_REPLACE, [])]
+                        changes_to_log.append(f"manager: removido")
+
             # Mapeamento de campos do formulário para atributos do AD
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
@@ -2447,6 +2504,14 @@ def edit_user(username):
 
         # Populate form with existing data
         for field in form:
+            if field.name == 'manager':
+                manager_dn = get_attr_value(user, 'manager')
+                if manager_dn:
+                    m_entry = get_user_by_dn(conn, manager_dn, ['sAMAccountName'])
+                    if m_entry:
+                        field.data = get_attr_value(m_entry, 'sAMAccountName')
+                continue
+
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
                 'display_name': 'displayName', 'description': 'description', 'office': 'physicalDeliveryOfficeName',
@@ -2776,7 +2841,7 @@ def permissions():
         'street': 'Rua', 'post_office_box': 'Caixa Postal', 'city': 'Cidade',
         'state': 'Estado/Província', 'zip_code': 'CEP', 'home_phone': 'Telefone Residencial',
         'pager': 'Pager', 'mobile': 'Celular', 'fax': 'Fax', 'title': 'Cargo',
-        'department': 'Departamento', 'company': 'Empresa', 'matricula': 'Matrícula'
+        'department': 'Departamento', 'company': 'Empresa', 'manager': 'Gerente', 'matricula': 'Matrícula'
     }
 
     try:
