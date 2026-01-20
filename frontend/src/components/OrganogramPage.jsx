@@ -24,7 +24,7 @@ const OrganogramPage = () => {
 
     // Função recursiva para renderizar a árvore
     const renderTree = (nodes) => {
-        if (!nodes || nodes.length === 0) return null;
+        if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
         return (
             <ul className="org-tree-ul">
