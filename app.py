@@ -622,7 +622,8 @@ def organograma():
             # Tenta encontrar pela chave do arquivo JSX se o HTML não for a chave
             entry_point_key = 'src/organograma.jsx'
             if entry_point_key not in manifest:
-                 return "Erro de configuração do Frontend. Verifique o manifesto.", 500
+                 # Debug: Mostrar chaves disponíveis para diagnóstico
+                 return f"Erro de configuração do Frontend. Chave '{entry_point_key}' não encontrada. Chaves disponíveis: {list(manifest.keys())}", 500
 
         entry_point = manifest[entry_point_key]
         js_file = entry_point.get('file')
