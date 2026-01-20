@@ -6,7 +6,7 @@ import { generatePPTX } from '../services/pptxGenerator';
 import OrganogramDocument from '../services/pdfDocument';
 import { filterTree } from '../utils/exportUtils';
 
-const ExportModal = ({ isOpen, onClose, data, selectedNodeId }) => {
+const ExportModal = ({ isOpen, onClose, data, selectedNodeId, selectedNode }) => {
     const [format, setFormat] = useState('pdf'); // 'pdf' | 'pptx'
     const [scope, setScope] = useState('full'); // 'full' | 'subtree' | 'single'
     const [loading, setLoading] = useState(false);
@@ -78,6 +78,16 @@ const ExportModal = ({ isOpen, onClose, data, selectedNodeId }) => {
                             </button>
                         </div>
                     </div>
+
+                    {/* Contexto do Nó Selecionado */}
+                    {selectedNode && (
+                        <div className="selected-context">
+                            <span className="context-label">Nó Selecionado:</span>
+                            <span className="context-value">
+                                <strong>{selectedNode.name}</strong> - {selectedNode.title || 'Sem Cargo'}
+                            </span>
+                        </div>
+                    )}
 
                     {/* Seleção de Escopo */}
                     <div className="section">
@@ -186,6 +196,21 @@ const ExportModal = ({ isOpen, onClose, data, selectedNodeId }) => {
                     text-transform: uppercase;
                     letter-spacing: 0.05em;
                 }
+                .selected-context {
+                    background: #eff6ff;
+                    border: 1px solid #bfdbfe;
+                    border-radius: 6px;
+                    padding: 10px 12px;
+                    margin-bottom: 20px;
+                    font-size: 0.9rem;
+                    color: #1e40af;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                .context-label { font-weight: 600; }
+                .context-value { color: #1e3a8a; }
+
                 .options-grid {
                     display: grid;
                     grid-template-columns: 1fr 1fr;

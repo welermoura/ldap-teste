@@ -8,7 +8,8 @@ import {
     Network,
     AlertTriangle,
     Loader2,
-    Download
+    Download,
+    Check
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 import ExportModal from './ExportModal';
@@ -17,7 +18,9 @@ import ExportModal from './ExportModal';
 const OrganogramContext = createContext({
     hoveredNodeId: null,
     setHoveredNodeId: () => {},
-    focusedNodeId: null,
+    selectedNodeId: null,
+    setSelectedNodeId: () => {},
+    selectedNode: null,
 });
 
 // --- Utility Functions ---
@@ -63,16 +66,16 @@ const getInitials = (name) => {
 // --- Components ---
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
 
     // States calculation
     const isHovered = hoveredNodeId === nodeId;
-    const isFocused = focusedNodeId === nodeId;
+    const isSelected = selectedNodeId === nodeId;
     const isDirectSubordinate = hoveredNodeId === parentId && hoveredNodeId !== null;
-    const isDimmed = (hoveredNodeId !== null || focusedNodeId !== null) && !isHovered && !isDirectSubordinate && !isFocused;
+    const isDimmed = (hoveredNodeId !== null || selectedNodeId !== null) && !isHovered && !isDirectSubordinate && !isSelected;
 
     // Executive Check
     const isExecutive = node.title && (
@@ -90,6 +93,16 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         setHoveredNodeId(null);
     };
 
+    const handleClick = (e) => {
+        e.stopPropagation();
+        setSelectedNodeId(nodeId);
+    };
+
+    const handleToggle = (e) => {
+        e.stopPropagation();
+        if (hasChildren) toggleNode();
+    };
+
     return (
         <div
             id={nodeId}
@@ -98,13 +111,17 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                 ${isMatch ? 'highlight' : ''}
                 ${isExecutive ? 'executive' : ''}
                 ${isHovered ? 'state-active' : ''}
-                ${isFocused ? 'state-focused' : ''}
+                ${isSelected ? 'state-selected' : ''}
                 ${isDirectSubordinate ? 'state-subordinate' : ''}
                 ${isDimmed ? 'state-dimmed' : ''}
             `}
-            onClick={() => hasChildren && toggleNode()}
+            onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            title={isSelected ? "Selecionado para exportação" : `${node.name} - ${node.title}`}
+            role="treeitem"
+            aria-selected={isSelected}
+            tabIndex={0}
             style={{
                 '--dept-color': deptColor,
             }}
@@ -112,6 +129,11 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             <div className="card-accent" style={{ backgroundColor: deptColor }}></div>
 
             <div className="card-body">
+                {isSelected && (
+                    <div className="selected-indicator">
+                        <Check size={12} strokeWidth={3} />
+                    </div>
+                )}
                 <div className="card-header">
                     <div className="avatar" style={{
                         backgroundColor: isExecutive ? '#0f172a' : `${deptColor}15`,
@@ -120,8 +142,8 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                         {getInitials(node.name)}
                     </div>
                     <div className="info">
-                        <h6 className="name" title={node.name}>{node.name}</h6>
-                        <p className="role" title={node.title}>{node.title || 'Cargo não definido'}</p>
+                        <h6 className="name">{node.name}</h6>
+                        <p className="role">{node.title || 'Cargo não definido'}</p>
                     </div>
                 </div>
 
@@ -135,7 +157,10 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             </div>
 
             {hasChildren && (
-                <div className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}>
+                <div
+                    className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}
+                    onClick={handleToggle}
+                >
                     <ChevronDown size={14} className="icon-chevron" />
                 </div>
             )}
@@ -150,8 +175,24 @@ const OrganogramPage = () => {
     const [zoom, setZoom] = useState(1);
     const [expandedNodes, setExpandedNodes] = useState(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
-    const [focusedNodeId, setFocusedNodeId] = useState(null);
+    const [selectedNodeId, setSelectedNodeId] = useState(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+    // Find selected node object
+    const selectedNode = useMemo(() => {
+        if (!selectedNodeId || !data) return null;
+        const find = (nodes) => {
+            for (const node of nodes) {
+                if (node.distinguishedName === selectedNodeId) return node;
+                if (node.children) {
+                    const found = find(node.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+        return find(data);
+    }, [selectedNodeId, data]);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -185,28 +226,50 @@ const OrganogramPage = () => {
             });
     }, []);
 
-    // Scroll effect for focused node
+    // Global click listener to clear selection
     useEffect(() => {
-        if (focusedNodeId) {
+        const handleGlobalClick = (e) => {
+            // Se clicar no canvas (background), limpar seleção
+            // O evento de clique no card para propagation, então isso só roda fora dos cards
+            if (e.target.classList.contains('canvas') || e.target.classList.contains('tree-wrapper')) {
+                setSelectedNodeId(null);
+            }
+        };
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setSelectedNodeId(null);
+            }
+        };
+
+        window.addEventListener('click', handleGlobalClick);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('click', handleGlobalClick);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
+    // Scroll effect for selected node (via search)
+    useEffect(() => {
+        if (selectedNodeId) {
             // Pequeno delay para garantir renderização da expansão
             setTimeout(() => {
-                const element = document.getElementById(focusedNodeId);
+                const element = document.getElementById(selectedNodeId);
                 if (element) {
                     element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
                 }
             }, 100);
-
-            // Remover foco após 3 segundos
-            const timer = setTimeout(() => {
-                setFocusedNodeId(null);
-            }, 3000);
-            return () => clearTimeout(timer);
         }
-    }, [focusedNodeId]);
+    }, [selectedNodeId]);
 
     // Drag handlers
     const handleMouseDown = (e) => {
         if (!canvasRef.current) return;
+        // Check if clicking scrollbar or control
+        if (e.target.tagName === 'BUTTON' || e.target.closest('.org-card')) return;
+
         setIsDragging(true);
         setStartPos({ x: e.pageX, y: e.pageY });
         setScrollPos({
@@ -259,7 +322,7 @@ const OrganogramPage = () => {
         if (path) {
             setExpandedNodes(prev => new Set([...prev, ...path]));
         }
-        setFocusedNodeId(nodeId);
+        setSelectedNodeId(nodeId);
     };
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
@@ -313,7 +376,7 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId, selectedNode }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
@@ -374,7 +437,8 @@ const OrganogramPage = () => {
                     isOpen={isExportModalOpen}
                     onClose={() => setIsExportModalOpen(false)}
                     data={data}
-                    selectedNodeId={focusedNodeId || hoveredNodeId}
+                    selectedNodeId={selectedNodeId}
+                    selectedNode={selectedNode}
                 />
 
                 <style>{`
@@ -652,10 +716,11 @@ const OrganogramPage = () => {
                         position: relative;
                         border-radius: 12px;
                         box-shadow: var(--shadow-md);
-                        transition: all 0.3s var(--ease-out);
+                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
                         cursor: pointer;
                         z-index: 2;
-                        border: 1px solid rgba(255,255,255,0.1); /* Subtle border for dark mode compatibility if needed */
+                        border: 2px solid transparent; /* Prepare for border change */
+                        outline: none;
                         overflow: hidden;
                     }
 
@@ -672,23 +737,48 @@ const OrganogramPage = () => {
                         flex-direction: column;
                         gap: 12px;
                         background: linear-gradient(180deg, #fff 0%, #fcfcfc 100%);
+                        position: relative;
                     }
 
                     /* Hover State (The User) */
                     .org-card.state-active {
-                        transform: scale(1.05) translateY(-4px);
+                        transform: translateY(-4px);
                         box-shadow: var(--shadow-hover);
                         z-index: 10;
-                        border-color: transparent;
-                        outline: 2px solid var(--line-active);
+                        border-color: rgba(59, 130, 246, 0.3);
                     }
 
-                    /* Focused State (Search Result) */
+                    /* Selected State */
+                    .org-card.state-selected {
+                        border-color: #2563eb;
+                        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                        z-index: 30;
+                        transform: translateY(-2px);
+                    }
+
+                    .selected-indicator {
+                        position: absolute;
+                        top: 8px;
+                        right: 8px;
+                        background: #2563eb;
+                        color: #fff;
+                        width: 20px;
+                        height: 20px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        animation: pop-in 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                    }
+
+                    @keyframes pop-in {
+                        from { transform: scale(0); }
+                        to { transform: scale(1); }
+                    }
+
+                    /* Focused State (Search Result - Temporary) */
                     .org-card.state-focused {
-                        transform: scale(1.05);
-                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), var(--shadow-hover);
-                        border-color: var(--line-active);
-                        z-index: 20;
                         animation: pulse-focus 2s infinite;
                     }
 
@@ -708,8 +798,8 @@ const OrganogramPage = () => {
 
                     /* Dimmed State */
                     .org-card.state-dimmed {
-                        opacity: 0.4;
-                        filter: grayscale(0.8);
+                        opacity: 0.5;
+                        filter: grayscale(0.6);
                         transform: scale(0.98);
                     }
 
