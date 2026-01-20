@@ -1464,6 +1464,110 @@ def api_toggle_object_status():
         logging.error(f"Erro ao alterar status do objeto '{dn}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao alterar o status: {e}'}), 500
 
+@app.route('/api/set_manager', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_edit')
+def api_set_manager():
+    """Define o gerente de um usuário."""
+    data = request.get_json()
+    user_sam = data.get('user_sam')
+    manager_sam = data.get('manager_sam')
+
+    if not user_sam:
+        return jsonify({'error': 'Usuário não especificado.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, user_sam, ['distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário alvo não encontrado.'}), 404
+
+        changes = {}
+        if manager_sam:
+            manager = get_user_by_samaccountname(conn, manager_sam, ['distinguishedName'])
+            if not manager:
+                return jsonify({'error': 'Gerente não encontrado.'}), 404
+            changes['manager'] = [(ldap3.MODIFY_REPLACE, [manager.distinguishedName.value])]
+            action_msg = f"definido para '{manager_sam}'"
+        else:
+            changes['manager'] = [(ldap3.MODIFY_REPLACE, [])]
+            action_msg = "removido"
+
+        conn.modify(user.distinguishedName.value, changes)
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Gerente de '{user_sam}' {action_msg} via API por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Gerente atualizado com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+
+    except Exception as e:
+        logging.error(f"Erro em api_set_manager: {e}", exc_info=True)
+        return jsonify({'error': f'Erro ao atualizar gerente: {e}'}), 500
+
+@app.route('/api/add_subordinate', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_edit')
+def api_add_subordinate():
+    """Define o usuário atual como gerente de outro usuário (adiciona subordinado)."""
+    data = request.get_json()
+    manager_sam = data.get('manager_sam') # O usuário atual (chefe)
+    subordinate_sam = data.get('subordinate_sam') # O novo subordinado
+
+    if not manager_sam or not subordinate_sam:
+        return jsonify({'error': 'Gerente e subordinado são obrigatórios.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        manager = get_user_by_samaccountname(conn, manager_sam, ['distinguishedName'])
+        subordinate = get_user_by_samaccountname(conn, subordinate_sam, ['distinguishedName'])
+
+        if not manager or not subordinate:
+            return jsonify({'error': 'Usuário ou gerente não encontrado.'}), 404
+
+        # Define o gerente do subordinado como o usuário manager_sam
+        conn.modify(subordinate.distinguishedName.value, {'manager': [(ldap3.MODIFY_REPLACE, [manager.distinguishedName.value])]})
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] '{subordinate_sam}' tornou-se subordinado de '{manager_sam}' via API por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Subordinado adicionado com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+
+    except Exception as e:
+        logging.error(f"Erro em api_add_subordinate: {e}", exc_info=True)
+        return jsonify({'error': f'Erro ao adicionar subordinado: {e}'}), 500
+
+@app.route('/api/remove_subordinate', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_edit')
+def api_remove_subordinate():
+    """Remove o gerente de um usuário (remove subordinado da lista do chefe)."""
+    data = request.get_json()
+    subordinate_sam = data.get('subordinate_sam')
+
+    if not subordinate_sam:
+        return jsonify({'error': 'Subordinado não especificado.'}), 400
+
+    try:
+        conn = get_service_account_connection()
+        subordinate = get_user_by_samaccountname(conn, subordinate_sam, ['distinguishedName'])
+
+        if not subordinate:
+            return jsonify({'error': 'Subordinado não encontrado.'}), 404
+
+        conn.modify(subordinate.distinguishedName.value, {'manager': [(ldap3.MODIFY_REPLACE, [])]})
+
+        if conn.result['description'] == 'success':
+            logging.info(f"[ALTERAÇÃO] Gerente de '{subordinate_sam}' removido via API por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Subordinado removido com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+
+    except Exception as e:
+        logging.error(f"Erro em api_remove_subordinate: {e}", exc_info=True)
+        return jsonify({'error': f'Erro ao remover subordinado: {e}'}), 500
+
+
 @app.route('/api/reset_password/<username>', methods=['POST'])
 @require_auth
 @require_api_permission(action='can_reset_password')
