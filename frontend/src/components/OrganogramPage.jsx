@@ -198,7 +198,7 @@ const OrganogramPage = () => {
                     height: 30px;
                     border-radius: 50%;
                     cursor: pointer;
-                    color: #495057; /* Darker color for visibility */
+                    color: #000; /* Black color as requested */
                     transition: all 0.2s;
                     display: flex;
                     align-items: center;
@@ -416,7 +416,7 @@ const OrganogramPage = () => {
                 .btn-expand {
                     border: none;
                     background: transparent;
-                    color: #6c757d;
+                    color: #000; /* Black color as requested */
                     display: flex;
                     align-items: center;
                     justify-content: center;
