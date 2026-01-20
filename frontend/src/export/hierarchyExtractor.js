@@ -27,27 +27,31 @@ export const filterTree = (data, scope, targetId) => {
         return node ? [node] : [];
     }
 
-    // Se escopo for 'single' (apenas nó), retorna o nó sem filhos
-    if (scope === 'single' && targetId) {
-        const node = findNode(data, targetId);
-        if (node) {
-            // Retorna cópia rasa sem filhos
-            return [{ ...node, children: [] }];
-        }
-        return [];
-    }
-
     return data; // Fallback
 };
 
-// Aplanar árvore para lista (útil para PDF lista/diretório)
-export const flattenTree = (nodes, depth = 0, result = []) => {
-    if (!nodes) return result;
-    nodes.forEach(node => {
-        result.push({ ...node, depth });
-        if (node.children) {
-            flattenTree(node.children, depth + 1, result);
+// Agrupar nós por nível hierárquico (BFS)
+export const extractLevels = (rootNode) => {
+    const levels = new Map(); // Map<level, Node[]>
+
+    if (!rootNode) return levels;
+
+    const queue = [{ node: rootNode, level: 0 }];
+
+    while (queue.length > 0) {
+        const { node, level } = queue.shift();
+
+        if (!levels.has(level)) {
+            levels.set(level, []);
         }
-    });
-    return result;
+        levels.get(level).push(node);
+
+        if (node.children) {
+            node.children.forEach(child => {
+                queue.push({ node: child, level: level + 1 });
+            });
+        }
+    }
+
+    return levels;
 };
