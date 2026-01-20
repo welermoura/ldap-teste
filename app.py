@@ -605,6 +605,110 @@ def create_ad_user(conn, form_data, model_attrs):
 # ==============================================================================
 # Rotas Principais da Aplicação
 # ==============================================================================
+@app.route('/organograma')
+def organograma():
+    """Rota pública para visualizar o organograma via React."""
+    try:
+        manifest_path = os.path.join(basedir, 'frontend', 'dist', '.vite', 'manifest.json')
+        with open(manifest_path, 'r') as f:
+            manifest = json.load(f)
+
+        # A chave de entrada deve corresponder à configuração do rollupOptions input no Vite
+        # Neste caso, 'organograma' aponta para 'organograma.html'
+        entry_point_key = 'organograma.html'
+
+        if entry_point_key not in manifest:
+            logging.error(f"Entrada '{entry_point_key}' não encontrada no manifesto: {list(manifest.keys())}")
+            # Tenta encontrar pela chave do arquivo JSX se o HTML não for a chave
+            entry_point_key = 'src/organograma.jsx'
+            if entry_point_key not in manifest:
+                 return "Erro de configuração do Frontend. Verifique o manifesto.", 500
+
+        entry_point = manifest[entry_point_key]
+        js_file = entry_point.get('file')
+        css_files = entry_point.get('css', [])
+        css_file = css_files[0] if css_files else None
+
+        return render_template('organograma_react.html', js_file=js_file, css_file=css_file)
+    except Exception as e:
+        logging.error(f"Erro ao carregar o manifesto do Vite para Organograma: {e}", exc_info=True)
+        # Fallback para desenvolvimento (se o build não existir, pode ser que esteja rodando dev server,
+        # mas aqui assumimos produção/build. Em dev, o proxy do Vite lidaria com isso ou usaríamos url completa)
+        return "Erro ao carregar a aplicação Organograma. Verifique os logs.", 500
+
+@app.route('/api/public/organogram_data')
+def api_public_organogram_data():
+    """API pública que retorna a estrutura hierárquica completa do AD."""
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+
+        if not search_base:
+            return jsonify({'error': 'AD_SEARCH_BASE não configurado.'}), 500
+
+        # Buscar todos os usuários ativos com seus gerentes
+        search_filter = "(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        attributes = ['displayName', 'title', 'manager', 'distinguishedName', 'department']
+
+        # Paged search para garantir que pegamos todos
+        entry_generator = conn.extend.standard.paged_search(
+            search_base=search_base,
+            search_filter=search_filter,
+            search_scope=SUBTREE,
+            attributes=attributes,
+            paged_size=1000,
+            generator=True
+        )
+
+        users = {}
+        for entry in entry_generator:
+            if entry['type'] != 'searchResEntry':
+                continue
+
+            attrs = entry['attributes']
+            dn = entry['dn']
+
+            users[dn] = {
+                'name': attrs.get('displayName'),
+                'title': attrs.get('title'),
+                'department': attrs.get('department'),
+                'manager_dn': attrs.get('manager'),
+                'children': []
+            }
+
+        # Construir a árvore
+        roots = []
+        for dn, user_data in users.items():
+            manager_dn = user_data['manager_dn']
+
+            # Se tem gerente e o gerente está na lista de usuários recuperados
+            if manager_dn and manager_dn in users:
+                users[manager_dn]['children'].append(user_data)
+            else:
+                # Se não tem gerente (ou gerente está desativado/fora do escopo), é uma raiz
+                roots.append(user_data)
+
+        # Limpar dados temporários (como manager_dn) antes de enviar para o front
+        # E ordenar filhos por nome
+        def clean_and_sort(node):
+            if 'manager_dn' in node:
+                del node['manager_dn']
+            node['children'].sort(key=lambda x: x['name'] or '')
+            for child in node['children']:
+                clean_and_sort(child)
+
+        for root in roots:
+            clean_and_sort(root)
+
+        roots.sort(key=lambda x: x['name'] or '')
+
+        return jsonify(roots)
+
+    except Exception as e:
+        logging.error(f"Erro na API de organograma público: {e}", exc_info=True)
+        return jsonify({'error': 'Erro ao carregar dados do organograma.'}), 500
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     config = load_config()

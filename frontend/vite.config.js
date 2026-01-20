@@ -7,5 +7,11 @@ export default defineConfig({
   base: '/ad-tree/',
   build: {
     manifest: true,
+    rollupOptions: {
+      input: {
+        main: './index.html',
+        organograma: './organograma.html',
+      },
+    },
   },
 })
