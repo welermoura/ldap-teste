@@ -669,22 +669,31 @@ def api_public_organogram_data():
             attrs = entry['attributes']
             dn = entry['dn']
 
-            users[dn] = {
-                'name': attrs.get('displayName'),
-                'title': attrs.get('title'),
-                'department': attrs.get('department'),
-                'manager_dn': attrs.get('manager'),
+            # Helper to get first item from list or value
+            def get_first(val):
+                if isinstance(val, list):
+                    return val[0] if val else None
+                return val
+
+            manager_dn_raw = get_first(attrs.get('manager'))
+
+            users[dn.lower()] = {
+                'name': get_first(attrs.get('displayName')),
+                'title': get_first(attrs.get('title')),
+                'department': get_first(attrs.get('department')),
+                'manager_dn': manager_dn_raw.lower() if manager_dn_raw else None,
+                'distinguishedName': dn,
                 'children': []
             }
 
         # Construir a árvore
         roots = []
-        for dn, user_data in users.items():
-            manager_dn = user_data['manager_dn']
+        for dn_lower, user_data in users.items():
+            manager_dn_lower = user_data['manager_dn']
 
             # Se tem gerente e o gerente está na lista de usuários recuperados
-            if manager_dn and manager_dn in users:
-                users[manager_dn]['children'].append(user_data)
+            if manager_dn_lower and manager_dn_lower in users:
+                users[manager_dn_lower]['children'].append(user_data)
             else:
                 # Se não tem gerente (ou gerente está desativado/fora do escopo), é uma raiz
                 roots.append(user_data)
