@@ -703,20 +703,30 @@ def api_public_organogram_data():
         def clean_and_sort(node):
             if 'manager_dn' in node:
                 del node['manager_dn']
-            node['children'].sort(key=lambda x: x['name'] or '')
+
+            # Garante que name é string para ordenação segura
+            name_val = node.get('name')
+            if name_val is None:
+                name_val = ''
+
+            # Ordena children com segurança
+            node['children'].sort(key=lambda x: (x.get('name') or '').lower())
+
             for child in node['children']:
                 clean_and_sort(child)
 
+        # Ordena raízes com segurança
+        roots.sort(key=lambda x: (x.get('name') or '').lower())
+
         for root in roots:
             clean_and_sort(root)
-
-        roots.sort(key=lambda x: x['name'] or '')
 
         return jsonify(roots)
 
     except Exception as e:
         logging.error(f"Erro na API de organograma público: {e}", exc_info=True)
-        return jsonify({'error': 'Erro ao carregar dados do organograma.'}), 500
+        # Retorna lista vazia em caso de erro para não quebrar o frontend com erro de parse
+        return jsonify([]), 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
