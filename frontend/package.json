@@ -10,8 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.3.2",
     "axios": "^1.12.2",
+    "file-saver": "^2.0.5",
     "lucide-react": "^0.562.0",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.1.1",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",

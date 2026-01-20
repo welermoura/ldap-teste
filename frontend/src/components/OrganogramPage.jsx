@@ -7,9 +7,11 @@ import {
     ChevronDown,
     Network,
     AlertTriangle,
-    Loader2
+    Loader2,
+    Download
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
+import ExportModal from './ExportModal';
 
 // --- Context ---
 const OrganogramContext = createContext({
@@ -149,6 +151,7 @@ const OrganogramPage = () => {
     const [expandedNodes, setExpandedNodes] = useState(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -334,6 +337,15 @@ const OrganogramPage = () => {
                             <button onClick={handleResetZoom} title="Resetar"><RotateCcw size={14} /></button>
                         </div>
 
+                        <button
+                            className="btn-login"
+                            title="Exportar"
+                            onClick={() => setIsExportModalOpen(true)}
+                            style={{ marginRight: 8 }}
+                        >
+                            <Download size={18} /> Exportar
+                        </button>
+
                         <a href="/login" className="btn-login">
                             <UserCircle size={18} /> Login
                         </a>
@@ -357,6 +369,13 @@ const OrganogramPage = () => {
                         {renderTree(data)}
                     </div>
                 </main>
+
+                <ExportModal
+                    isOpen={isExportModalOpen}
+                    onClose={() => setIsExportModalOpen(false)}
+                    data={data}
+                    selectedNodeId={focusedNodeId || hoveredNodeId}
+                />
 
                 <style>{`
                     /* --- Fonts & Vars --- */
@@ -491,6 +510,8 @@ const OrganogramPage = () => {
                         align-items: center;
                         gap: 8px;
                         transition: all 0.2s;
+                        border: none;
+                        cursor: pointer;
                     }
                     .btn-login:hover {
                         background: #334155;
