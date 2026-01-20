@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Download, FileText, Monitor, X, CheckCircle, Loader2 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { saveAs } from 'file-saver';
-import { generatePPTX } from '../services/pptxGenerator';
-import OrganogramDocument from '../services/pdfDocument';
-import { filterTree } from '../utils/exportUtils';
+import { generatePPTX } from '../export/pptExporter';
+import OrganogramDocument from '../export/pdfExporter';
+import { filterTree } from '../export/hierarchyExtractor';
 
 const ExportModal = ({ isOpen, onClose, data, selectedNodeId, selectedNode }) => {
     const [format, setFormat] = useState('pdf'); // 'pdf' | 'pptx'
-    const [scope, setScope] = useState('full'); // 'full' | 'subtree' | 'single'
+    const [scope, setScope] = useState('full'); // 'full' | 'subtree'
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
 
@@ -119,23 +119,8 @@ const ExportModal = ({ isOpen, onClose, data, selectedNodeId, selectedNode }) =>
                                 <div className="radio-info">
                                     <span className="radio-title">Nó Selecionado + Subordinados</span>
                                     <span className="radio-desc">
-                                        {selectedNodeId ? 'Apenas a área focada e seus níveis abaixo.' : 'Selecione um nó primeiro.'}
+                                        {selectedNodeId ? 'Área selecionada e sua equipe.' : 'Selecione um nó primeiro.'}
                                     </span>
-                                </div>
-                            </label>
-
-                            <label className={`radio-item ${!selectedNodeId ? 'disabled' : ''}`}>
-                                <input
-                                    type="radio"
-                                    name="scope"
-                                    value="single"
-                                    checked={scope === 'single'}
-                                    onChange={(e) => setScope(e.target.value)}
-                                    disabled={!selectedNodeId}
-                                />
-                                <div className="radio-info">
-                                    <span className="radio-title">Apenas Nó Selecionado</span>
-                                    <span className="radio-desc">Somente o card focado (sem filhos).</span>
                                 </div>
                             </label>
                         </div>
