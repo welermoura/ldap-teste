@@ -716,13 +716,18 @@ def api_public_organogram_data():
             for child in node['children']:
                 clean_and_sort(child)
 
-        # Ordena raízes com segurança
-        roots.sort(key=lambda x: (x.get('name') or '').lower())
+        # Filtrar raízes isoladas (sem gerente E sem subordinados)
+        # O usuário solicitou: "O Organograma só vai aparecer se o campo Gerente ou Serpervisiona estiverem preenchidos"
+        # Se um nó é raiz, ele não tem gerente (no contexto desta lista). Se também não tiver filhos, é isolado.
+        filtered_roots = [r for r in roots if r['children']]
 
-        for root in roots:
+        # Ordena raízes com segurança
+        filtered_roots.sort(key=lambda x: (x.get('name') or '').lower())
+
+        for root in filtered_roots:
             clean_and_sort(root)
 
-        return jsonify(roots)
+        return jsonify(filtered_roots)
 
     except Exception as e:
         logging.error(f"Erro na API de organograma público: {e}", exc_info=True)
