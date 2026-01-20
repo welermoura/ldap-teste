@@ -1,4 +1,16 @@
 import React, { useEffect, useState, useMemo, createContext, useContext } from 'react';
+import {
+    Search,
+    ZoomIn,
+    ZoomOut,
+    RotateCcw,
+    UserCircle,
+    ChevronDown,
+    Network,
+    X,
+    AlertTriangle,
+    Loader2
+} from 'lucide-react';
 
 // --- Context ---
 const OrganogramContext = createContext({
@@ -119,7 +131,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 
             {hasChildren && (
                 <div className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}>
-                    <i className="fas fa-chevron-down"></i>
+                    <ChevronDown size={14} className="icon-chevron" />
                 </div>
             )}
         </div>
@@ -190,9 +202,6 @@ const OrganogramPage = () => {
                     const isExpanded = expandedNodes.has(key);
 
                     // Connection State Logic
-                    // A conexão acima do nó deve acender se:
-                    // 1. O pai está hovered (caminho pai -> filho)
-                    // 2. O próprio nó está hovered (destacar conexão chegando nele? Talvez não necessário, foco no filho)
                     const isConnectionActive = hoveredNodeId === parentId && hoveredNodeId !== null;
 
                     return (
@@ -215,14 +224,14 @@ const OrganogramPage = () => {
 
     if (loading) return (
         <div className="loading-container">
-            <div className="spinner"></div>
+            <Loader2 className="spinner" size={40} />
             <p>Carregando estrutura...</p>
         </div>
     );
 
     if (error) return (
         <div className="error-container">
-            <i className="fas fa-exclamation-triangle"></i>
+            <AlertTriangle size={48} className="text-red-500" />
             <p>Erro ao carregar: {error}</p>
         </div>
     );
@@ -233,7 +242,7 @@ const OrganogramPage = () => {
                 <header className="page-header">
                     <div className="brand">
                         <div className="brand-icon">
-                            <i className="fas fa-sitemap"></i>
+                            <Network size={20} />
                         </div>
                         <div className="brand-text">
                             <h2>Organograma</h2>
@@ -243,7 +252,7 @@ const OrganogramPage = () => {
 
                     <div className="actions">
                         <div className={`search-wrapper ${searchTerm ? 'active' : ''}`}>
-                            <i className="fas fa-search"></i>
+                            <Search size={16} className="search-icon" />
                             <input
                                 type="text"
                                 placeholder="Buscar colaborador..."
@@ -252,21 +261,21 @@ const OrganogramPage = () => {
                             />
                             {searchTerm && (
                                 <button className="clear-search" onClick={() => setSearchTerm('')}>
-                                    <i className="fas fa-times"></i>
+                                    <X size={14} />
                                 </button>
                             )}
                         </div>
 
                         <div className="zoom-controls">
-                            <button onClick={handleZoomOut} title="Reduzir Zoom"><i className="fas fa-minus"></i></button>
+                            <button onClick={handleZoomOut} title="Reduzir Zoom"><ZoomOut size={16} /></button>
                             <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-                            <button onClick={handleZoomIn} title="Aumentar Zoom"><i className="fas fa-plus"></i></button>
+                            <button onClick={handleZoomIn} title="Aumentar Zoom"><ZoomIn size={16} /></button>
                             <div className="separator"></div>
-                            <button onClick={handleResetZoom} title="Resetar"><i className="fas fa-compress-arrows-alt"></i></button>
+                            <button onClick={handleResetZoom} title="Resetar"><RotateCcw size={14} /></button>
                         </div>
 
                         <a href="/login" className="btn-login">
-                            <i className="fas fa-user-circle"></i> Login
+                            <UserCircle size={18} /> Login
                         </a>
                     </div>
                 </header>
@@ -340,7 +349,6 @@ const OrganogramPage = () => {
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 1.1rem;
                     }
                     .brand-text h2 {
                         margin: 0;
@@ -368,7 +376,7 @@ const OrganogramPage = () => {
                         position: relative;
                         transition: all 0.2s;
                     }
-                    .search-wrapper i {
+                    .search-icon {
                         position: absolute;
                         left: 12px;
                         top: 50%;
@@ -402,6 +410,8 @@ const OrganogramPage = () => {
                         color: var(--text-secondary);
                         cursor: pointer;
                         padding: 4px;
+                        display: flex;
+                        align-items: center;
                     }
                     .clear-search:hover { color: var(--text-primary); }
 
@@ -741,7 +751,7 @@ const OrganogramPage = () => {
                         border-color: var(--text-secondary);
                         transform: translateX(-50%) scale(1.1);
                     }
-                    .toggle-btn.expanded i {
+                    .toggle-btn.expanded .icon-chevron {
                         transform: rotate(180deg);
                         transition: transform 0.3s;
                     }
@@ -757,12 +767,8 @@ const OrganogramPage = () => {
                         gap: 16px;
                     }
                     .spinner {
-                        width: 40px;
-                        height: 40px;
-                        border: 3px solid rgba(0,0,0,0.1);
-                        border-radius: 50%;
-                        border-top-color: var(--text-primary);
-                        animation: spin 0.8s linear infinite;
+                        color: var(--text-primary);
+                        animation: spin 1s linear infinite;
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
 

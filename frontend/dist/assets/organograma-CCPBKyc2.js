@@ -1,11 +1,81 @@
-import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{}}),M=r=>{if(!r)return"#64748b";const s={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(s[r])return s[r];let l=0;for(let d=0;d<r.length;d++)l=r.charCodeAt(d)+((l<<5)-l);return`hsl(${Math.abs(l%360)}, 60%, 40%)`},H=r=>{if(!r)return"";const s=r.split(" ");return s.length>=2?`${s[0][0]}${s[s.length-1][0]}`.toUpperCase():r[0].toUpperCase()},A=({node:r,isExpanded:s,toggleNode:l,hasChildren:p,isMatch:d,parentId:v})=>{const{hoveredNodeId:n,setHoveredNodeId:g}=t.useContext(L),i=t.useMemo(()=>M(r.department),[r.department]),x=r.distinguishedName,u=n===x,h=n===v&&n!==null,m=n!==null&&!u&&!h,b=r.title&&(r.title.toLowerCase().includes("presidente")||r.title.toLowerCase().includes("ceo")||r.title.toLowerCase().includes("diretor")),w=j=>{j.stopPropagation(),g(x)},y=()=>{g(null)};return e.jsxs("div",{className:`
+import{a as n,j as e,c as A}from"./index-Q695sD3D.js";/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Z=r=>r.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),H=r=>r.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,a,s)=>s?s.toUpperCase():a.toLowerCase()),$=r=>{const o=H(r);return o.charAt(0).toUpperCase()+o.slice(1)},M=(...r)=>r.filter((o,a,s)=>!!o&&o.trim()!==""&&s.indexOf(o)===a).join(" ").trim(),R=r=>{for(const o in r)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */var U={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const D=n.forwardRef(({color:r="currentColor",size:o=24,strokeWidth:a=2,absoluteStrokeWidth:s,className:c="",children:p,iconNode:l,...h},d)=>n.createElement("svg",{ref:d,...U,width:o,height:o,stroke:r,strokeWidth:s?Number(a)*24/Number(o):a,className:M("lucide",c),...!p&&!R(h)&&{"aria-hidden":"true"},...h},[...l.map(([g,m])=>n.createElement(g,m)),...Array.isArray(p)?p:[p]]));/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const x=(r,o)=>{const a=n.forwardRef(({className:s,...c},p)=>n.createElement(D,{ref:p,iconNode:o,className:M(`lucide-${Z($(r))}`,`lucide-${r}`,s),...c}));return a.displayName=$(r),a};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const O=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],T=x("chevron-down",O);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const B=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],P=x("circle-user",B);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const q=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],V=x("loader-circle",q);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const X=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],Y=x("network",X);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const F=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],W=x("rotate-ccw",F);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const J=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],K=x("search",J);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const G=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],Q=x("triangle-alert",G);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ee=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],re=x("x",ee);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const oe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],te=x("zoom-in",oe);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ae=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],ne=x("zoom-out",ae),_=n.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{}}),se=r=>{if(!r)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[r])return o[r];let a=0;for(let c=0;c<r.length;c++)a=r.charCodeAt(c)+((a<<5)-a);return`hsl(${Math.abs(a%360)}, 60%, 40%)`},ie=r=>{if(!r)return"";const o=r.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():r[0].toUpperCase()},ce=({node:r,isExpanded:o,toggleNode:a,hasChildren:s,isMatch:c,parentId:p})=>{const{hoveredNodeId:l,setHoveredNodeId:h}=n.useContext(_),d=n.useMemo(()=>se(r.department),[r.department]),g=r.distinguishedName,m=l===g,b=l===p&&l!==null,v=l!==null&&!m&&!b,y=r.title&&(r.title.toLowerCase().includes("presidente")||r.title.toLowerCase().includes("ceo")||r.title.toLowerCase().includes("diretor")),w=j=>{j.stopPropagation(),h(g)},k=()=>{h(null)};return e.jsxs("div",{className:`
                 org-card
-                ${d?"highlight":""}
-                ${b?"executive":""}
-                ${u?"state-active":""}
-                ${h?"state-subordinate":""}
-                ${m?"state-dimmed":""}
-            `,onClick:()=>p&&l(),onMouseEnter:w,onMouseLeave:y,style:{"--dept-color":i},children:[e.jsx("div",{className:"card-accent",style:{backgroundColor:i}}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:b?"#0f172a":`${i}15`,color:b?"#fff":i},children:H(r.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:r.name,children:r.name}),e.jsx("p",{className:"role",title:r.title,children:r.title||"Cargo não definido"})]})]}),r.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{color:i,borderColor:`${i}30`},children:r.department})})]}),p&&e.jsx("div",{className:`toggle-btn ${s?"expanded":""}`,children:e.jsx("i",{className:"fas fa-chevron-down"})})]})},D=()=>{const[r,s]=t.useState([]),[l,p]=t.useState(!0),[d,v]=t.useState(null),[n,g]=t.useState(""),[i,x]=t.useState(1),[u,h]=t.useState(new Set),[m,b]=t.useState(null);t.useEffect(()=>{fetch("/api/public/organogram_data").then(a=>{if(!a.ok)throw new Error("Falha ao carregar dados");return a.json()}).then(a=>{const c=Array.isArray(a)?a:[];s(c);const o=new Set;c.forEach((N,k)=>{const f=N.distinguishedName||k;o.add(f)}),h(o),p(!1)}).catch(a=>{v(a.message),p(!1)})},[]);const w=a=>{h(c=>{const o=new Set(c);return o.has(a)?o.delete(a):o.add(a),o})},y=()=>x(a=>Math.min(a+.1,2)),j=()=>x(a=>Math.max(a-.1,.4)),E=()=>x(1),C=(a,c=null)=>!a||!Array.isArray(a)||a.length===0?null:e.jsx("ul",{className:"org-tree",children:a.map((o,N)=>{const k=n&&o.name&&o.name.toLowerCase().includes(n.toLowerCase()),f=o.distinguishedName||N,z=o.children&&o.children.length>0,S=u.has(f),I=m===c&&m!==null;return e.jsxs("li",{className:`org-leaf ${I?"conn-active":""}`,children:[e.jsx(A,{node:o,isExpanded:S,toggleNode:()=>w(f),hasChildren:z,isMatch:k,parentId:c}),z&&S&&C(o.children,f)]},f)})});return l?e.jsxs("div",{className:"loading-container",children:[e.jsx("div",{className:"spinner"}),e.jsx("p",{children:"Carregando estrutura..."})]}):d?e.jsxs("div",{className:"error-container",children:[e.jsx("i",{className:"fas fa-exclamation-triangle"}),e.jsxs("p",{children:["Erro ao carregar: ",d]})]}):e.jsx(L.Provider,{value:{hoveredNodeId:m,setHoveredNodeId:b},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx("i",{className:"fas fa-sitemap"})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsxs("div",{className:`search-wrapper ${n?"active":""}`,children:[e.jsx("i",{className:"fas fa-search"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:n,onChange:a=>g(a.target.value)}),n&&e.jsx("button",{className:"clear-search",onClick:()=>g(""),children:e.jsx("i",{className:"fas fa-times"})})]}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:j,title:"Reduzir Zoom",children:e.jsx("i",{className:"fas fa-minus"})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(i*100),"%"]}),e.jsx("button",{onClick:y,title:"Aumentar Zoom",children:e.jsx("i",{className:"fas fa-plus"})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:E,title:"Resetar",children:e.jsx("i",{className:"fas fa-compress-arrows-alt"})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx("i",{className:"fas fa-user-circle"})," Login"]})]})]}),e.jsx("main",{className:"canvas",children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${i})`},children:C(r)})}),e.jsx("style",{children:`
+                ${c?"highlight":""}
+                ${y?"executive":""}
+                ${m?"state-active":""}
+                ${b?"state-subordinate":""}
+                ${v?"state-dimmed":""}
+            `,onClick:()=>s&&a(),onMouseEnter:w,onMouseLeave:k,style:{"--dept-color":d},children:[e.jsx("div",{className:"card-accent",style:{backgroundColor:d}}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:y?"#0f172a":`${d}15`,color:y?"#fff":d},children:ie(r.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:r.name,children:r.name}),e.jsx("p",{className:"role",title:r.title,children:r.title||"Cargo não definido"})]})]}),r.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{color:d,borderColor:`${d}30`},children:r.department})})]}),s&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(T,{size:14,className:"icon-chevron"})})]})},le=()=>{const[r,o]=n.useState([]),[a,s]=n.useState(!0),[c,p]=n.useState(null),[l,h]=n.useState(""),[d,g]=n.useState(1),[m,b]=n.useState(new Set),[v,y]=n.useState(null);n.useEffect(()=>{fetch("/api/public/organogram_data").then(t=>{if(!t.ok)throw new Error("Falha ao carregar dados");return t.json()}).then(t=>{const f=Array.isArray(t)?t:[];o(f);const i=new Set;f.forEach((N,C)=>{const u=N.distinguishedName||C;i.add(u)}),b(i),s(!1)}).catch(t=>{p(t.message),s(!1)})},[]);const w=t=>{b(f=>{const i=new Set(f);return i.has(t)?i.delete(t):i.add(t),i})},k=()=>g(t=>Math.min(t+.1,2)),j=()=>g(t=>Math.max(t-.1,.4)),E=()=>g(1),z=(t,f=null)=>!t||!Array.isArray(t)||t.length===0?null:e.jsx("ul",{className:"org-tree",children:t.map((i,N)=>{const C=l&&i.name&&i.name.toLowerCase().includes(l.toLowerCase()),u=i.distinguishedName||N,S=i.children&&i.children.length>0,L=m.has(u),I=v===f&&v!==null;return e.jsxs("li",{className:`org-leaf ${I?"conn-active":""}`,children:[e.jsx(ce,{node:i,isExpanded:L,toggleNode:()=>w(u),hasChildren:S,isMatch:C,parentId:f}),S&&L&&z(i.children,u)]},u)})});return a?e.jsxs("div",{className:"loading-container",children:[e.jsx(V,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):c?e.jsxs("div",{className:"error-container",children:[e.jsx(Q,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",c]})]}):e.jsx(_.Provider,{value:{hoveredNodeId:v,setHoveredNodeId:y},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(Y,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsxs("div",{className:`search-wrapper ${l?"active":""}`,children:[e.jsx(K,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:l,onChange:t=>h(t.target.value)}),l&&e.jsx("button",{className:"clear-search",onClick:()=>h(""),children:e.jsx(re,{size:14})})]}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:j,title:"Reduzir Zoom",children:e.jsx(ne,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(d*100),"%"]}),e.jsx("button",{onClick:k,title:"Aumentar Zoom",children:e.jsx(te,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:E,title:"Resetar",children:e.jsx(W,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(P,{size:18})," Login"]})]})]}),e.jsx("main",{className:"canvas",children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${d})`},children:z(r)})}),e.jsx("style",{children:`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -63,7 +133,6 @@ import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({h
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 1.1rem;
                     }
                     .brand-text h2 {
                         margin: 0;
@@ -91,7 +160,7 @@ import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({h
                         position: relative;
                         transition: all 0.2s;
                     }
-                    .search-wrapper i {
+                    .search-icon {
                         position: absolute;
                         left: 12px;
                         top: 50%;
@@ -125,6 +194,8 @@ import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({h
                         color: var(--text-secondary);
                         cursor: pointer;
                         padding: 4px;
+                        display: flex;
+                        align-items: center;
                     }
                     .clear-search:hover { color: var(--text-primary); }
 
@@ -464,7 +535,7 @@ import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({h
                         border-color: var(--text-secondary);
                         transform: translateX(-50%) scale(1.1);
                     }
-                    .toggle-btn.expanded i {
+                    .toggle-btn.expanded .icon-chevron {
                         transform: rotate(180deg);
                         transition: transform 0.3s;
                     }
@@ -480,13 +551,9 @@ import{a as t,j as e,c as $}from"./index-Q695sD3D.js";const L=t.createContext({h
                         gap: 16px;
                     }
                     .spinner {
-                        width: 40px;
-                        height: 40px;
-                        border: 3px solid rgba(0,0,0,0.1);
-                        border-radius: 50%;
-                        border-top-color: var(--text-primary);
-                        animation: spin 0.8s linear infinite;
+                        color: var(--text-primary);
+                        animation: spin 1s linear infinite;
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
 
-                `})]})})};$.createRoot(document.getElementById("root")).render(e.jsx(t.StrictMode,{children:e.jsx(D,{})}));
+                `})]})})};A.createRoot(document.getElementById("root")).render(e.jsx(n.StrictMode,{children:e.jsx(le,{})}));
