@@ -192,21 +192,23 @@ const OrganogramPage = () => {
                     border: 1px solid #dee2e6;
                 }
                 .zoom-controls button {
-                    border: none;
-                    background: transparent;
+                    border: 1px solid #dee2e6; /* Added border for visibility */
+                    background: white; /* Changed background for visibility */
                     width: 30px;
                     height: 30px;
                     border-radius: 50%;
                     cursor: pointer;
-                    color: #6c757d;
+                    color: #495057; /* Darker color for visibility */
                     transition: all 0.2s;
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    margin: 0 2px;
                 }
                 .zoom-controls button:hover {
-                    background: #e9ecef;
-                    color: #007bff;
+                    background: #007bff;
+                    color: white;
+                    border-color: #007bff;
                 }
                 .zoom-level {
                     font-size: 0.85rem;
@@ -410,27 +412,25 @@ const OrganogramPage = () => {
                     box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
                 }
 
-                /* Expand Button */
+                /* Expand Button - Minimalist arrow only */
                 .btn-expand {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 50%;
-                    border: 1px solid #dee2e6;
-                    background: white;
+                    border: none;
+                    background: transparent;
                     color: #6c757d;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 10px;
+                    font-size: 14px; /* Larger icon */
                     cursor: pointer;
-                    margin-top: 10px;
+                    margin-top: 5px;
                     transition: all 0.2s;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    width: 100%; /* Full width click area */
+                    height: 20px;
                 }
                 .btn-expand:hover {
-                    background: #007bff;
-                    color: white;
-                    border-color: #007bff;
+                    color: #007bff;
+                    background: #f8f9fa; /* Subtle background on hover */
+                    border-radius: 4px;
                 }
 
                 /* Hover effects on lines */
