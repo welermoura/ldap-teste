@@ -1,21 +1,21 @@
 import React, { useEffect, useState, useMemo, createContext, useContext } from 'react';
 import {
-    Search,
     ZoomIn,
     ZoomOut,
     RotateCcw,
     UserCircle,
     ChevronDown,
     Network,
-    X,
     AlertTriangle,
     Loader2
 } from 'lucide-react';
+import OrganogramSearch from './OrganogramSearch';
 
 // --- Context ---
 const OrganogramContext = createContext({
     hoveredNodeId: null,
     setHoveredNodeId: () => {},
+    focusedNodeId: null,
 });
 
 // --- Utility Functions ---
@@ -61,15 +61,16 @@ const getInitials = (name) => {
 // --- Components ---
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
 
     // States calculation
     const isHovered = hoveredNodeId === nodeId;
+    const isFocused = focusedNodeId === nodeId;
     const isDirectSubordinate = hoveredNodeId === parentId && hoveredNodeId !== null;
-    const isDimmed = hoveredNodeId !== null && !isHovered && !isDirectSubordinate;
+    const isDimmed = (hoveredNodeId !== null || focusedNodeId !== null) && !isHovered && !isDirectSubordinate && !isFocused;
 
     // Executive Check
     const isExecutive = node.title && (
@@ -89,11 +90,13 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 
     return (
         <div
+            id={nodeId}
             className={`
                 org-card
                 ${isMatch ? 'highlight' : ''}
                 ${isExecutive ? 'executive' : ''}
                 ${isHovered ? 'state-active' : ''}
+                ${isFocused ? 'state-focused' : ''}
                 ${isDirectSubordinate ? 'state-subordinate' : ''}
                 ${isDimmed ? 'state-dimmed' : ''}
             `}
@@ -142,10 +145,10 @@ const OrganogramPage = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [searchTerm, setSearchTerm] = useState('');
     const [zoom, setZoom] = useState(1);
     const [expandedNodes, setExpandedNodes] = useState(new Set());
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
+    const [focusedNodeId, setFocusedNodeId] = useState(null);
 
     useEffect(() => {
         fetch('/api/public/organogram_data')
@@ -173,6 +176,25 @@ const OrganogramPage = () => {
             });
     }, []);
 
+    // Scroll effect for focused node
+    useEffect(() => {
+        if (focusedNodeId) {
+            // Pequeno delay para garantir renderização da expansão
+            setTimeout(() => {
+                const element = document.getElementById(focusedNodeId);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                }
+            }, 100);
+
+            // Remover foco após 3 segundos
+            const timer = setTimeout(() => {
+                setFocusedNodeId(null);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [focusedNodeId]);
+
     const toggleNode = (key) => {
         setExpandedNodes(prev => {
             const newSet = new Set(prev);
@@ -183,6 +205,28 @@ const OrganogramPage = () => {
             }
             return newSet;
         });
+    };
+
+    const findPathToNode = (nodes, targetId, path = []) => {
+        for (const node of nodes) {
+            const currentId = node.distinguishedName;
+            if (currentId === targetId) {
+                return path;
+            }
+            if (node.children) {
+                const result = findPathToNode(node.children, targetId, [...path, currentId]);
+                if (result) return result;
+            }
+        }
+        return null;
+    };
+
+    const handleSelectNode = (nodeId) => {
+        const path = findPathToNode(data, nodeId);
+        if (path) {
+            setExpandedNodes(prev => new Set([...prev, ...path]));
+        }
+        setFocusedNodeId(nodeId);
     };
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
@@ -196,7 +240,6 @@ const OrganogramPage = () => {
         return (
             <ul className="org-tree">
                 {nodes.map((node, index) => {
-                    const isMatch = searchTerm && node.name && node.name.toLowerCase().includes(searchTerm.toLowerCase());
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
@@ -211,7 +254,7 @@ const OrganogramPage = () => {
                                 isExpanded={isExpanded}
                                 toggleNode={() => toggleNode(key)}
                                 hasChildren={hasChildren}
-                                isMatch={isMatch}
+                                isMatch={false} // Match logic agora é via busca/foco
                                 parentId={parentId}
                             />
                             {hasChildren && isExpanded && renderTree(node.children, key)}
@@ -237,7 +280,7 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
@@ -251,20 +294,7 @@ const OrganogramPage = () => {
                     </div>
 
                     <div className="actions">
-                        <div className={`search-wrapper ${searchTerm ? 'active' : ''}`}>
-                            <Search size={16} className="search-icon" />
-                            <input
-                                type="text"
-                                placeholder="Buscar colaborador..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                            {searchTerm && (
-                                <button className="clear-search" onClick={() => setSearchTerm('')}>
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
+                        <OrganogramSearch data={data} onSelect={handleSelectNode} />
 
                         <div className="zoom-controls">
                             <button onClick={handleZoomOut} title="Reduzir Zoom"><ZoomOut size={16} /></button>
@@ -370,50 +400,6 @@ const OrganogramPage = () => {
                         align-items: center;
                         gap: 24px;
                     }
-
-                    /* Search */
-                    .search-wrapper {
-                        position: relative;
-                        transition: all 0.2s;
-                    }
-                    .search-icon {
-                        position: absolute;
-                        left: 12px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        color: var(--text-secondary);
-                        pointer-events: none;
-                    }
-                    .search-wrapper input {
-                        padding: 10px 12px 10px 38px;
-                        border: 1px solid var(--border-color);
-                        border-radius: 8px;
-                        font-size: 0.9rem;
-                        width: 260px;
-                        background: #fff;
-                        color: var(--text-primary);
-                        transition: all 0.2s;
-                    }
-                    .search-wrapper input:focus {
-                        outline: none;
-                        border-color: #3b82f6;
-                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-                        width: 300px;
-                    }
-                    .clear-search {
-                        position: absolute;
-                        right: 8px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        background: none;
-                        border: none;
-                        color: var(--text-secondary);
-                        cursor: pointer;
-                        padding: 4px;
-                        display: flex;
-                        align-items: center;
-                    }
-                    .clear-search:hover { color: var(--text-primary); }
 
                     /* Zoom */
                     .zoom-controls {
@@ -635,6 +621,21 @@ const OrganogramPage = () => {
                         z-index: 10;
                         border-color: transparent;
                         outline: 2px solid var(--line-active);
+                    }
+
+                    /* Focused State (Search Result) */
+                    .org-card.state-focused {
+                        transform: scale(1.05);
+                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), var(--shadow-hover);
+                        border-color: var(--line-active);
+                        z-index: 20;
+                        animation: pulse-focus 2s infinite;
+                    }
+
+                    @keyframes pulse-focus {
+                        0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.5); }
+                        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+                        100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
                     }
 
                     /* Subordinate State */
