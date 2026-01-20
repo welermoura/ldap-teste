@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, createContext, useContext } from 'react';
+import React, { useEffect, useState, useMemo, createContext, useContext, useRef } from 'react';
 import {
     ZoomIn,
     ZoomOut,
@@ -150,6 +150,12 @@ const OrganogramPage = () => {
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
 
+    // Drag-to-pan state
+    const canvasRef = useRef(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+    const [scrollPos, setScrollPos] = useState({ left: 0, top: 0 });
+
     useEffect(() => {
         fetch('/api/public/organogram_data')
             .then(res => {
@@ -194,6 +200,30 @@ const OrganogramPage = () => {
             return () => clearTimeout(timer);
         }
     }, [focusedNodeId]);
+
+    // Drag handlers
+    const handleMouseDown = (e) => {
+        if (!canvasRef.current) return;
+        setIsDragging(true);
+        setStartPos({ x: e.pageX, y: e.pageY });
+        setScrollPos({
+            left: canvasRef.current.scrollLeft,
+            top: canvasRef.current.scrollTop
+        });
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isDragging || !canvasRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - startPos.x;
+        const y = e.pageY - startPos.y;
+        canvasRef.current.scrollLeft = scrollPos.left - x;
+        canvasRef.current.scrollTop = scrollPos.top - y;
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
 
     const toggleNode = (key) => {
         setExpandedNodes(prev => {
@@ -310,7 +340,14 @@ const OrganogramPage = () => {
                     </div>
                 </header>
 
-                <main className="canvas">
+                <main
+                    className={`canvas ${isDragging ? 'grabbing' : ''}`}
+                    ref={canvasRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                >
                     <div
                         className="tree-wrapper"
                         style={{
@@ -469,8 +506,10 @@ const OrganogramPage = () => {
                         background-image:
                             radial-gradient(#e2e8f0 1px, transparent 1px);
                         background-size: 24px 24px;
+                        user-select: none; /* Prevent text selection while dragging */
                     }
                     .canvas:active { cursor: grabbing; }
+                    .canvas.grabbing { cursor: grabbing; }
 
                     .tree-wrapper {
                         display: flex;
