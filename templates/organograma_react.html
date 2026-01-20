@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Organograma - Gestão AD</title>
     {% if css_file %}
-    <link rel="stylesheet" href="{{ url_for('ad_tree_assets', filename=css_file) }}">
+    <link rel="stylesheet" href="{{ url_for('ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
     {% endif %}
   </head>
   <body>
     <div id="root"></div>
     {% if js_file %}
-    <script type="module" src="{{ url_for('ad_tree_assets', filename=js_file) }}"></script>
+    <script type="module" src="{{ url_for('ad_tree_assets', filename=js_file.replace('assets/', '')) }}"></script>
     {% else %}
     <p>Erro: Arquivo JS não encontrado. Execute o build do frontend.</p>
     {% endif %}
