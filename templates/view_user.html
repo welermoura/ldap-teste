@@ -102,6 +102,7 @@
                     <li class="nav-item" role="presentation"><button class="nav-link" id="endereco-tab" data-bs-toggle="tab" data-bs-target="#endereco" type="button" role="tab">Endereço</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="telefones-tab" data-bs-toggle="tab" data-bs-target="#telefones" type="button" role="tab">Telefones</button></li>
                     <li class="nav-item" role="presentation"><button class="nav-link" id="organizacao-tab" data-bs-toggle="tab" data-bs-target="#organizacao" type="button" role="tab">Organização</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="organograma-tab" data-bs-toggle="tab" data-bs-target="#organograma" type="button" role="tab">Organograma</button></li>
                     {% if check_permission(action='can_manage_groups') %}
                     <li class="nav-item" role="presentation"><button class="nav-link" id="memberof-tab" data-bs-toggle="tab" data-bs-target="#memberof" type="button" role="tab">Membro de</button></li>
                     {% endif %}
@@ -144,25 +145,49 @@
                             <tr><td style="width: 30%;"><strong>Cargo:</strong></td><td>{{ get_attr_value(user, 'title') }}</td></tr>
                             <tr><td><strong>Departamento:</strong></td><td>{{ get_attr_value(user, 'department') }}</td></tr>
                             <tr><td><strong>Empresa:</strong></td><td>{{ get_attr_value(user, 'company') }}</td></tr>
-                            <tr><td><strong>Gerente:</strong></td>
+                            <tr><td><strong>Matrícula:</strong></td><td>{{ get_attr_value(user, 'extensionAttribute4') }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="organograma" role="tabpanel">
+                        <table class="table glass-table table-borderless">
+                            <tr>
+                                <td style="width: 30%;"><strong>Gerente:</strong></td>
                                 <td>
                                     {% if manager_info %}
                                         <a href="{{ url_for('view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
                                     {% else %}
                                         <span class="text-muted">N/A</span>
                                     {% endif %}
+                                    {% if check_permission(action='can_edit') %}
+                                        <button class="btn btn-sm btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#changeManagerModal">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    {% endif %}
                                 </td>
                             </tr>
-                            <tr><td><strong>Matrícula:</strong></td><td>{{ get_attr_value(user, 'extensionAttribute4') }}</td></tr>
                         </table>
 
-                        <h6 class="mt-4 mb-3 border-bottom pb-2">Supervisiona:</h6>
+                        <h6 class="mt-4 mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                            Supervisiona:
+                            {% if check_permission(action='can_edit') %}
+                                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addSubordinateModal">
+                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                </button>
+                            {% endif %}
+                        </h6>
                         {% if direct_reports_info %}
                             <div class="list-group glass-list-group" style="max-height: 200px; overflow-y: auto;">
                                 {% for dr in direct_reports_info %}
-                                    <a href="{{ url_for('view_user', username=dr.sam) }}" class="list-group-item list-group-item-action bg-transparent text-white border-0 ps-0">
-                                        <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
-                                    </a>
+                                    <div class="list-group-item bg-transparent text-white border-0 ps-0 d-flex justify-content-between align-items-center">
+                                        <a href="{{ url_for('view_user', username=dr.sam) }}" class="text-decoration-none text-white">
+                                            <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
+                                        </a>
+                                        {% if check_permission(action='can_edit') %}
+                                            <button class="btn btn-sm btn-danger remove-subordinate-btn" data-subordinate-sam="{{ dr.sam }}" data-subordinate-name="{{ dr.name }}">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
                                 {% endfor %}
                             </div>
                         {% else %}
@@ -215,6 +240,44 @@
       </form>
     </div>
   </div>
+</div>
+
+<!-- Modal Alterar Gerente -->
+<div class="modal fade" id="changeManagerModal" tabindex="-1" aria-labelledby="changeManagerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changeManagerModalLabel">Alterar Gerente de {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="managerSearchInput" class="form-label">Buscar Gerente (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="managerSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="managerSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Subordinado -->
+<div class="modal fade" id="addSubordinateModal" tabindex="-1" aria-labelledby="addSubordinateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSubordinateModalLabel">Adicionar Subordinado para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="subordinateSearchInput" class="form-label">Buscar Subordinado (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="subordinateSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="subordinateSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Adicionar a Grupo -->
@@ -374,6 +437,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const confirmResetPasswordBtn = document.getElementById('confirmResetPasswordBtn');
     const newPasswordInput = document.getElementById('new_password');
     const confirmPasswordInput = document.getElementById('confirm_password');
+
+    // Elementos do Organograma
+    const managerSearchInput = document.getElementById('managerSearchInput');
+    const managerSearchResults = document.getElementById('managerSearchResults');
+    const changeManagerModalEl = document.getElementById('changeManagerModal');
+    const changeManagerModal = new bootstrap.Modal(changeManagerModalEl);
+
+    const subordinateSearchInput = document.getElementById('subordinateSearchInput');
+    const subordinateSearchResults = document.getElementById('subordinateSearchResults');
+    const addSubordinateModalEl = document.getElementById('addSubordinateModal');
+    const addSubordinateModal = new bootstrap.Modal(addSubordinateModalEl);
+    const organogramaTab = document.getElementById('organograma-tab');
+
 
     // === Variáveis de Estado ===
     const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
@@ -692,6 +768,155 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
+
+    // === Lógica do Organograma ===
+
+    // Função genérica de busca de usuários para o Organograma
+    async function searchUsersForHierarchy(query, resultsContainer, type) {
+        if (query.length < 3) {
+            resultsContainer.innerHTML = '<p class="text-muted p-2">Digite pelo menos 3 caracteres.</p>';
+            return;
+        }
+        resultsContainer.innerHTML = '<div class="text-center p-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
+
+        try {
+            const response = await fetch(`/api/search_ad?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Falha na busca.');
+            const results = await response.json();
+
+            resultsContainer.innerHTML = '';
+            const users = results.filter(item => item.type === 'user'); // Filtra apenas usuários
+
+            if (users.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-muted p-2">Nenhum usuário encontrado.</p>';
+                return;
+            }
+
+            users.forEach(user => {
+                const item = document.createElement('button');
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${escapeHTML(user.name)}</h6>
+                        <small>${escapeHTML(user.sam)}</small>
+                    </div>
+                    <small class="text-muted">${escapeHTML(user.ou_path || '')}</small>
+                `;
+                item.onclick = () => {
+                    if (type === 'manager') {
+                        setManager(user.sam);
+                    } else if (type === 'subordinate') {
+                        addSubordinate(user.sam);
+                    }
+                };
+                resultsContainer.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Erro na busca:', error);
+            resultsContainer.innerHTML = '<p class="text-danger p-2">Erro ao buscar usuários.</p>';
+        }
+    }
+
+    async function setManager(managerSam) {
+        setupConfirmationModal('Confirmar Gerente', `Definir ${managerSam} como gerente de ${username}?`, async () => {
+            try {
+                const response = await fetch('/api/set_manager', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ user_sam: username, manager_sam: managerSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao definir gerente.');
+
+                showToast('Gerente atualizado com sucesso.', 'success');
+                changeManagerModal.hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    async function addSubordinate(subordinateSam) {
+        setupConfirmationModal('Adicionar Subordinado', `Definir ${username} como gerente de ${subordinateSam}?`, async () => {
+            try {
+                const response = await fetch('/api/add_subordinate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ manager_sam: username, subordinate_sam: subordinateSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao adicionar subordinado.');
+
+                showToast('Subordinado adicionado com sucesso.', 'success');
+                addSubordinateModal.hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    async function removeSubordinate(subordinateSam, subordinateName) {
+        setupConfirmationModal('Remover Subordinado', `Remover ${subordinateName} (${subordinateSam}) da lista de supervisionados?`, async () => {
+            try {
+                const response = await fetch('/api/remove_subordinate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ subordinate_sam: subordinateSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao remover subordinado.');
+
+                showToast('Subordinado removido com sucesso.', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    // Listeners para Organograma
+    if (managerSearchInput) {
+        let timeout;
+        managerSearchInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => searchUsersForHierarchy(managerSearchInput.value, managerSearchResults, 'manager'), 400);
+        });
+    }
+
+    if (subordinateSearchInput) {
+        let timeout;
+        subordinateSearchInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => searchUsersForHierarchy(subordinateSearchInput.value, subordinateSearchResults, 'subordinate'), 400);
+        });
+    }
+
+    // Delegação de eventos para botões de remover subordinado (pois a lista pode ser longa/dinâmica)
+    const organogramaPane = document.getElementById('organograma');
+    if (organogramaPane) {
+        organogramaPane.addEventListener('click', function(e) {
+            const btn = e.target.closest('.remove-subordinate-btn');
+            if (btn) {
+                const sam = btn.dataset.subordinateSam;
+                const name = btn.dataset.subordinateName;
+                removeSubordinate(sam, name);
+            }
+        });
+    }
+
+    // Limpar modais ao fechar
+    changeManagerModalEl.addEventListener('hidden.bs.modal', () => {
+        managerSearchInput.value = '';
+        managerSearchResults.innerHTML = '';
+    });
+    addSubordinateModalEl.addEventListener('hidden.bs.modal', () => {
+        subordinateSearchInput.value = '';
+        subordinateSearchResults.innerHTML = '';
+    });
+
 });
 </script>
 <style>
