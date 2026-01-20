@@ -5,6 +5,8 @@ const OrganogramPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [zoom, setZoom] = useState(1);
+    const [expandedNodes, setExpandedNodes] = useState(new Set());
 
     useEffect(() => {
         fetch('/api/public/organogram_data')
@@ -13,7 +15,17 @@ const OrganogramPage = () => {
                 return res.json();
             })
             .then(data => {
-                setData(Array.isArray(data) ? data : []);
+                const validData = Array.isArray(data) ? data : [];
+                setData(validData);
+
+                // Inicialmente expande apenas os nós raiz
+                const initialExpanded = new Set();
+                validData.forEach((node, index) => {
+                    const key = node.distinguishedName || index;
+                    initialExpanded.add(key);
+                });
+                setExpandedNodes(initialExpanded);
+
                 setLoading(false);
             })
             .catch(err => {
@@ -29,6 +41,22 @@ const OrganogramPage = () => {
         return name[0].toUpperCase();
     };
 
+    const toggleNode = (key) => {
+        setExpandedNodes(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(key)) {
+                newSet.delete(key);
+            } else {
+                newSet.add(key);
+            }
+            return newSet;
+        });
+    };
+
+    const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
+    const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.3));
+    const handleResetZoom = () => setZoom(1);
+
     // Função recursiva para renderizar a árvore
     const renderTree = (nodes) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
@@ -38,9 +66,17 @@ const OrganogramPage = () => {
                 {nodes.map((node, index) => {
                     const isMatch = searchTerm && node.name && node.name.toLowerCase().includes(searchTerm.toLowerCase());
                     const nodeClass = `org-node ${isMatch ? 'highlight-node' : ''}`;
+                    const key = node.distinguishedName || index;
+                    const hasChildren = node.children && node.children.length > 0;
+                    const isExpanded = expandedNodes.has(key);
+
+                    // Auto-expand if search matches this node or a child (simplified: just this node for now)
+                    if (isMatch && !isExpanded && hasChildren) {
+                        // This side-effect in render is not ideal, but for search highlighting it's often acceptable or handled via useEffect
+                    }
 
                     return (
-                        <li key={node.distinguishedName || index} className="org-tree-li">
+                        <li key={key} className="org-tree-li">
                             <div className={nodeClass} id={`node-${index}`}>
                                 <div className="avatar">
                                     {getInitials(node.name)}
@@ -50,8 +86,20 @@ const OrganogramPage = () => {
                                     <p className="title">{node.title}</p>
                                     <p className="department">{node.department}</p>
                                 </div>
+                                {hasChildren && (
+                                    <button
+                                        className="btn-expand"
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent card click if we add one later
+                                            toggleNode(key);
+                                        }}
+                                        title={isExpanded ? "Recolher" : "Expandir"}
+                                    >
+                                        <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                    </button>
+                                )}
                             </div>
-                            {node.children && node.children.length > 0 && renderTree(node.children)}
+                            {hasChildren && isExpanded && renderTree(node.children)}
                         </li>
                     );
                 })}
@@ -66,20 +114,34 @@ const OrganogramPage = () => {
         <div className="organogram-page">
             <div className="header-container">
                 <h2><i className="fas fa-sitemap"></i> Organograma</h2>
-                <div className="search-box">
-                    <input
-                        type="text"
-                        placeholder="Buscar colaborador..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="form-control glass-input"
-                    />
+                <div className="controls">
+                    <div className="zoom-controls">
+                        <button onClick={handleZoomOut} title="Diminuir Zoom"><i className="fas fa-minus"></i></button>
+                        <span className="zoom-level">{Math.round(zoom * 100)}%</span>
+                        <button onClick={handleZoomIn} title="Aumentar Zoom"><i className="fas fa-plus"></i></button>
+                        <button onClick={handleResetZoom} title="Resetar Zoom"><i className="fas fa-redo"></i></button>
+                    </div>
+                    <div className="search-box">
+                        <input
+                            type="text"
+                            placeholder="Buscar colaborador..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="form-control glass-input"
+                        />
+                    </div>
+                    <a href="/login" className="btn-login">Login</a>
                 </div>
-                <a href="/login" className="btn-login">Login</a>
             </div>
 
             <div className="organogram-scroll-container">
-                <div className="org-tree-wrapper">
+                <div
+                    className="org-tree-wrapper"
+                    style={{
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top center'
+                    }}
+                >
                     {renderTree(data)}
                 </div>
             </div>
@@ -91,30 +153,77 @@ const OrganogramPage = () => {
                     min-height: 100vh;
                     color: #333;
                     padding: 20px;
+                    overflow: hidden; /* Prevent body scroll if zoom goes huge */
+                    display: flex;
+                    flex-direction: column;
                 }
                 .header-container {
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    margin-bottom: 30px;
+                    margin-bottom: 20px;
                     background: white;
                     padding: 15px 30px;
                     border-radius: 12px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+                    flex-wrap: wrap;
+                    gap: 15px;
+                    z-index: 10;
+                    position: relative;
                 }
                 .header-container h2 {
                     margin: 0;
                     font-size: 1.5rem;
                     color: #2c3e50;
                 }
+                .controls {
+                    display: flex;
+                    align-items: center;
+                    gap: 15px;
+                    flex-wrap: wrap;
+                }
+
+                .zoom-controls {
+                    display: flex;
+                    align-items: center;
+                    background: #f8f9fa;
+                    border-radius: 20px;
+                    padding: 3px;
+                    border: 1px solid #dee2e6;
+                }
+                .zoom-controls button {
+                    border: none;
+                    background: transparent;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                    color: #6c757d;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .zoom-controls button:hover {
+                    background: #e9ecef;
+                    color: #007bff;
+                }
+                .zoom-level {
+                    font-size: 0.85rem;
+                    color: #495057;
+                    min-width: 45px;
+                    text-align: center;
+                    font-weight: 600;
+                }
+
                 .search-box input {
                     background: #f8f9fa;
                     border: 1px solid #dee2e6;
                     color: #495057;
-                    padding: 10px 20px;
+                    padding: 8px 20px;
                     border-radius: 20px;
                     outline: none;
-                    width: 300px;
+                    width: 250px;
                     transition: border-color 0.3s;
                 }
                 .search-box input:focus {
@@ -124,10 +233,11 @@ const OrganogramPage = () => {
                     color: #007bff;
                     text-decoration: none;
                     border: 1px solid #007bff;
-                    padding: 8px 25px;
+                    padding: 6px 20px;
                     border-radius: 20px;
                     transition: all 0.3s;
                     font-weight: 600;
+                    font-size: 0.9rem;
                 }
                 .btn-login:hover {
                     background: #007bff;
@@ -143,14 +253,15 @@ const OrganogramPage = () => {
                     color: #6c757d;
                 }
 
-                /* Tree CSS - Flexbox approach for better alignment */
+                /* Tree CSS - Flexbox approach */
                 .organogram-scroll-container {
                     overflow: auto;
                     background: white;
                     border-radius: 12px;
                     padding: 40px;
                     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-                    min-height: 80vh;
+                    flex: 1; /* Take remaining height */
+                    position: relative;
                 }
 
                 .org-tree-wrapper {
@@ -158,6 +269,7 @@ const OrganogramPage = () => {
                     justify-content: center;
                     width: fit-content;
                     min-width: 100%;
+                    transition: transform 0.3s ease; /* Smooth zoom */
                 }
 
                 .org-tree-ul {
@@ -179,7 +291,6 @@ const OrganogramPage = () => {
                 }
 
                 /* Connectors */
-                /* Top horizontal line for children */
                 .org-tree-li::before, .org-tree-li::after {
                     content: '';
                     position: absolute; top: 0; right: 50%;
@@ -191,18 +302,15 @@ const OrganogramPage = () => {
                     border-left: 2px solid #ccc;
                 }
 
-                /* Remove connectors for single child or first/last child specific cases */
                 .org-tree-li:only-child::after, .org-tree-li:only-child::before {
                     display: none;
                 }
                 .org-tree-li:only-child{ padding-top: 0;}
 
-                /* Remove outer connectors for first and last elements to create the "T" shape */
                 .org-tree-li:first-child::before, .org-tree-li:last-child::after{
                     border: 0 none;
                 }
 
-                /* Add curved corners */
                 .org-tree-li:last-child::before{
                     border-right: 2px solid #ccc;
                     border-radius: 0 5px 0 0;
@@ -211,17 +319,15 @@ const OrganogramPage = () => {
                     border-radius: 5px 0 0 0;
                 }
 
-                /* Vertical line from parent down to children */
                 .org-tree-ul ul::before{
                     content: '';
                     position: absolute; top: 0; left: 50%;
                     border-left: 2px solid #ccc;
                     width: 0; height: 20px;
-                    transform: translateX(-50%); /* Center strictly */
+                    transform: translateX(-50%);
                 }
 
                 /* HIDE connectors for the very top level roots */
-                /* This prevents the "phantom parent" line for the forest roots */
                 .org-tree-wrapper > .org-tree-ul > .org-tree-li::before,
                 .org-tree-wrapper > .org-tree-ul > .org-tree-li::after {
                     display: none;
@@ -248,7 +354,7 @@ const OrganogramPage = () => {
                     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
                     z-index: 1;
                     position: relative;
-                    margin-bottom: 0; /* Ensure no gap that breaks lines */
+                    margin-bottom: 0;
                 }
                 .org-node:hover {
                     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
@@ -302,6 +408,29 @@ const OrganogramPage = () => {
                     border: 2px solid #ffc107 !important;
                     background: #fff9e6 !important;
                     box-shadow: 0 0 15px rgba(255, 193, 7, 0.5);
+                }
+
+                /* Expand Button */
+                .btn-expand {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 50%;
+                    border: 1px solid #dee2e6;
+                    background: white;
+                    color: #6c757d;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                    cursor: pointer;
+                    margin-top: 10px;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                .btn-expand:hover {
+                    background: #007bff;
+                    color: white;
+                    border-color: #007bff;
                 }
 
                 /* Hover effects on lines */
