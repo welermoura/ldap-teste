@@ -6,9 +6,7 @@ export const buildMatrixLayout = (data) => {
     const rootNode = data[0];
     const levelsMap = extractLevels(rootNode);
 
-    // Configuração do layout (Unidades abstratas, baseadas em proporção A4 Landscape / 16:9)
-    // Largura total útil ~10-11 unidades. Altura útil ~6-7 unidades.
-    const MAX_CARDS_PER_ROW = 6;
+    // Configuração do layout
     const MAX_ROWS_PER_PAGE = 4;
 
     const pages = [];
@@ -18,18 +16,24 @@ export const buildMatrixLayout = (data) => {
         rows: []
     };
 
-    // Iterar pelos níveis (0, 1, 2...)
-    // Ordenar chaves para garantir ordem 0 -> N
+    // Iterar pelos níveis
     const sortedLevels = Array.from(levelsMap.keys()).sort((a, b) => a - b);
+    const lastLevelIndex = sortedLevels.length - 1;
 
-    for (const level of sortedLevels) {
+    for (let i = 0; i < sortedLevels.length; i++) {
+        const level = sortedLevels[i];
         const nodes = levelsMap.get(level);
+        const isLastLevel = (i === lastLevelIndex);
 
-        // Se o nível tem muitos nós, quebrar em múltiplas linhas (wraps)
-        for (let i = 0; i < nodes.length; i += MAX_CARDS_PER_ROW) {
-            const rowNodes = nodes.slice(i, i + MAX_CARDS_PER_ROW);
+        // Lógica de Grid
+        // Níveis intermediários: até 8 por linha (quebra em múltiplas linhas se > 8)
+        // Último nível: Grid de 3 colunas (quebra em linhas de 3)
+        const CARDS_PER_ROW = isLastLevel ? 3 : 8;
 
-            // Verificar se cabe na página atual
+        for (let j = 0; j < nodes.length; j += CARDS_PER_ROW) {
+            const rowNodes = nodes.slice(j, j + CARDS_PER_ROW);
+
+            // Verificar paginação
             if (currentPage.rows.length >= MAX_ROWS_PER_PAGE) {
                 pages.push(currentPage);
                 currentPage = {
@@ -42,12 +46,12 @@ export const buildMatrixLayout = (data) => {
             // Adicionar linha
             currentPage.rows.push({
                 level: level,
-                items: rowNodes
+                items: rowNodes,
+                isLastLevel: isLastLevel // Flag para renderizador saber layout (centralizado vs grid 3-col)
             });
         }
     }
 
-    // Adicionar última página se tiver conteúdo
     if (currentPage.rows.length > 0) {
         pages.push(currentPage);
     }
