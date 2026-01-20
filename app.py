@@ -978,7 +978,6 @@ def ad_tree():
         return "Erro ao carregar a aplicação. Verifique os logs.", 500
 
 @app.route('/ad-tree/assets/<path:filename>')
-@require_auth
 def ad_tree_assets(filename):
     """Serve os assets da aplicação React."""
     return send_from_directory(os.path.join(basedir, 'frontend', 'dist', 'assets'), filename)
