@@ -1,527 +1,200 @@
-import React, { useEffect, useState, useMemo, createContext, useContext, useRef } from 'react';
-import {
-    ZoomIn,
-    ZoomOut,
-    RotateCcw,
-    UserCircle,
-    ChevronDown,
-    Network,
-    AlertTriangle,
-    Loader2,
-    LocateFixed
-} from 'lucide-react';
-import OrganogramSearch from './OrganogramSearch';
-
-// --- Context ---
-const OrganogramContext = createContext({
-    hoveredNodeId: null,
-    setHoveredNodeId: () => {},
-    focusedNodeId: null,
-    setFocusedNodeId: () => {},
-    ancestorIds: new Set(),
-});
-
-// --- Utility Functions ---
-
-const getDepartmentColor = (dept) => {
-    if (!dept) return '#64748b'; // Slate-500 default
-
-    const palette = {
-        'Financeiro': '#059669', // Emerald
-        'Comercial': '#d97706', // Amber
-        'Vendas': '#d97706',
-        'TI': '#2563eb', // Blue
-        'Tecnologia': '#2563eb',
-        'Recursos Humanos': '#db2777', // Pink
-        'RH': '#db2777',
-        'Diretoria': '#0f172a', // Slate-900
-        'Executivo': '#0f172a',
-        'Jurídico': '#7c3aed', // Violet
-        'Marketing': '#ea580c', // Orange
-        'Operações': '#0891b2', // Cyan
-    };
-
-    if (palette[dept]) return palette[dept];
-
-    let hash = 0;
-    for (let i = 0; i < dept.length; i++) {
-        hash = dept.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash % 360);
-    return `hsl(${hue}, 60%, 40%)`;
-};
-
-const getInitials = (name) => {
-    if (!name) return '';
-    const names = name.split(' ');
-    if (names.length >= 2) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
-    return name[0].toUpperCase();
-};
-
-// --- Components ---
-
-const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds } = useContext(OrganogramContext);
-    const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
-
-    const nodeId = node.distinguishedName;
-
-    // States calculation
-    const isHovered = hoveredNodeId === nodeId;
-    const isFocused = focusedNodeId === nodeId;
-    const isDirectSubordinate = hoveredNodeId === parentId && hoveredNodeId !== null;
-    const isAncestor = ancestorIds.has(nodeId);
-
-    // Logic: Dim if someone is focused/hovered, but this node is NOT involved
-    // Involved = Hovered OR Focused OR Direct Subordinate OR Ancestor
-    const isInteracting = hoveredNodeId !== null || focusedNodeId !== null;
-    const isRelevant = isHovered || isFocused || isDirectSubordinate || isAncestor;
-    const isDimmed = isInteracting && !isRelevant;
-
-    const isExecutive = node.title && (
-        node.title.toLowerCase().includes('presidente') ||
-        node.title.toLowerCase().includes('ceo') ||
-        node.title.toLowerCase().includes('diretor')
-    );
-
-    const handleMouseEnter = (e) => {
-        e.stopPropagation();
-        setHoveredNodeId(nodeId);
-    };
-
-    const handleMouseLeave = () => {
-        setHoveredNodeId(null);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            setFocusedNodeId(nodeId);
-            if (hasChildren) toggleNode();
-        }
-    };
-
-    return (
-        <div
-            id={nodeId}
-            className={`
-                org-card
-                ${isMatch ? 'highlight' : ''}
-                ${isExecutive ? 'executive' : ''}
-                ${isHovered ? 'state-active' : ''}
-                ${isFocused ? 'state-focused' : ''}
-                ${isDirectSubordinate ? 'state-subordinate' : ''}
-                ${isAncestor ? 'state-ancestor' : ''}
-                ${isDimmed ? 'state-dimmed' : ''}
-            `}
-            onClick={(e) => {
-                e.stopPropagation();
-                setFocusedNodeId(nodeId);
-                if (hasChildren) toggleNode();
-            }}
-            onKeyDown={handleKeyDown}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            style={{
-                '--dept-color': deptColor,
-            }}
-            role="button"
-            aria-expanded={isExpanded}
-            aria-label={`${node.name}, ${node.title}`}
-            tabIndex={0}
-        >
-            <div className="card-accent"></div>
-
-            <div className="card-body">
-                <div className="card-header">
-                    <div className="avatar" style={{
-                        backgroundColor: isExecutive ? '#0f172a' : `${deptColor}10`,
-                        color: isExecutive ? '#fff' : deptColor
-                    }}>
-                        {getInitials(node.name)}
-                    </div>
-                    <div className="info">
-                        <h6 className="name" title={node.name}>{node.name}</h6>
-                        <p className="role" title={node.title}>{node.title || 'Cargo não definido'}</p>
-                    </div>
-                </div>
-
-                {node.department && (
-                    <div className="card-footer">
-                        <span className="dept-badge" style={{
-                             backgroundColor: `${deptColor}08`,
-                             color: deptColor,
-                             borderColor: `${deptColor}20`
-                        }}>
-                            {node.department}
-                        </span>
-                    </div>
-                )}
-            </div>
-
-            {hasChildren && (
-                <div className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}>
-                    <ChevronDown size={14} className="icon-chevron" />
-                </div>
-            )}
-        </div>
-    );
-};
-
-const OrganogramPage = () => {
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [zoom, setZoom] = useState(1);
-    const [expandedNodes, setExpandedNodes] = useState(new Set());
-    const [expandedGroups, setExpandedGroups] = useState(new Set()); // For "+N others"
-    const [hoveredNodeId, setHoveredNodeId] = useState(null);
-    const [focusedNodeId, setFocusedNodeId] = useState(null);
-    const [ancestorIds, setAncestorIds] = useState(new Set());
-
-    // Drag-to-pan state
-    const canvasRef = useRef(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
-    const [scrollPos, setScrollPos] = useState({ left: 0, top: 0 });
-
-    useEffect(() => {
-        fetch('/api/public/organogram_data')
-            .then(res => {
-                if (!res.ok) throw new Error('Falha ao carregar dados');
-                return res.json();
-            })
-            .then(data => {
-                const validData = Array.isArray(data) ? data : [];
-                setData(validData);
-
-                // Expandir raízes inicialmente
-                const initialExpanded = new Set();
-                validData.forEach((node, index) => {
-                    const key = node.distinguishedName || index;
-                    initialExpanded.add(key);
-                });
-                setExpandedNodes(initialExpanded);
-
-                setLoading(false);
-            })
-            .catch(err => {
-                setError(err.message);
-                setLoading(false);
-            });
-    }, []);
-
-    // Helper: Find Path
-    const findPathToNode = (nodes, targetId, path = []) => {
-        for (const node of nodes) {
-            const currentId = node.distinguishedName;
-            if (currentId === targetId) {
-                return [...path, currentId]; // Include target for full highlighting
-            }
-            if (node.children) {
-                const result = findPathToNode(node.children, targetId, [...path, currentId]);
-                if (result) return result;
-            }
-        }
-        return null;
-    };
-
-    // Update Ancestors on Hover/Focus
-    useEffect(() => {
-        const targetId = hoveredNodeId || focusedNodeId;
-        if (targetId) {
-            const path = findPathToNode(data, targetId);
-            if (path) {
-                setAncestorIds(new Set(path));
-            } else {
-                setAncestorIds(new Set());
-            }
-        } else {
-            setAncestorIds(new Set());
-        }
-    }, [hoveredNodeId, focusedNodeId, data]);
-
-    // Zoom on Wheel
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const handleWheel = (e) => {
-            if (e.ctrlKey || e.metaKey || true) { // Default behavior for canvas zoom
-                e.preventDefault();
-                const delta = -e.deltaY * 0.001;
-                setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 2));
-            }
-        };
-
-        canvas.addEventListener('wheel', handleWheel, { passive: false });
-        return () => canvas.removeEventListener('wheel', handleWheel);
-    }, []);
-
-    // Scroll effect for focused node
-    useEffect(() => {
-        if (focusedNodeId) {
-            setTimeout(() => {
-                const element = document.getElementById(focusedNodeId);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+import{a,j as e,c as he}from"./index-Q695sD3D.js";/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const pe=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),fe=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,s,d)=>d?d.toUpperCase():s.toLowerCase()),G=t=>{const o=fe(t);return o.charAt(0).toUpperCase()+o.slice(1)},K=(...t)=>t.filter((o,s,d)=>!!o&&o.trim()!==""&&d.indexOf(o)===s).join(" ").trim(),ue=t=>{for(const o in t)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */var ge={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const xe=a.forwardRef(({color:t="currentColor",size:o=24,strokeWidth:s=2,absoluteStrokeWidth:d,className:p="",children:f,iconNode:g,...x},y)=>a.createElement("svg",{ref:y,...ge,width:o,height:o,stroke:t,strokeWidth:d?Number(s)*24/Number(o):s,className:K("lucide",p),...!f&&!ue(x)&&{"aria-hidden":"true"},...x},[...g.map(([w,C])=>a.createElement(w,C)),...Array.isArray(f)?f:[f]]));/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const b=(t,o)=>{const s=a.forwardRef(({className:d,...p},f)=>a.createElement(xe,{ref:f,iconNode:o,className:K(`lucide-${pe(G(t))}`,`lucide-${t}`,d),...p}));return s.displayName=G(t),s};/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const me=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],Q=b("chevron-down",me);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const be=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],ve=b("circle-user",be);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ye=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],we=b("loader-circle",ye);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ke=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],Ne=b("locate-fixed",ke);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const je=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],Ce=b("network",je);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const ze=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Ie=b("rotate-ccw",ze);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Se=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Ee=b("search",Se);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Me=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],$e=b("triangle-alert",Me);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Le=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],Ae=b("user",Le);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Re=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],Te=b("x",Re);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const _e=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],De=b("zoom-in",_e);/**
+ * @license lucide-react v0.562.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const Pe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Fe=b("zoom-out",Pe),He=({data:t,onSelect:o})=>{const[s,d]=a.useState(""),[p,f]=a.useState(!1),g=a.useRef(null),x=a.useMemo(()=>{const n=[],h=z=>{z&&z.forEach(c=>{n.push({name:c.name,title:c.title,department:c.department,id:c.distinguishedName,distinguishedName:c.distinguishedName}),c.children&&h(c.children)})};return h(t),n},[t]),y=a.useMemo(()=>{if(!s||s.length<2)return[];const n=s.toLowerCase();return x.filter(h=>h.name&&h.name.toLowerCase().includes(n)).slice(0,8)},[s,x]);a.useEffect(()=>{const n=h=>{g.current&&!g.current.contains(h.target)&&f(!1)};return document.addEventListener("mousedown",n),()=>document.removeEventListener("mousedown",n)},[]);const w=n=>{d(n.name),f(!1),o(n.id)},C=()=>{d(""),f(!1)};return e.jsxs("div",{className:"search-component",ref:g,children:[e.jsxs("div",{className:`search-input-wrapper ${p?"active":""}`,children:[e.jsx(Ee,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:s,onChange:n=>{d(n.target.value),f(!0)},onFocus:()=>f(!0)}),s&&e.jsx("button",{className:"clear-btn",onClick:C,children:e.jsx(Te,{size:14})})]}),p&&y.length>0&&e.jsx("div",{className:"search-dropdown",children:y.map(n=>e.jsxs("div",{className:"search-item",onClick:()=>w(n),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(Ae,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:n.name}),e.jsxs("span",{className:"item-meta",children:[n.title," • ",n.department]})]})]},n.id))}),p&&s.length>=2&&y.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
+                .search-component {
+                    position: relative;
+                    width: 300px;
                 }
-            }, 100);
+                .search-input-wrapper {
+                    display: flex;
+                    align-items: center;
+                    background: #fff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    transition: all 0.2s;
+                    position: relative;
+                }
+                .search-input-wrapper:focus-within {
+                    border-color: #3b82f6;
+                    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+                }
+                .search-icon {
+                    color: #94a3b8;
+                    margin-right: 8px;
+                }
+                .search-input-wrapper input {
+                    border: none;
+                    outline: none;
+                    width: 100%;
+                    font-size: 0.9rem;
+                    color: #0f172a;
+                }
+                .clear-btn {
+                    background: none;
+                    border: none;
+                    color: #94a3b8;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    padding: 4px;
+                }
+                .clear-btn:hover { color: #64748b; }
 
-            const timer = setTimeout(() => {
-                setFocusedNodeId(null);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [focusedNodeId]);
-
-    // Drag handlers
-    const handleMouseDown = (e) => {
-        if (!canvasRef.current) return;
-        setIsDragging(true);
-        setStartPos({ x: e.pageX, y: e.pageY });
-        setScrollPos({
-            left: canvasRef.current.scrollLeft,
-            top: canvasRef.current.scrollTop
-        });
-    };
-
-    const handleMouseMove = (e) => {
-        if (!isDragging || !canvasRef.current) return;
-        e.preventDefault();
-        const x = e.pageX - startPos.x;
-        const y = e.pageY - startPos.y;
-        canvasRef.current.scrollLeft = scrollPos.left - x;
-        canvasRef.current.scrollTop = scrollPos.top - y;
-    };
-
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
-
-    const toggleNode = (key) => {
-        setExpandedNodes(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(key)) {
-                newSet.delete(key);
-            } else {
-                newSet.add(key);
-            }
-            return newSet;
-        });
-    };
-
-    const handleSelectNode = (nodeId) => {
-        const path = findPathToNode(data, nodeId);
-        if (path) {
-            setExpandedNodes(prev => new Set([...prev, ...path]));
-        }
-        setFocusedNodeId(nodeId);
-    };
-
-    const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
-    const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
-    const handleResetZoom = () => setZoom(1);
-
-    const handleCenterFocused = () => {
-        if (focusedNodeId) {
-            const element = document.getElementById(focusedNodeId);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-            }
-        }
-    };
-
-    // Recursively render tree
-    const renderTree = (nodes, parentId = null, parentKey = null) => {
-        if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
-
-        const GROUP_LIMIT = 8;
-        const isGroupExpanded = parentKey && expandedGroups.has(parentKey);
-        const shouldGroup = nodes.length > GROUP_LIMIT && !isGroupExpanded;
-
-        const displayNodes = shouldGroup ? nodes.slice(0, GROUP_LIMIT) : nodes;
-        const remainingCount = nodes.length - GROUP_LIMIT;
-
-        // Determine target for path logic
-        const targetId = hoveredNodeId || focusedNodeId;
-
-        // --- Path Calculation Logic ---
-        // 1. Identify which child is part of the active path (ancestor or target)
-        let activeChildIndex = -1;
-        if (targetId || ancestorIds.size > 0) {
-            activeChildIndex = displayNodes.findIndex(node => {
-                const nid = node.distinguishedName;
-                return (nid === targetId) || (ancestorIds.has(nid));
-            });
-        }
-
-        // 2. Determine Pivot (Center of the group)
-        const pivot = (displayNodes.length - 1) / 2;
-
-        return (
-            <ul className="org-tree">
-                {displayNodes.map((node, index) => {
-                    const key = node.distinguishedName || index;
-                    const hasChildren = node.children && node.children.length > 0;
-                    const isExpanded = expandedNodes.has(key);
-
-                    // --- Connector Logic ---
-                    let isVerticalActive = false;
-                    let isLeftActive = false;
-                    let isRightActive = false;
-
-                    if (activeChildIndex !== -1) {
-                        const A = activeChildIndex;
-                        const P = pivot;
-
-                        // Vertical stem is active if this is the specific active child
-                        if (index === A) {
-                            isVerticalActive = true;
-                        }
-
-                        // Determine horizontal segments based on direction to center
-                        if (A < P) {
-                            // Path goes RIGHT from A to Center
-                            // Left Arm Active?
-                            if (index > A && index <= Math.floor(P)) isLeftActive = true;
-                            // Right Arm Active?
-                            if (index >= A && index < Math.ceil(P)) isRightActive = true;
-                        } else if (A > P) {
-                            // Path goes LEFT from A to Center
-                            // Left Arm Active?
-                            if (index > Math.floor(P) && index <= A) isLeftActive = true;
-                            // Right Arm Active?
-                            if (index >= Math.ceil(P) && index < A) isRightActive = true;
-                        } else {
-                            // A === P. We are at center. No horizontal movement needed.
-                        }
-                    }
-
-                    // Downward Connection (Pass-through ancestor)
-                    const isPassThrough = ancestorIds.has(key) && key !== targetId;
-
-                    return (
-                        <li key={key} className={`
+                .search-dropdown {
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    right: 0;
+                    margin-top: 8px;
+                    background: #fff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+                    max-height: 300px;
+                    overflow-y: auto;
+                    z-index: 100;
+                    padding: 4px;
+                }
+                .search-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 8px 12px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: background 0.15s;
+                }
+                .search-item:hover {
+                    background: #f1f5f9;
+                }
+                .item-avatar {
+                    width: 32px;
+                    height: 32px;
+                    background: #e2e8f0;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #64748b;
+                }
+                .item-info {
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .item-name {
+                    font-weight: 500;
+                    font-size: 0.9rem;
+                    color: #0f172a;
+                }
+                .item-meta {
+                    font-size: 0.75rem;
+                    color: #64748b;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .search-dropdown.empty {
+                    padding: 16px;
+                    text-align: center;
+                    color: #94a3b8;
+                    font-size: 0.9rem;
+                }
+            `})]})},J=a.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set}),Oe=t=>{if(!t)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[t])return o[t];let s=0;for(let p=0;p<t.length;p++)s=t.charCodeAt(p)+((s<<5)-s);return`hsl(${Math.abs(s%360)}, 60%, 40%)`},Ue=t=>{if(!t)return"";const o=t.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Ve=({node:t,isExpanded:o,toggleNode:s,hasChildren:d,isMatch:p,parentId:f})=>{const{hoveredNodeId:g,setHoveredNodeId:x,focusedNodeId:y,setFocusedNodeId:w,ancestorIds:C}=a.useContext(J),n=a.useMemo(()=>Oe(t.department),[t.department]),h=t.distinguishedName,z=g===h,c=y===h,$=g===f&&g!==null,I=C.has(h),T=(g!==null||y!==null)&&!(z||c||$||I),L=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),_=N=>{N.stopPropagation(),x(h)},P=()=>{x(null)},D=N=>{(N.key==="Enter"||N.key===" ")&&(N.preventDefault(),w(h),d&&s())};return e.jsxs("div",{id:h,className:`
+                org-card
+                ${p?"highlight":""}
+                ${L?"executive":""}
+                ${z?"state-active":""}
+                ${c?"state-focused":""}
+                ${$?"state-subordinate":""}
+                ${I?"state-ancestor":""}
+                ${T?"state-dimmed":""}
+            `,onClick:N=>{N.stopPropagation(),w(h),d&&s()},onKeyDown:D,onMouseEnter:_,onMouseLeave:P,style:{"--dept-color":n},role:"button","aria-expanded":o,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:L?"#0f172a":`${n}10`,color:L?"#fff":n},children:Ue(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${n}08`,color:n,borderColor:`${n}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(Q,{size:14,className:"icon-chevron"})})]})},Be=()=>{const[t,o]=a.useState([]),[s,d]=a.useState(!0),[p,f]=a.useState(null),[g,x]=a.useState(1),[y,w]=a.useState(new Set),[C,n]=a.useState(new Set),[h,z]=a.useState(null),[c,$]=a.useState(null),[I,R]=a.useState(new Set),k=a.useRef(null),[T,L]=a.useState(!1),[_,P]=a.useState({x:0,y:0}),[D,N]=a.useState({left:0,top:0});a.useEffect(()=>{fetch("/api/public/organogram_data").then(r=>{if(!r.ok)throw new Error("Falha ao carregar dados");return r.json()}).then(r=>{const l=Array.isArray(r)?r:[];o(l);const i=new Set;l.forEach((v,j)=>{const S=v.distinguishedName||j;i.add(S)}),w(i),d(!1)}).catch(r=>{f(r.message),d(!1)})},[]);const F=(r,l,i=[])=>{for(const v of r){const j=v.distinguishedName;if(j===l)return[...i,j];if(v.children){const S=F(v.children,l,[...i,j]);if(S)return S}}return null};a.useEffect(()=>{const r=h||c;if(r){const l=F(t,r);R(l?new Set(l):new Set)}else R(new Set)},[h,c,t]),a.useEffect(()=>{const r=k.current;if(!r)return;const l=i=>{i.ctrlKey||i.metaKey;{i.preventDefault();const v=-i.deltaY*.001;x(j=>Math.min(Math.max(j+v,.4),2))}};return r.addEventListener("wheel",l,{passive:!1}),()=>r.removeEventListener("wheel",l)},[]),a.useEffect(()=>{if(c){setTimeout(()=>{const l=document.getElementById(c);l&&l.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const r=setTimeout(()=>{$(null)},3e3);return()=>clearTimeout(r)}},[c]);const ee=r=>{k.current&&(L(!0),P({x:r.pageX,y:r.pageY}),N({left:k.current.scrollLeft,top:k.current.scrollTop}))},te=r=>{if(!T||!k.current)return;r.preventDefault();const l=r.pageX-_.x,i=r.pageY-_.y;k.current.scrollLeft=D.left-l,k.current.scrollTop=D.top-i},Z=()=>{L(!1)},re=r=>{w(l=>{const i=new Set(l);return i.has(r)?i.delete(r):i.add(r),i})},oe=r=>{const l=F(t,r);l&&w(i=>new Set([...i,...l])),$(r)},ae=()=>x(r=>Math.min(r+.1,2)),ne=()=>x(r=>Math.max(r-.1,.4)),se=()=>x(1),ie=()=>{if(c){const r=document.getElementById(c);r&&r.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},X=(r,l=null,i=null)=>{if(!r||!Array.isArray(r)||r.length===0)return null;const v=8,j=i&&C.has(i),S=r.length>v&&!j,H=S?r.slice(0,v):r,le=r.length-v,O=h||c;let U=-1;(O||I.size>0)&&(U=H.findIndex(m=>{const u=m.distinguishedName;return u===O||I.has(u)}));const ce=(H.length-1)/2;return e.jsxs("ul",{className:"org-tree",children:[H.map((m,u)=>{const E=m.distinguishedName||u,W=m.children&&m.children.length>0,Y=y.has(E);let q=!1,V=!1,B=!1;if(U!==-1){const M=U,A=ce;u===M&&(q=!0),M<A?(u>M&&u<=Math.floor(A)&&(V=!0),u>=M&&u<Math.ceil(A)&&(B=!0)):M>A&&(u>Math.floor(A)&&u<=M&&(V=!0),u>=Math.ceil(A)&&u<M&&(B=!0))}const de=I.has(E)&&E!==O;return e.jsxs("li",{className:`
                             org-leaf
-                            ${isLeftActive ? 'conn-l' : ''}
-                            ${isRightActive ? 'conn-r' : ''}
-                            ${isVerticalActive ? 'conn-v' : ''}
-                            ${isPassThrough ? 'conn-descendant' : ''}
-                        `}>
-                            {/* Dedicated Vertical Connector */}
-                            <div className="connector-vertical"></div>
-
-                            <NodeCard
-                                node={node}
-                                isExpanded={isExpanded}
-                                toggleNode={() => toggleNode(key)}
-                                hasChildren={hasChildren}
-                                isMatch={false}
-                                parentId={parentId}
-                            />
-                            {hasChildren && isExpanded && renderTree(node.children, key, key)}
-                        </li>
-                    );
-                })}
-
-                {shouldGroup && (
-                    <li className="org-leaf">
-                         <div className="connector-vertical"></div>
-                         <div
-                            className="org-card group-node"
-                            onClick={() => setExpandedGroups(prev => new Set([...prev, parentKey]))}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setExpandedGroups(prev => new Set([...prev, parentKey]));
-                                }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            title="Expandir todos"
-                         >
-                            <div className="card-body" style={{ alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                    +{remainingCount} Colaboradores
-                                </span>
-                                <ChevronDown size={16} color="var(--text-secondary)" />
-                            </div>
-                         </div>
-                    </li>
-                )}
-            </ul>
-        );
-    };
-
-    if (loading) return (
-        <div className="loading-container">
-            <Loader2 className="spinner" size={40} />
-            <p>Carregando estrutura...</p>
-        </div>
-    );
-
-    if (error) return (
-        <div className="error-container">
-            <AlertTriangle size={48} className="text-red-500" />
-            <p>Erro ao carregar: {error}</p>
-        </div>
-    );
-
-    return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds }}>
-            <div className="organogram-page">
-                <header className="page-header">
-                    <div className="brand">
-                        <div className="brand-icon">
-                            <Network size={20} />
-                        </div>
-                        <div className="brand-text">
-                            <h2>Organograma</h2>
-                            <span>Corporativo</span>
-                        </div>
-                    </div>
-
-                    <div className="actions">
-                        <OrganogramSearch data={data} onSelect={handleSelectNode} />
-
-                        <div className="zoom-controls">
-                            <button onClick={handleCenterFocused} disabled={!focusedNodeId} title="Centralizar Seleção" style={{ opacity: focusedNodeId ? 1 : 0.4 }}>
-                                <LocateFixed size={16} />
-                            </button>
-                            <div className="separator"></div>
-                            <button onClick={handleZoomOut} title="Reduzir Zoom"><ZoomOut size={16} /></button>
-                            <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-                            <button onClick={handleZoomIn} title="Aumentar Zoom"><ZoomIn size={16} /></button>
-                            <div className="separator"></div>
-                            <button onClick={handleResetZoom} title="Resetar"><RotateCcw size={14} /></button>
-                        </div>
-
-                        <a href="/login" className="btn-login">
-                            <UserCircle size={18} /> Login
-                        </a>
-                    </div>
-                </header>
-
-                <main
-                    className={`canvas ${isDragging ? 'grabbing' : ''}`}
-                    ref={canvasRef}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
-                >
-                    <div
-                        className="tree-wrapper"
-                        style={{
-                            transform: `scale(${zoom})`,
-                        }}
-                    >
-                        {renderTree(data)}
-                    </div>
-                </main>
-
-                <style>{`
+                            ${V?"conn-l":""}
+                            ${B?"conn-r":""}
+                            ${q?"conn-v":""}
+                            ${de?"conn-descendant":""}
+                        `,children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(Ve,{node:m,isExpanded:Y,toggleNode:()=>re(E),hasChildren:W,isMatch:!1,parentId:l}),W&&Y&&X(m.children,E,E)]},E)}),S&&e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx("div",{className:"org-card group-node",onClick:()=>n(m=>new Set([...m,i])),onKeyDown:m=>{(m.key==="Enter"||m.key===" ")&&(m.preventDefault(),n(u=>new Set([...u,i])))},role:"button",tabIndex:0,title:"Expandir todos",children:e.jsxs("div",{className:"card-body",style:{alignItems:"center",justifyContent:"center",padding:"12px"},children:[e.jsxs("span",{style:{fontWeight:600,color:"var(--text-secondary)"},children:["+",le," Colaboradores"]}),e.jsx(Q,{size:16,color:"var(--text-secondary)"})]})})]})]})};return s?e.jsxs("div",{className:"loading-container",children:[e.jsx(we,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):p?e.jsxs("div",{className:"error-container",children:[e.jsx($e,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",p]})]}):e.jsx(J.Provider,{value:{hoveredNodeId:h,setHoveredNodeId:z,focusedNodeId:c,setFocusedNodeId:$,ancestorIds:I},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(Ce,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(He,{data:t,onSelect:oe}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:ie,disabled:!c,title:"Centralizar Seleção",style:{opacity:c?1:.4},children:e.jsx(Ne,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ne,title:"Reduzir Zoom",children:e.jsx(Fe,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(g*100),"%"]}),e.jsx("button",{onClick:ae,title:"Aumentar Zoom",children:e.jsx(De,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:se,title:"Resetar",children:e.jsx(Ie,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(ve,{size:18})," Login"]})]})]}),e.jsx("main",{className:`canvas ${T?"grabbing":""}`,ref:k,onMouseDown:ee,onMouseMove:te,onMouseUp:Z,onMouseLeave:Z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${g})`},children:X(t)})}),e.jsx("style",{children:`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -1082,10 +755,4 @@ const OrganogramPage = () => {
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
 
-                `}</style>
-            </div>
-        </OrganogramContext.Provider>
-    );
-};
-
-export default OrganogramPage;
+                `})]})})};he.createRoot(document.getElementById("root")).render(e.jsx(a.StrictMode,{children:e.jsx(Be,{})}));
