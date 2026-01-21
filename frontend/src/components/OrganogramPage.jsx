@@ -359,8 +359,11 @@ const OrganogramPage = () => {
         // 2. Determine Pivot (Center of the group)
         const pivot = (displayNodes.length - 1) / 2;
 
+        // If an active path exists within this group, the line to the parent must be active
+        const isGroupActive = activeChildIndex !== -1;
+
         return (
-            <ul className="org-tree">
+            <ul className={`org-tree ${isGroupActive ? 'group-active' : ''}`}>
                 {displayNodes.map((node, index) => {
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
@@ -873,8 +876,15 @@ const OrganogramPage = () => {
                         z-index: 1;
                     }
 
-                    /* Descendant (Downward from ancestor) Highlight */
+                    /* Descendant (Downward from ancestor) Highlight - LEGACY (Backup) */
                     .org-leaf.conn-descendant > ul::before {
+                        background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
+                        z-index: 1;
+                    }
+
+                    /* Group Active Highlight (New Logic - Up to Parent) */
+                    .org-tree.group-active::before {
                         background-color: var(--line-active);
                         animation: pulse-line 2s infinite ease-in-out;
                         z-index: 1;

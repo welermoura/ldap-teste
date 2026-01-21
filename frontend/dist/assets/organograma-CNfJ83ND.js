@@ -1,84 +1,84 @@
-import{a,j as e,c as he}from"./index-Q695sD3D.js";/**
+import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const pe=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),fe=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,s,d)=>d?d.toUpperCase():s.toLowerCase()),G=t=>{const o=fe(t);return o.charAt(0).toUpperCase()+o.slice(1)},K=(...t)=>t.filter((o,s,d)=>!!o&&o.trim()!==""&&d.indexOf(o)===s).join(" ").trim(),ue=t=>{for(const o in t)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
+ */const fe=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),ue=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,i,d)=>d?d.toUpperCase():i.toLowerCase()),q=t=>{const o=ue(t);return o.charAt(0).toUpperCase()+o.slice(1)},K=(...t)=>t.filter((o,i,d)=>!!o&&o.trim()!==""&&d.indexOf(o)===i).join(" ").trim(),ge=t=>{for(const o in t)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */var ge={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
+ */var xe={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const xe=a.forwardRef(({color:t="currentColor",size:o=24,strokeWidth:s=2,absoluteStrokeWidth:d,className:p="",children:f,iconNode:g,...x},y)=>a.createElement("svg",{ref:y,...ge,width:o,height:o,stroke:t,strokeWidth:d?Number(s)*24/Number(o):s,className:K("lucide",p),...!f&&!ue(x)&&{"aria-hidden":"true"},...x},[...g.map(([w,C])=>a.createElement(w,C)),...Array.isArray(f)?f:[f]]));/**
+ */const me=a.forwardRef(({color:t="currentColor",size:o=24,strokeWidth:i=2,absoluteStrokeWidth:d,className:p="",children:f,iconNode:g,...x},y)=>a.createElement("svg",{ref:y,...xe,width:o,height:o,stroke:t,strokeWidth:d?Number(i)*24/Number(o):i,className:K("lucide",p),...!f&&!ge(x)&&{"aria-hidden":"true"},...x},[...g.map(([w,C])=>a.createElement(w,C)),...Array.isArray(f)?f:[f]]));/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const b=(t,o)=>{const s=a.forwardRef(({className:d,...p},f)=>a.createElement(xe,{ref:f,iconNode:o,className:K(`lucide-${pe(G(t))}`,`lucide-${t}`,d),...p}));return s.displayName=G(t),s};/**
+ */const b=(t,o)=>{const i=a.forwardRef(({className:d,...p},f)=>a.createElement(me,{ref:f,iconNode:o,className:K(`lucide-${fe(q(t))}`,`lucide-${t}`,d),...p}));return i.displayName=q(t),i};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const me=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],Q=b("chevron-down",me);/**
+ */const be=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],Q=b("chevron-down",be);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const be=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],ve=b("circle-user",be);/**
+ */const ve=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],ye=b("circle-user",ve);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ye=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],we=b("loader-circle",ye);/**
+ */const we=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],ke=b("loader-circle",we);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ke=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],Ne=b("locate-fixed",ke);/**
+ */const Ne=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],je=b("locate-fixed",Ne);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const je=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],Ce=b("network",je);/**
+ */const Ce=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],ze=b("network",Ce);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ze=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Ie=b("rotate-ccw",ze);/**
+ */const Ie=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Se=b("rotate-ccw",Ie);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Se=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Ee=b("search",Se);/**
+ */const Ee=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Me=b("search",Ee);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Me=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],$e=b("triangle-alert",Me);/**
+ */const Le=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],$e=b("triangle-alert",Le);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Le=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],Ae=b("user",Le);/**
+ */const Ae=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],Re=b("user",Ae);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Re=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],Te=b("x",Re);/**
+ */const Te=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],_e=b("x",Te);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const _e=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],De=b("zoom-in",_e);/**
+ */const Pe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],De=b("zoom-in",Pe);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Pe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Fe=b("zoom-out",Pe),He=({data:t,onSelect:o})=>{const[s,d]=a.useState(""),[p,f]=a.useState(!1),g=a.useRef(null),x=a.useMemo(()=>{const n=[],h=z=>{z&&z.forEach(c=>{n.push({name:c.name,title:c.title,department:c.department,id:c.distinguishedName,distinguishedName:c.distinguishedName}),c.children&&h(c.children)})};return h(t),n},[t]),y=a.useMemo(()=>{if(!s||s.length<2)return[];const n=s.toLowerCase();return x.filter(h=>h.name&&h.name.toLowerCase().includes(n)).slice(0,8)},[s,x]);a.useEffect(()=>{const n=h=>{g.current&&!g.current.contains(h.target)&&f(!1)};return document.addEventListener("mousedown",n),()=>document.removeEventListener("mousedown",n)},[]);const w=n=>{d(n.name),f(!1),o(n.id)},C=()=>{d(""),f(!1)};return e.jsxs("div",{className:"search-component",ref:g,children:[e.jsxs("div",{className:`search-input-wrapper ${p?"active":""}`,children:[e.jsx(Ee,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:s,onChange:n=>{d(n.target.value),f(!0)},onFocus:()=>f(!0)}),s&&e.jsx("button",{className:"clear-btn",onClick:C,children:e.jsx(Te,{size:14})})]}),p&&y.length>0&&e.jsx("div",{className:"search-dropdown",children:y.map(n=>e.jsxs("div",{className:"search-item",onClick:()=>w(n),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(Ae,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:n.name}),e.jsxs("span",{className:"item-meta",children:[n.title," • ",n.department]})]})]},n.id))}),p&&s.length>=2&&y.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
+ */const He=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Fe=b("zoom-out",He),Oe=({data:t,onSelect:o})=>{const[i,d]=a.useState(""),[p,f]=a.useState(!1),g=a.useRef(null),x=a.useMemo(()=>{const n=[],h=z=>{z&&z.forEach(c=>{n.push({name:c.name,title:c.title,department:c.department,id:c.distinguishedName,distinguishedName:c.distinguishedName}),c.children&&h(c.children)})};return h(t),n},[t]),y=a.useMemo(()=>{if(!i||i.length<2)return[];const n=i.toLowerCase();return x.filter(h=>h.name&&h.name.toLowerCase().includes(n)).slice(0,8)},[i,x]);a.useEffect(()=>{const n=h=>{g.current&&!g.current.contains(h.target)&&f(!1)};return document.addEventListener("mousedown",n),()=>document.removeEventListener("mousedown",n)},[]);const w=n=>{d(n.name),f(!1),o(n.id)},C=()=>{d(""),f(!1)};return e.jsxs("div",{className:"search-component",ref:g,children:[e.jsxs("div",{className:`search-input-wrapper ${p?"active":""}`,children:[e.jsx(Me,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:i,onChange:n=>{d(n.target.value),f(!0)},onFocus:()=>f(!0)}),i&&e.jsx("button",{className:"clear-btn",onClick:C,children:e.jsx(_e,{size:14})})]}),p&&y.length>0&&e.jsx("div",{className:"search-dropdown",children:y.map(n=>e.jsxs("div",{className:"search-item",onClick:()=>w(n),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(Re,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:n.name}),e.jsxs("span",{className:"item-meta",children:[n.title," • ",n.department]})]})]},n.id))}),p&&i.length>=2&&y.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
                 .search-component {
                     position: relative;
                     width: 300px;
@@ -179,22 +179,22 @@ import{a,j as e,c as he}from"./index-Q695sD3D.js";/**
                     color: #94a3b8;
                     font-size: 0.9rem;
                 }
-            `})]})},J=a.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set}),Oe=t=>{if(!t)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[t])return o[t];let s=0;for(let p=0;p<t.length;p++)s=t.charCodeAt(p)+((s<<5)-s);return`hsl(${Math.abs(s%360)}, 60%, 40%)`},Ue=t=>{if(!t)return"";const o=t.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Ve=({node:t,isExpanded:o,toggleNode:s,hasChildren:d,isMatch:p,parentId:f})=>{const{hoveredNodeId:g,setHoveredNodeId:x,focusedNodeId:y,setFocusedNodeId:w,ancestorIds:C}=a.useContext(J),n=a.useMemo(()=>Oe(t.department),[t.department]),h=t.distinguishedName,z=g===h,c=y===h,$=g===f&&g!==null,I=C.has(h),T=(g!==null||y!==null)&&!(z||c||$||I),L=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),_=N=>{N.stopPropagation(),x(h)},P=()=>{x(null)},D=N=>{(N.key==="Enter"||N.key===" ")&&(N.preventDefault(),w(h),d&&s())};return e.jsxs("div",{id:h,className:`
+            `})]})},J=a.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set}),Ue=t=>{if(!t)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[t])return o[t];let i=0;for(let p=0;p<t.length;p++)i=t.charCodeAt(p)+((i<<5)-i);return`hsl(${Math.abs(i%360)}, 60%, 40%)`},Be=t=>{if(!t)return"";const o=t.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Ve=({node:t,isExpanded:o,toggleNode:i,hasChildren:d,isMatch:p,parentId:f})=>{const{hoveredNodeId:g,setHoveredNodeId:x,focusedNodeId:y,setFocusedNodeId:w,ancestorIds:C}=a.useContext(J),n=a.useMemo(()=>Ue(t.department),[t.department]),h=t.distinguishedName,z=g===h,c=y===h,L=g===f&&g!==null,I=C.has(h),T=(g!==null||y!==null)&&!(z||c||L||I),$=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),_=N=>{N.stopPropagation(),x(h)},H=()=>{x(null)},P=N=>{(N.key==="Enter"||N.key===" ")&&(N.preventDefault(),w(h),d&&i())};return e.jsxs("div",{id:h,className:`
                 org-card
                 ${p?"highlight":""}
-                ${L?"executive":""}
+                ${$?"executive":""}
                 ${z?"state-active":""}
                 ${c?"state-focused":""}
-                ${$?"state-subordinate":""}
+                ${L?"state-subordinate":""}
                 ${I?"state-ancestor":""}
                 ${T?"state-dimmed":""}
-            `,onClick:N=>{N.stopPropagation(),w(h),d&&s()},onKeyDown:D,onMouseEnter:_,onMouseLeave:P,style:{"--dept-color":n},role:"button","aria-expanded":o,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:L?"#0f172a":`${n}10`,color:L?"#fff":n},children:Ue(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${n}08`,color:n,borderColor:`${n}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(Q,{size:14,className:"icon-chevron"})})]})},Be=()=>{const[t,o]=a.useState([]),[s,d]=a.useState(!0),[p,f]=a.useState(null),[g,x]=a.useState(1),[y,w]=a.useState(new Set),[C,n]=a.useState(new Set),[h,z]=a.useState(null),[c,$]=a.useState(null),[I,R]=a.useState(new Set),k=a.useRef(null),[T,L]=a.useState(!1),[_,P]=a.useState({x:0,y:0}),[D,N]=a.useState({left:0,top:0});a.useEffect(()=>{fetch("/api/public/organogram_data").then(r=>{if(!r.ok)throw new Error("Falha ao carregar dados");return r.json()}).then(r=>{const l=Array.isArray(r)?r:[];o(l);const i=new Set;l.forEach((v,j)=>{const S=v.distinguishedName||j;i.add(S)}),w(i),d(!1)}).catch(r=>{f(r.message),d(!1)})},[]);const F=(r,l,i=[])=>{for(const v of r){const j=v.distinguishedName;if(j===l)return[...i,j];if(v.children){const S=F(v.children,l,[...i,j]);if(S)return S}}return null};a.useEffect(()=>{const r=h||c;if(r){const l=F(t,r);R(l?new Set(l):new Set)}else R(new Set)},[h,c,t]),a.useEffect(()=>{const r=k.current;if(!r)return;const l=i=>{i.ctrlKey||i.metaKey;{i.preventDefault();const v=-i.deltaY*.001;x(j=>Math.min(Math.max(j+v,.4),2))}};return r.addEventListener("wheel",l,{passive:!1}),()=>r.removeEventListener("wheel",l)},[]),a.useEffect(()=>{if(c){setTimeout(()=>{const l=document.getElementById(c);l&&l.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const r=setTimeout(()=>{$(null)},3e3);return()=>clearTimeout(r)}},[c]);const ee=r=>{k.current&&(L(!0),P({x:r.pageX,y:r.pageY}),N({left:k.current.scrollLeft,top:k.current.scrollTop}))},te=r=>{if(!T||!k.current)return;r.preventDefault();const l=r.pageX-_.x,i=r.pageY-_.y;k.current.scrollLeft=D.left-l,k.current.scrollTop=D.top-i},Z=()=>{L(!1)},re=r=>{w(l=>{const i=new Set(l);return i.has(r)?i.delete(r):i.add(r),i})},oe=r=>{const l=F(t,r);l&&w(i=>new Set([...i,...l])),$(r)},ae=()=>x(r=>Math.min(r+.1,2)),ne=()=>x(r=>Math.max(r-.1,.4)),se=()=>x(1),ie=()=>{if(c){const r=document.getElementById(c);r&&r.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},X=(r,l=null,i=null)=>{if(!r||!Array.isArray(r)||r.length===0)return null;const v=8,j=i&&C.has(i),S=r.length>v&&!j,H=S?r.slice(0,v):r,le=r.length-v,O=h||c;let U=-1;(O||I.size>0)&&(U=H.findIndex(m=>{const u=m.distinguishedName;return u===O||I.has(u)}));const ce=(H.length-1)/2;return e.jsxs("ul",{className:"org-tree",children:[H.map((m,u)=>{const E=m.distinguishedName||u,W=m.children&&m.children.length>0,Y=y.has(E);let q=!1,V=!1,B=!1;if(U!==-1){const M=U,A=ce;u===M&&(q=!0),M<A?(u>M&&u<=Math.floor(A)&&(V=!0),u>=M&&u<Math.ceil(A)&&(B=!0)):M>A&&(u>Math.floor(A)&&u<=M&&(V=!0),u>=Math.ceil(A)&&u<M&&(B=!0))}const de=I.has(E)&&E!==O;return e.jsxs("li",{className:`
+            `,onClick:N=>{N.stopPropagation(),w(h),d&&i()},onKeyDown:P,onMouseEnter:_,onMouseLeave:H,style:{"--dept-color":n},role:"button","aria-expanded":o,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:$?"#0f172a":`${n}10`,color:$?"#fff":n},children:Be(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${n}08`,color:n,borderColor:`${n}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(Q,{size:14,className:"icon-chevron"})})]})},Ze=()=>{const[t,o]=a.useState([]),[i,d]=a.useState(!0),[p,f]=a.useState(null),[g,x]=a.useState(1),[y,w]=a.useState(new Set),[C,n]=a.useState(new Set),[h,z]=a.useState(null),[c,L]=a.useState(null),[I,R]=a.useState(new Set),k=a.useRef(null),[T,$]=a.useState(!1),[_,H]=a.useState({x:0,y:0}),[P,N]=a.useState({left:0,top:0});a.useEffect(()=>{fetch("/api/public/organogram_data").then(r=>{if(!r.ok)throw new Error("Falha ao carregar dados");return r.json()}).then(r=>{const l=Array.isArray(r)?r:[];o(l);const s=new Set;l.forEach((v,j)=>{const S=v.distinguishedName||j;s.add(S)}),w(s),d(!1)}).catch(r=>{f(r.message),d(!1)})},[]);const F=(r,l,s=[])=>{for(const v of r){const j=v.distinguishedName;if(j===l)return[...s,j];if(v.children){const S=F(v.children,l,[...s,j]);if(S)return S}}return null};a.useEffect(()=>{const r=h||c;if(r){const l=F(t,r);R(l?new Set(l):new Set)}else R(new Set)},[h,c,t]),a.useEffect(()=>{const r=k.current;if(!r)return;const l=s=>{s.ctrlKey||s.metaKey;{s.preventDefault();const v=-s.deltaY*.001;x(j=>Math.min(Math.max(j+v,.4),2))}};return r.addEventListener("wheel",l,{passive:!1}),()=>r.removeEventListener("wheel",l)},[]),a.useEffect(()=>{if(c){setTimeout(()=>{const l=document.getElementById(c);l&&l.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const r=setTimeout(()=>{L(null)},3e3);return()=>clearTimeout(r)}},[c]);const ee=r=>{k.current&&($(!0),H({x:r.pageX,y:r.pageY}),N({left:k.current.scrollLeft,top:k.current.scrollTop}))},te=r=>{if(!T||!k.current)return;r.preventDefault();const l=r.pageX-_.x,s=r.pageY-_.y;k.current.scrollLeft=P.left-l,k.current.scrollTop=P.top-s},Z=()=>{$(!1)},re=r=>{w(l=>{const s=new Set(l);return s.has(r)?s.delete(r):s.add(r),s})},oe=r=>{const l=F(t,r);l&&w(s=>new Set([...s,...l])),L(r)},ae=()=>x(r=>Math.min(r+.1,2)),ne=()=>x(r=>Math.max(r-.1,.4)),ie=()=>x(1),se=()=>{if(c){const r=document.getElementById(c);r&&r.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},G=(r,l=null,s=null)=>{if(!r||!Array.isArray(r)||r.length===0)return null;const v=8,j=s&&C.has(s),S=r.length>v&&!j,O=S?r.slice(0,v):r,le=r.length-v,U=h||c;let D=-1;(U||I.size>0)&&(D=O.findIndex(m=>{const u=m.distinguishedName;return u===U||I.has(u)}));const ce=(O.length-1)/2,de=D!==-1;return e.jsxs("ul",{className:`org-tree ${de?"group-active":""}`,children:[O.map((m,u)=>{const E=m.distinguishedName||u,X=m.children&&m.children.length>0,Y=y.has(E);let W=!1,B=!1,V=!1;if(D!==-1){const M=D,A=ce;u===M&&(W=!0),M<A?(u>M&&u<=Math.floor(A)&&(B=!0),u>=M&&u<Math.ceil(A)&&(V=!0)):M>A&&(u>Math.floor(A)&&u<=M&&(B=!0),u>=Math.ceil(A)&&u<M&&(V=!0))}const he=I.has(E)&&E!==U;return e.jsxs("li",{className:`
                             org-leaf
-                            ${V?"conn-l":""}
-                            ${B?"conn-r":""}
-                            ${q?"conn-v":""}
-                            ${de?"conn-descendant":""}
-                        `,children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(Ve,{node:m,isExpanded:Y,toggleNode:()=>re(E),hasChildren:W,isMatch:!1,parentId:l}),W&&Y&&X(m.children,E,E)]},E)}),S&&e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx("div",{className:"org-card group-node",onClick:()=>n(m=>new Set([...m,i])),onKeyDown:m=>{(m.key==="Enter"||m.key===" ")&&(m.preventDefault(),n(u=>new Set([...u,i])))},role:"button",tabIndex:0,title:"Expandir todos",children:e.jsxs("div",{className:"card-body",style:{alignItems:"center",justifyContent:"center",padding:"12px"},children:[e.jsxs("span",{style:{fontWeight:600,color:"var(--text-secondary)"},children:["+",le," Colaboradores"]}),e.jsx(Q,{size:16,color:"var(--text-secondary)"})]})})]})]})};return s?e.jsxs("div",{className:"loading-container",children:[e.jsx(we,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):p?e.jsxs("div",{className:"error-container",children:[e.jsx($e,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",p]})]}):e.jsx(J.Provider,{value:{hoveredNodeId:h,setHoveredNodeId:z,focusedNodeId:c,setFocusedNodeId:$,ancestorIds:I},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(Ce,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(He,{data:t,onSelect:oe}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:ie,disabled:!c,title:"Centralizar Seleção",style:{opacity:c?1:.4},children:e.jsx(Ne,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ne,title:"Reduzir Zoom",children:e.jsx(Fe,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(g*100),"%"]}),e.jsx("button",{onClick:ae,title:"Aumentar Zoom",children:e.jsx(De,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:se,title:"Resetar",children:e.jsx(Ie,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(ve,{size:18})," Login"]})]})]}),e.jsx("main",{className:`canvas ${T?"grabbing":""}`,ref:k,onMouseDown:ee,onMouseMove:te,onMouseUp:Z,onMouseLeave:Z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${g})`},children:X(t)})}),e.jsx("style",{children:`
+                            ${B?"conn-l":""}
+                            ${V?"conn-r":""}
+                            ${W?"conn-v":""}
+                            ${he?"conn-descendant":""}
+                        `,children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(Ve,{node:m,isExpanded:Y,toggleNode:()=>re(E),hasChildren:X,isMatch:!1,parentId:l}),X&&Y&&G(m.children,E,E)]},E)}),S&&e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx("div",{className:"org-card group-node",onClick:()=>n(m=>new Set([...m,s])),onKeyDown:m=>{(m.key==="Enter"||m.key===" ")&&(m.preventDefault(),n(u=>new Set([...u,s])))},role:"button",tabIndex:0,title:"Expandir todos",children:e.jsxs("div",{className:"card-body",style:{alignItems:"center",justifyContent:"center",padding:"12px"},children:[e.jsxs("span",{style:{fontWeight:600,color:"var(--text-secondary)"},children:["+",le," Colaboradores"]}),e.jsx(Q,{size:16,color:"var(--text-secondary)"})]})})]})]})};return i?e.jsxs("div",{className:"loading-container",children:[e.jsx(ke,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):p?e.jsxs("div",{className:"error-container",children:[e.jsx($e,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",p]})]}):e.jsx(J.Provider,{value:{hoveredNodeId:h,setHoveredNodeId:z,focusedNodeId:c,setFocusedNodeId:L,ancestorIds:I},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(ze,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(Oe,{data:t,onSelect:oe}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:se,disabled:!c,title:"Centralizar Seleção",style:{opacity:c?1:.4},children:e.jsx(je,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ne,title:"Reduzir Zoom",children:e.jsx(Fe,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(g*100),"%"]}),e.jsx("button",{onClick:ae,title:"Aumentar Zoom",children:e.jsx(De,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ie,title:"Resetar",children:e.jsx(Se,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(ye,{size:18})," Login"]})]})]}),e.jsx("main",{className:`canvas ${T?"grabbing":""}`,ref:k,onMouseDown:ee,onMouseMove:te,onMouseUp:Z,onMouseLeave:Z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${g})`},children:G(t)})}),e.jsx("style",{children:`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -546,8 +546,15 @@ import{a,j as e,c as he}from"./index-Q695sD3D.js";/**
                         z-index: 1;
                     }
 
-                    /* Descendant (Downward from ancestor) Highlight */
+                    /* Descendant (Downward from ancestor) Highlight - LEGACY (Backup) */
                     .org-leaf.conn-descendant > ul::before {
+                        background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
+                        z-index: 1;
+                    }
+
+                    /* Group Active Highlight (New Logic - Up to Parent) */
+                    .org-tree.group-active::before {
                         background-color: var(--line-active);
                         animation: pulse-line 2s infinite ease-in-out;
                         z-index: 1;
@@ -755,4 +762,4 @@ import{a,j as e,c as he}from"./index-Q695sD3D.js";/**
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
 
-                `})]})})};he.createRoot(document.getElementById("root")).render(e.jsx(a.StrictMode,{children:e.jsx(Be,{})}));
+                `})]})})};pe.createRoot(document.getElementById("root")).render(e.jsx(a.StrictMode,{children:e.jsx(Ze,{})}));
