@@ -749,6 +749,10 @@ const OrganogramPage = () => {
                         animation: pulse-line 2s infinite ease-in-out;
                     }
 
+                    /* Prevent active state from highlighting outer arms */
+                    .org-leaf:first-child.conn-active::before { border-color: transparent; }
+                    .org-leaf:last-child.conn-active::after { border-color: transparent; }
+
                     /* --- Card Styles --- */
                     .org-card {
                         background: var(--bg-card);
