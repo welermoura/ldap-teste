@@ -7,7 +7,8 @@ import {
     ChevronDown,
     Network,
     AlertTriangle,
-    Loader2
+    Loader2,
+    LocateFixed
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -16,11 +17,11 @@ const OrganogramContext = createContext({
     hoveredNodeId: null,
     setHoveredNodeId: () => {},
     focusedNodeId: null,
+    ancestorIds: new Set(),
 });
 
 // --- Utility Functions ---
 
-// Gera cor determinística baseada no departamento
 const getDepartmentColor = (dept) => {
     if (!dept) return '#64748b'; // Slate-500 default
 
@@ -39,10 +40,8 @@ const getDepartmentColor = (dept) => {
         'Operações': '#0891b2', // Cyan
     };
 
-    // Retorna cor da paleta ou gera uma consistente
     if (palette[dept]) return palette[dept];
 
-    // Fallback gerado
     let hash = 0;
     for (let i = 0; i < dept.length; i++) {
         hash = dept.charCodeAt(i) + ((hash << 5) - hash);
@@ -61,7 +60,7 @@ const getInitials = (name) => {
 // --- Components ---
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, ancestorIds } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
@@ -70,9 +69,14 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
     const isHovered = hoveredNodeId === nodeId;
     const isFocused = focusedNodeId === nodeId;
     const isDirectSubordinate = hoveredNodeId === parentId && hoveredNodeId !== null;
-    const isDimmed = (hoveredNodeId !== null || focusedNodeId !== null) && !isHovered && !isDirectSubordinate && !isFocused;
+    const isAncestor = ancestorIds.has(nodeId);
 
-    // Executive Check
+    // Logic: Dim if someone is focused/hovered, but this node is NOT involved
+    // Involved = Hovered OR Focused OR Direct Subordinate OR Ancestor
+    const isInteracting = hoveredNodeId !== null || focusedNodeId !== null;
+    const isRelevant = isHovered || isFocused || isDirectSubordinate || isAncestor;
+    const isDimmed = isInteracting && !isRelevant;
+
     const isExecutive = node.title && (
         node.title.toLowerCase().includes('presidente') ||
         node.title.toLowerCase().includes('ceo') ||
@@ -88,6 +92,14 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         setHoveredNodeId(null);
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setFocusedNodeId(nodeId);
+            if (hasChildren) toggleNode();
+        }
+    };
+
     return (
         <div
             id={nodeId}
@@ -98,21 +110,31 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                 ${isHovered ? 'state-active' : ''}
                 ${isFocused ? 'state-focused' : ''}
                 ${isDirectSubordinate ? 'state-subordinate' : ''}
+                ${isAncestor ? 'state-ancestor' : ''}
                 ${isDimmed ? 'state-dimmed' : ''}
             `}
-            onClick={() => hasChildren && toggleNode()}
+            onClick={(e) => {
+                e.stopPropagation();
+                setFocusedNodeId(nodeId);
+                if (hasChildren) toggleNode();
+            }}
+            onKeyDown={handleKeyDown}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             style={{
                 '--dept-color': deptColor,
             }}
+            role="button"
+            aria-expanded={isExpanded}
+            aria-label={`${node.name}, ${node.title}`}
+            tabIndex={0}
         >
-            <div className="card-accent" style={{ backgroundColor: deptColor }}></div>
+            <div className="card-accent"></div>
 
             <div className="card-body">
                 <div className="card-header">
                     <div className="avatar" style={{
-                        backgroundColor: isExecutive ? '#0f172a' : `${deptColor}15`,
+                        backgroundColor: isExecutive ? '#0f172a' : `${deptColor}10`,
                         color: isExecutive ? '#fff' : deptColor
                     }}>
                         {getInitials(node.name)}
@@ -125,7 +147,11 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 
                 {node.department && (
                     <div className="card-footer">
-                        <span className="dept-badge" style={{ color: deptColor, borderColor: `${deptColor}30` }}>
+                        <span className="dept-badge" style={{
+                             backgroundColor: `${deptColor}08`,
+                             color: deptColor,
+                             borderColor: `${deptColor}20`
+                        }}>
                             {node.department}
                         </span>
                     </div>
@@ -147,8 +173,10 @@ const OrganogramPage = () => {
     const [error, setError] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [expandedNodes, setExpandedNodes] = useState(new Set());
+    const [expandedGroups, setExpandedGroups] = useState(new Set()); // For "+N others"
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
+    const [ancestorIds, setAncestorIds] = useState(new Set());
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -182,10 +210,56 @@ const OrganogramPage = () => {
             });
     }, []);
 
+    // Helper: Find Path
+    const findPathToNode = (nodes, targetId, path = []) => {
+        for (const node of nodes) {
+            const currentId = node.distinguishedName;
+            if (currentId === targetId) {
+                return [...path, currentId]; // Include target for full highlighting
+            }
+            if (node.children) {
+                const result = findPathToNode(node.children, targetId, [...path, currentId]);
+                if (result) return result;
+            }
+        }
+        return null;
+    };
+
+    // Update Ancestors on Hover/Focus
+    useEffect(() => {
+        const targetId = hoveredNodeId || focusedNodeId;
+        if (targetId) {
+            const path = findPathToNode(data, targetId);
+            if (path) {
+                setAncestorIds(new Set(path));
+            } else {
+                setAncestorIds(new Set());
+            }
+        } else {
+            setAncestorIds(new Set());
+        }
+    }, [hoveredNodeId, focusedNodeId, data]);
+
+    // Zoom on Wheel
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const handleWheel = (e) => {
+            if (e.ctrlKey || e.metaKey || true) { // Default behavior for canvas zoom
+                e.preventDefault();
+                const delta = -e.deltaY * 0.001;
+                setZoom(prev => Math.min(Math.max(prev + delta, 0.4), 2));
+            }
+        };
+
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheel);
+    }, []);
+
     // Scroll effect for focused node
     useEffect(() => {
         if (focusedNodeId) {
-            // Pequeno delay para garantir renderização da expansão
             setTimeout(() => {
                 const element = document.getElementById(focusedNodeId);
                 if (element) {
@@ -193,7 +267,6 @@ const OrganogramPage = () => {
                 }
             }, 100);
 
-            // Remover foco após 3 segundos
             const timer = setTimeout(() => {
                 setFocusedNodeId(null);
             }, 3000);
@@ -237,20 +310,6 @@ const OrganogramPage = () => {
         });
     };
 
-    const findPathToNode = (nodes, targetId, path = []) => {
-        for (const node of nodes) {
-            const currentId = node.distinguishedName;
-            if (currentId === targetId) {
-                return path;
-            }
-            if (node.children) {
-                const result = findPathToNode(node.children, targetId, [...path, currentId]);
-                if (result) return result;
-            }
-        }
-        return null;
-    };
-
     const handleSelectNode = (nodeId) => {
         const path = findPathToNode(data, nodeId);
         if (path) {
@@ -263,34 +322,76 @@ const OrganogramPage = () => {
     const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
     const handleResetZoom = () => setZoom(1);
 
+    const handleCenterFocused = () => {
+        if (focusedNodeId) {
+            const element = document.getElementById(focusedNodeId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            }
+        }
+    };
+
     // Recursively render tree
-    const renderTree = (nodes, parentId = null) => {
+    const renderTree = (nodes, parentId = null, parentKey = null) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
+
+        const GROUP_LIMIT = 8;
+        const isGroupExpanded = parentKey && expandedGroups.has(parentKey);
+        const shouldGroup = nodes.length > GROUP_LIMIT && !isGroupExpanded;
+
+        const displayNodes = shouldGroup ? nodes.slice(0, GROUP_LIMIT) : nodes;
+        const remainingCount = nodes.length - GROUP_LIMIT;
 
         return (
             <ul className="org-tree">
-                {nodes.map((node, index) => {
+                {displayNodes.map((node, index) => {
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
 
                     // Connection State Logic
-                    const isConnectionActive = hoveredNodeId === parentId && hoveredNodeId !== null;
+                    const isPathActive = (ancestorIds.has(parentId) && ancestorIds.has(key)) ||
+                                         (hoveredNodeId === parentId);
 
                     return (
-                        <li key={key} className={`org-leaf ${isConnectionActive ? 'conn-active' : ''}`}>
+                        <li key={key} className={`org-leaf ${isPathActive ? 'conn-active' : ''}`}>
                             <NodeCard
                                 node={node}
                                 isExpanded={isExpanded}
                                 toggleNode={() => toggleNode(key)}
                                 hasChildren={hasChildren}
-                                isMatch={false} // Match logic agora é via busca/foco
+                                isMatch={false}
                                 parentId={parentId}
                             />
-                            {hasChildren && isExpanded && renderTree(node.children, key)}
+                            {hasChildren && isExpanded && renderTree(node.children, key, key)}
                         </li>
                     );
                 })}
+
+                {shouldGroup && (
+                    <li className="org-leaf">
+                         <div
+                            className="org-card group-node"
+                            onClick={() => setExpandedGroups(prev => new Set([...prev, parentKey]))}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setExpandedGroups(prev => new Set([...prev, parentKey]));
+                                }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            title="Expandir todos"
+                         >
+                            <div className="card-body" style={{ alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                    +{remainingCount} Colaboradores
+                                </span>
+                                <ChevronDown size={16} color="var(--text-secondary)" />
+                            </div>
+                         </div>
+                    </li>
+                )}
             </ul>
         );
     };
@@ -310,7 +411,7 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, ancestorIds }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
@@ -327,6 +428,10 @@ const OrganogramPage = () => {
                         <OrganogramSearch data={data} onSelect={handleSelectNode} />
 
                         <div className="zoom-controls">
+                            <button onClick={handleCenterFocused} disabled={!focusedNodeId} title="Centralizar Seleção" style={{ opacity: focusedNodeId ? 1 : 0.4 }}>
+                                <LocateFixed size={16} />
+                            </button>
+                            <div className="separator"></div>
                             <button onClick={handleZoomOut} title="Reduzir Zoom"><ZoomOut size={16} /></button>
                             <span className="zoom-level">{Math.round(zoom * 100)}%</span>
                             <button onClick={handleZoomIn} title="Aumentar Zoom"><ZoomIn size={16} /></button>
@@ -364,22 +469,26 @@ const OrganogramPage = () => {
 
                     :root {
                         --bg-page: #f8fafc; /* Slate 50 */
-                        --bg-card: #ffffff;
-                        --text-primary: #0f172a; /* Slate 900 */
+                        --bg-card: #FAFAFB; /* Off-white premium */
+                        --text-primary: #1e293b; /* Slate 800 */
                         --text-secondary: #64748b; /* Slate 500 */
                         --border-color: #e2e8f0; /* Slate 200 */
                         --line-color: #cbd5e1; /* Slate 300 */
                         --line-active: #3b82f6; /* Blue 500 */
-                        --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-                        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
-                        --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-                        --ease-out: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+                        /* Shadows - Premium Depth */
+                        --shadow-sm: 0 2px 4px rgba(0,0,0,0.02), 0 1px 2px rgba(0,0,0,0.03);
+                        --shadow-md: 0 8px 16px -4px rgba(0,0,0,0.04), 0 4px 8px -2px rgba(0,0,0,0.02);
+                        --shadow-hover: 0 20px 30px -8px rgba(0,0,0,0.08), 0 8px 12px -4px rgba(0,0,0,0.03);
+
+                        --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                        --ease-elastic: cubic-bezier(0.34, 1.56, 0.64, 1);
                     }
 
                     * { box-sizing: border-box; }
 
                     .organogram-page {
-                        font-family: 'Inter', sans-serif;
+                        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                         background-color: var(--bg-page);
                         height: 100vh;
                         display: flex;
@@ -548,7 +657,7 @@ const OrganogramPage = () => {
                         height: 30px;
                         background-color: var(--line-color);
                         transform: translateX(-50%);
-                        transition: background-color 0.3s, box-shadow 0.3s;
+                        transition: all 0.2s var(--ease-out);
                     }
 
                     /* Connectors for children */
@@ -560,7 +669,7 @@ const OrganogramPage = () => {
                         border-top: 2px solid var(--line-color);
                         width: 50%;
                         height: 30px;
-                        transition: border-color 0.3s, box-shadow 0.3s;
+                        transition: all 0.2s var(--ease-out);
                     }
                     .org-leaf::after {
                         right: auto;
@@ -594,7 +703,7 @@ const OrganogramPage = () => {
                         height: 30px;
                         background-color: var(--line-color);
                         transform: translateX(-50%);
-                        transition: background-color 0.3s, box-shadow 0.3s;
+                        transition: all 0.2s var(--ease-out);
                     }
 
                     /* --- Active Connection States --- */
@@ -607,12 +716,7 @@ const OrganogramPage = () => {
                         z-index: 1;
                     }
 
-                    /* Linha vertical descendo do pai (renderizada no UL filho anterior)
-                       Isso é tricky. No CSS puro é difícil estilizar o "before" do UL baseando no LI pai.
-                       Mas podemos estilizar o "before" do UL se tivermos uma classe no UL.
-                       Por simplicidade, o 'pulse' vai nas linhas horizontais/verticais do próprio LI.
-                    */
-
+                    /* Pulse Animation */
                     @keyframes pulse-line {
                         0% { opacity: 0.6; }
                         50% { opacity: 1; box-shadow: 0 0 8px var(--line-active); }
@@ -631,84 +735,86 @@ const OrganogramPage = () => {
                         position: relative;
                         border-radius: 12px;
                         box-shadow: var(--shadow-md);
-                        transition: all 0.3s var(--ease-out);
+                        transition: all 0.2s var(--ease-out);
                         cursor: pointer;
                         z-index: 2;
-                        border: 1px solid rgba(255,255,255,0.1); /* Subtle border for dark mode compatibility if needed */
+                        border: 1px solid transparent;
                         overflow: hidden;
+                        display: flex;
+                        flex-direction: row;
                     }
 
-                    /* Left Accent Bar */
+                    /* Left Accent Bar (Vertical now, as requested "barra lateral colorida") */
                     .card-accent {
-                        height: 4px;
-                        width: 100%;
+                        width: 5px;
+                        height: 100%;
                         background-color: var(--dept-color);
+                        flex-shrink: 0;
                     }
 
                     .card-body {
-                        padding: 16px;
+                        flex: 1;
+                        padding: 14px 16px;
                         display: flex;
                         flex-direction: column;
-                        gap: 12px;
-                        background: linear-gradient(180deg, #fff 0%, #fcfcfc 100%);
+                        gap: 10px;
+                        background: var(--bg-card);
                     }
 
-                    /* Hover State (The User) */
+                    /* Hover State */
                     .org-card.state-active {
-                        transform: scale(1.05) translateY(-4px);
+                        transform: scale(1.03);
                         box-shadow: var(--shadow-hover);
-                        z-index: 10;
-                        border-color: transparent;
-                        outline: 2px solid var(--line-active);
-                    }
-
-                    /* Focused State (Search Result) */
-                    .org-card.state-focused {
-                        transform: scale(1.05);
-                        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), var(--shadow-hover);
+                        z-index: 50;
                         border-color: var(--line-active);
-                        z-index: 20;
-                        animation: pulse-focus 2s infinite;
                     }
 
-                    @keyframes pulse-focus {
-                        0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.5); }
-                        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-                        100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
+                    /* Focused State */
+                    .org-card.state-focused {
+                        transform: scale(1.03);
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), var(--shadow-hover);
+                        border-color: var(--line-active);
+                        z-index: 50;
                     }
 
                     /* Subordinate State */
                     .org-card.state-subordinate {
                         transform: translateY(-2px);
                         box-shadow: var(--shadow-md);
-                        border-color: var(--line-active);
-                        background-color: #f0f9ff; /* Light blue tint */
+                        background-color: #fff;
+                        border: 1px solid var(--line-active);
+                    }
+
+                    /* Ancestor State */
+                    .org-card.state-ancestor {
+                         border: 1px dashed var(--line-active);
+                         box-shadow: var(--shadow-md);
                     }
 
                     /* Dimmed State */
                     .org-card.state-dimmed {
-                        opacity: 0.4;
-                        filter: grayscale(0.8);
+                        opacity: 0.55;
+                        filter: grayscale(0.6);
                         transform: scale(0.98);
                     }
 
-                    /* Highlight (Search) */
+                    /* Highlight (Search Match) */
                     .org-card.highlight {
                         background-color: #fffbeb;
-                        border: 2px solid #f59e0b;
+                        border: 1px solid #f59e0b;
                     }
 
                     /* Header Layout */
                     .card-header {
                         display: flex;
                         align-items: center;
-                        gap: 12px;
+                        gap: 14px;
                     }
 
                     .avatar {
-                        width: 44px;
-                        height: 44px;
-                        border-radius: 10px;
+                        width: 42px;
+                        height: 42px;
+                        border-radius: 50%; /* Circular for modern look */
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -725,45 +831,58 @@ const OrganogramPage = () => {
 
                     .name {
                         margin: 0;
-                        font-size: 0.95rem;
-                        font-weight: 600;
+                        font-size: 1rem;
+                        font-weight: 700;
                         color: var(--text-primary);
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
-                        letter-spacing: -0.01em;
+                        letter-spacing: -0.015em;
+                        line-height: 1.2;
                     }
 
                     .role {
-                        margin: 2px 0 0 0;
-                        font-size: 0.8rem;
+                        margin: 3px 0 0 0;
+                        font-size: 0.85rem;
                         color: var(--text-secondary);
+                        font-weight: 500;
                         display: -webkit-box;
                         -webkit-line-clamp: 2;
                         -webkit-box-orient: vertical;
                         overflow: hidden;
-                        line-height: 1.3;
+                        line-height: 1.35;
                     }
 
                     /* Footer */
                     .card-footer {
-                        border-top: 1px solid #f1f5f9;
-                        padding-top: 10px;
+                        padding-top: 4px;
                         display: flex;
                     }
 
                     .dept-badge {
                         font-size: 0.7rem;
                         font-weight: 600;
-                        padding: 2px 8px;
-                        border-radius: 99px;
+                        padding: 3px 10px;
+                        border-radius: 6px;
                         border: 1px solid;
                         text-transform: uppercase;
-                        letter-spacing: 0.05em;
+                        letter-spacing: 0.04em;
                         max-width: 100%;
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
+                        background-color: transparent; /* Overridden inline */
+                    }
+
+                    /* Group Node */
+                    .group-node {
+                        height: 60px;
+                        border: 1px dashed var(--line-color);
+                        background: rgba(255,255,255,0.5);
+                    }
+                    .group-node:hover {
+                        border-color: var(--line-active);
+                        background: #fff;
                     }
 
                     /* Toggle Button */
