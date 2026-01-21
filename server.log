@@ -1,0 +1,11 @@
+Starting mock server on port 5001...
+ * Serving Flask app 'mock_server'
+ * Debug mode: off
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+[33mPress CTRL+C to quit[0m
+127.0.0.1 - - [21/Jan/2026 19:35:42] "GET /organograma HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 19:35:42] "GET /ad-tree/assets/index-DQ3P1g1z.css HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 19:35:42] "GET /ad-tree/assets/index-Q695sD3D.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 19:35:42] "GET /ad-tree/assets/organograma-B_yGXq1g.js HTTP/1.1" 200 -
+127.0.0.1 - - [21/Jan/2026 19:35:43] "GET /api/public/organogram_data HTTP/1.1" 200 -

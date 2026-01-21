@@ -1,84 +1,84 @@
-import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
+import{a,j as e,c as se}from"./index-Q695sD3D.js";/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const fe=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),ue=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,i,d)=>d?d.toUpperCase():i.toLowerCase()),q=t=>{const o=ue(t);return o.charAt(0).toUpperCase()+o.slice(1)},K=(...t)=>t.filter((o,i,d)=>!!o&&o.trim()!==""&&d.indexOf(o)===i).join(" ").trim(),ge=t=>{for(const o in t)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
+ */const ce=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),le=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(o,n,l)=>l?l.toUpperCase():n.toLowerCase()),K=t=>{const o=le(t);return o.charAt(0).toUpperCase()+o.slice(1)},J=(...t)=>t.filter((o,n,l)=>!!o&&o.trim()!==""&&l.indexOf(o)===n).join(" ").trim(),de=t=>{for(const o in t)if(o.startsWith("aria-")||o==="role"||o==="title")return!0};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */var xe={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
+ */var pe={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const me=a.forwardRef(({color:t="currentColor",size:o=24,strokeWidth:i=2,absoluteStrokeWidth:d,className:p="",children:f,iconNode:g,...x},y)=>a.createElement("svg",{ref:y,...xe,width:o,height:o,stroke:t,strokeWidth:d?Number(i)*24/Number(o):i,className:K("lucide",p),...!f&&!ge(x)&&{"aria-hidden":"true"},...x},[...g.map(([w,C])=>a.createElement(w,C)),...Array.isArray(f)?f:[f]]));/**
+ */const he=a.forwardRef(({color:t="currentColor",size:o=24,strokeWidth:n=2,absoluteStrokeWidth:l,className:p="",children:h,iconNode:N,...g},v)=>a.createElement("svg",{ref:v,...pe,width:o,height:o,stroke:t,strokeWidth:l?Number(n)*24/Number(o):n,className:J("lucide",p),...!h&&!de(g)&&{"aria-hidden":"true"},...g},[...N.map(([C,y])=>a.createElement(C,y)),...Array.isArray(h)?h:[h]]));/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const b=(t,o)=>{const i=a.forwardRef(({className:d,...p},f)=>a.createElement(me,{ref:f,iconNode:o,className:K(`lucide-${fe(q(t))}`,`lucide-${t}`,d),...p}));return i.displayName=q(t),i};/**
+ */const b=(t,o)=>{const n=a.forwardRef(({className:l,...p},h)=>a.createElement(he,{ref:h,iconNode:o,className:J(`lucide-${ce(K(t))}`,`lucide-${t}`,l),...p}));return n.displayName=K(t),n};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const be=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],Q=b("chevron-down",be);/**
+ */const ue=[["path",{d:"m6 9 6 6 6-6",key:"qrunsl"}]],ge=b("chevron-down",ue);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ve=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],ye=b("circle-user",ve);/**
+ */const fe=[["circle",{cx:"12",cy:"12",r:"10",key:"1mglay"}],["circle",{cx:"12",cy:"10",r:"3",key:"ilqhr7"}],["path",{d:"M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662",key:"154egf"}]],xe=b("circle-user",fe);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const we=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],ke=b("loader-circle",we);/**
+ */const me=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],be=b("loader-circle",me);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ne=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],je=b("locate-fixed",Ne);/**
+ */const ve=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],ye=b("locate-fixed",ve);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ce=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],ze=b("network",Ce);/**
+ */const we=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],ke=b("network",we);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ie=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Se=b("rotate-ccw",Ie);/**
+ */const je=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Ne=b("rotate-ccw",je);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ee=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Me=b("search",Ee);/**
+ */const Ce=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],ze=b("search",Ce);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Le=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],$e=b("triangle-alert",Le);/**
+ */const Se=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],Ie=b("triangle-alert",Se);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ae=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],Re=b("user",Ae);/**
+ */const Me=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],$e=b("user",Me);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Te=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],_e=b("x",Te);/**
+ */const Ee=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],Le=b("x",Ee);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Pe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],De=b("zoom-in",Pe);/**
+ */const Ae=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],_e=b("zoom-in",Ae);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const He=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Fe=b("zoom-out",He),Oe=({data:t,onSelect:o})=>{const[i,d]=a.useState(""),[p,f]=a.useState(!1),g=a.useRef(null),x=a.useMemo(()=>{const n=[],h=z=>{z&&z.forEach(c=>{n.push({name:c.name,title:c.title,department:c.department,id:c.distinguishedName,distinguishedName:c.distinguishedName}),c.children&&h(c.children)})};return h(t),n},[t]),y=a.useMemo(()=>{if(!i||i.length<2)return[];const n=i.toLowerCase();return x.filter(h=>h.name&&h.name.toLowerCase().includes(n)).slice(0,8)},[i,x]);a.useEffect(()=>{const n=h=>{g.current&&!g.current.contains(h.target)&&f(!1)};return document.addEventListener("mousedown",n),()=>document.removeEventListener("mousedown",n)},[]);const w=n=>{d(n.name),f(!1),o(n.id)},C=()=>{d(""),f(!1)};return e.jsxs("div",{className:"search-component",ref:g,children:[e.jsxs("div",{className:`search-input-wrapper ${p?"active":""}`,children:[e.jsx(Me,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:i,onChange:n=>{d(n.target.value),f(!0)},onFocus:()=>f(!0)}),i&&e.jsx("button",{className:"clear-btn",onClick:C,children:e.jsx(_e,{size:14})})]}),p&&y.length>0&&e.jsx("div",{className:"search-dropdown",children:y.map(n=>e.jsxs("div",{className:"search-item",onClick:()=>w(n),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(Re,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:n.name}),e.jsxs("span",{className:"item-meta",children:[n.title," • ",n.department]})]})]},n.id))}),p&&i.length>=2&&y.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
+ */const De=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Re=b("zoom-out",De),He=({data:t,onSelect:o})=>{const[n,l]=a.useState(""),[p,h]=a.useState(!1),N=a.useRef(null),g=a.useMemo(()=>{const c=[],i=x=>{x&&x.forEach(f=>{c.push({name:f.name,title:f.title,department:f.department,id:f.distinguishedName,distinguishedName:f.distinguishedName}),f.children&&i(f.children)})};return i(t),c},[t]),v=a.useMemo(()=>{if(!n||n.length<2)return[];const c=n.toLowerCase();return g.filter(i=>i.name&&i.name.toLowerCase().includes(c)).slice(0,8)},[n,g]);a.useEffect(()=>{const c=i=>{N.current&&!N.current.contains(i.target)&&h(!1)};return document.addEventListener("mousedown",c),()=>document.removeEventListener("mousedown",c)},[]);const C=c=>{l(c.name),h(!1),o(c.id)},y=()=>{l(""),h(!1)};return e.jsxs("div",{className:"search-component",ref:N,children:[e.jsxs("div",{className:`search-input-wrapper ${p?"active":""}`,children:[e.jsx(ze,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:n,onChange:c=>{l(c.target.value),h(!0)},onFocus:()=>h(!0)}),n&&e.jsx("button",{className:"clear-btn",onClick:y,children:e.jsx(Le,{size:14})})]}),p&&v.length>0&&e.jsx("div",{className:"search-dropdown",children:v.map(c=>e.jsxs("div",{className:"search-item",onClick:()=>C(c),children:[e.jsx("div",{className:"item-avatar",children:e.jsx($e,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:c.name}),e.jsxs("span",{className:"item-meta",children:[c.title," • ",c.department]})]})]},c.id))}),p&&n.length>=2&&v.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
                 .search-component {
                     position: relative;
                     width: 300px;
@@ -179,22 +179,23 @@ import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
                     color: #94a3b8;
                     font-size: 0.9rem;
                 }
-            `})]})},J=a.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set}),Ue=t=>{if(!t)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[t])return o[t];let i=0;for(let p=0;p<t.length;p++)i=t.charCodeAt(p)+((i<<5)-i);return`hsl(${Math.abs(i%360)}, 60%, 40%)`},Be=t=>{if(!t)return"";const o=t.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Ve=({node:t,isExpanded:o,toggleNode:i,hasChildren:d,isMatch:p,parentId:f})=>{const{hoveredNodeId:g,setHoveredNodeId:x,focusedNodeId:y,setFocusedNodeId:w,ancestorIds:C}=a.useContext(J),n=a.useMemo(()=>Ue(t.department),[t.department]),h=t.distinguishedName,z=g===h,c=y===h,L=g===f&&g!==null,I=C.has(h),T=(g!==null||y!==null)&&!(z||c||L||I),$=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),_=N=>{N.stopPropagation(),x(h)},H=()=>{x(null)},P=N=>{(N.key==="Enter"||N.key===" ")&&(N.preventDefault(),w(h),d&&i())};return e.jsxs("div",{id:h,className:`
+            `})]})},Q=a.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set}),Oe=t=>{if(!t)return"#64748b";const o={Financeiro:"#059669",Comercial:"#d97706",Vendas:"#d97706",TI:"#2563eb",Tecnologia:"#2563eb","Recursos Humanos":"#db2777",RH:"#db2777",Diretoria:"#0f172a",Executivo:"#0f172a",Jurídico:"#7c3aed",Marketing:"#ea580c",Operações:"#0891b2"};if(o[t])return o[t];let n=0;for(let p=0;p<t.length;p++)n=t.charCodeAt(p)+((n<<5)-n);return`hsl(${Math.abs(n%360)}, 60%, 40%)`},Pe=t=>{if(!t)return"";const o=t.split(" ");return o.length>=2?`${o[0][0]}${o[o.length-1][0]}`.toUpperCase():t[0].toUpperCase()},W=({node:t,isExpanded:o,toggleNode:n,hasChildren:l,isMatch:p,parentId:h,isGridItem:N})=>{const{hoveredNodeId:g,setHoveredNodeId:v,focusedNodeId:C,setFocusedNodeId:y,ancestorIds:c}=a.useContext(Q),i=a.useMemo(()=>Oe(t.department),[t.department]),x=t.distinguishedName,f=g===x,$=C===x,w=g===h&&g!==null,A=c.has(x),F=(g!==null||C!==null)&&!(f||$||w||A),E=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),T=S=>{S.stopPropagation(),v(x)},_=()=>{v(null)},B=S=>{(S.key==="Enter"||S.key===" ")&&(S.preventDefault(),y(x),l&&n())};return e.jsxs("div",{id:x,className:`
                 org-card
+                ${N?"card-grid":""}
                 ${p?"highlight":""}
-                ${$?"executive":""}
-                ${z?"state-active":""}
-                ${c?"state-focused":""}
-                ${L?"state-subordinate":""}
-                ${I?"state-ancestor":""}
-                ${T?"state-dimmed":""}
-            `,onClick:N=>{N.stopPropagation(),w(h),d&&i()},onKeyDown:P,onMouseEnter:_,onMouseLeave:H,style:{"--dept-color":n},role:"button","aria-expanded":o,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:$?"#0f172a":`${n}10`,color:$?"#fff":n},children:Be(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${n}08`,color:n,borderColor:`${n}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(Q,{size:14,className:"icon-chevron"})})]})},Ze=()=>{const[t,o]=a.useState([]),[i,d]=a.useState(!0),[p,f]=a.useState(null),[g,x]=a.useState(1),[y,w]=a.useState(new Set),[C,n]=a.useState(new Set),[h,z]=a.useState(null),[c,L]=a.useState(null),[I,R]=a.useState(new Set),k=a.useRef(null),[T,$]=a.useState(!1),[_,H]=a.useState({x:0,y:0}),[P,N]=a.useState({left:0,top:0});a.useEffect(()=>{fetch("/api/public/organogram_data").then(r=>{if(!r.ok)throw new Error("Falha ao carregar dados");return r.json()}).then(r=>{const l=Array.isArray(r)?r:[];o(l);const s=new Set;l.forEach((v,j)=>{const S=v.distinguishedName||j;s.add(S)}),w(s),d(!1)}).catch(r=>{f(r.message),d(!1)})},[]);const F=(r,l,s=[])=>{for(const v of r){const j=v.distinguishedName;if(j===l)return[...s,j];if(v.children){const S=F(v.children,l,[...s,j]);if(S)return S}}return null};a.useEffect(()=>{const r=h||c;if(r){const l=F(t,r);R(l?new Set(l):new Set)}else R(new Set)},[h,c,t]),a.useEffect(()=>{const r=k.current;if(!r)return;const l=s=>{s.ctrlKey||s.metaKey;{s.preventDefault();const v=-s.deltaY*.001;x(j=>Math.min(Math.max(j+v,.4),2))}};return r.addEventListener("wheel",l,{passive:!1}),()=>r.removeEventListener("wheel",l)},[]),a.useEffect(()=>{if(c){setTimeout(()=>{const l=document.getElementById(c);l&&l.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const r=setTimeout(()=>{L(null)},3e3);return()=>clearTimeout(r)}},[c]);const ee=r=>{k.current&&($(!0),H({x:r.pageX,y:r.pageY}),N({left:k.current.scrollLeft,top:k.current.scrollTop}))},te=r=>{if(!T||!k.current)return;r.preventDefault();const l=r.pageX-_.x,s=r.pageY-_.y;k.current.scrollLeft=P.left-l,k.current.scrollTop=P.top-s},Z=()=>{$(!1)},re=r=>{w(l=>{const s=new Set(l);return s.has(r)?s.delete(r):s.add(r),s})},oe=r=>{const l=F(t,r);l&&w(s=>new Set([...s,...l])),L(r)},ae=()=>x(r=>Math.min(r+.1,2)),ne=()=>x(r=>Math.max(r-.1,.4)),ie=()=>x(1),se=()=>{if(c){const r=document.getElementById(c);r&&r.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},G=(r,l=null,s=null)=>{if(!r||!Array.isArray(r)||r.length===0)return null;const v=8,j=s&&C.has(s),S=r.length>v&&!j,O=S?r.slice(0,v):r,le=r.length-v,U=h||c;let D=-1;(U||I.size>0)&&(D=O.findIndex(m=>{const u=m.distinguishedName;return u===U||I.has(u)}));const ce=(O.length-1)/2,de=D!==-1;return e.jsxs("ul",{className:`org-tree ${de?"group-active":""}`,children:[O.map((m,u)=>{const E=m.distinguishedName||u,X=m.children&&m.children.length>0,Y=y.has(E);let W=!1,B=!1,V=!1;if(D!==-1){const M=D,A=ce;u===M&&(W=!0),M<A?(u>M&&u<=Math.floor(A)&&(B=!0),u>=M&&u<Math.ceil(A)&&(V=!0)):M>A&&(u>Math.floor(A)&&u<=M&&(B=!0),u>=Math.ceil(A)&&u<M&&(V=!0))}const he=I.has(E)&&E!==U;return e.jsxs("li",{className:`
+                ${E?"executive":""}
+                ${f?"state-active":""}
+                ${$?"state-focused":""}
+                ${w?"state-subordinate":""}
+                ${A?"state-ancestor":""}
+                ${F?"state-dimmed":""}
+            `,onClick:S=>{S.stopPropagation(),y(x),l&&n()},onKeyDown:B,onMouseEnter:T,onMouseLeave:_,style:{"--dept-color":i},role:"button","aria-expanded":o,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:E?"#0f172a":`${i}10`,color:E?"#fff":i},children:Pe(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${i}08`,color:i,borderColor:`${i}20`},children:t.department})})]}),l&&e.jsx("div",{className:`toggle-btn ${o?"expanded":""}`,children:e.jsx(ge,{size:14,className:"icon-chevron"})})]})},Fe=()=>{const[t,o]=a.useState([]),[n,l]=a.useState(!0),[p,h]=a.useState(null),[N,g]=a.useState(1),[v,C]=a.useState(new Set),[y,c]=a.useState(null),[i,x]=a.useState(null),[f,$]=a.useState(new Set),w=a.useRef(null),[A,O]=a.useState(!1),[P,F]=a.useState({x:0,y:0}),[E,T]=a.useState({left:0,top:0});a.useEffect(()=>{fetch("/api/public/organogram_data").then(r=>{if(!r.ok)throw new Error("Falha ao carregar dados");return r.json()}).then(r=>{const s=Array.isArray(r)?r:[];o(s);const d=new Set;s.forEach((I,k)=>{const z=I.distinguishedName||k;d.add(z)}),C(d),l(!1)}).catch(r=>{h(r.message),l(!1)})},[]);const _=(r,s,d=[])=>{for(const I of r){const k=I.distinguishedName;if(k===s)return[...d,k];if(I.children){const z=_(I.children,s,[...d,k]);if(z)return z}}return null};a.useEffect(()=>{const r=y||i;if(r){const s=_(t,r);$(s?new Set(s):new Set)}else $(new Set)},[y,i,t]),a.useEffect(()=>{const r=w.current;if(!r)return;const s=d=>{d.ctrlKey||d.metaKey;{d.preventDefault();const I=-d.deltaY*.001;g(k=>Math.min(Math.max(k+I,.4),2))}};return r.addEventListener("wheel",s,{passive:!1}),()=>r.removeEventListener("wheel",s)},[]),a.useEffect(()=>{if(i){setTimeout(()=>{const s=document.getElementById(i);s&&s.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const r=setTimeout(()=>{x(null)},3e3);return()=>clearTimeout(r)}},[i]);const B=r=>{w.current&&(O(!0),F({x:r.pageX,y:r.pageY}),T({left:w.current.scrollLeft,top:w.current.scrollTop}))},S=r=>{if(!A||!w.current)return;r.preventDefault();const s=r.pageX-P.x,d=r.pageY-P.y;w.current.scrollLeft=E.left-s,w.current.scrollTop=E.top-d},Z=()=>{O(!1)},X=r=>{C(s=>{const d=new Set(s);return d.has(r)?d.delete(r):d.add(r),d})},ee=r=>{const s=_(t,r);s&&C(d=>new Set([...d,...s])),x(r)},te=()=>g(r=>Math.min(r+.1,2)),re=()=>g(r=>Math.max(r-.1,.4)),oe=()=>g(1),ae=()=>{if(i){const r=document.getElementById(i);r&&r.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},G=(r,s=null)=>{if(!r||!Array.isArray(r)||r.length===0)return null;const I=r.length>8,k=y||i;let z=-1;(k||f.size>0)&&(z=r.findIndex(m=>{const u=m.distinguishedName;return u===k||f.has(u)}));const q=z!==-1;if(I)return e.jsx("div",{className:`org-grid-wrapper ${q?"grid-active":""}`,children:r.map((m,u)=>{const j=m.distinguishedName||u,D=m.children&&m.children.length>0,R=v.has(j),H=z===u;return e.jsxs("div",{className:`grid-item ${H?"grid-item-active":""}`,children:[e.jsx(W,{node:m,isExpanded:R,toggleNode:()=>X(j),hasChildren:D,isMatch:!1,parentId:s,isGridItem:!0}),D&&R&&e.jsx("div",{className:"grid-sub-tree",children:G(m.children,j)})]},j)})});const Y=r,ne=(Y.length-1)/2;return e.jsx("ul",{className:`org-tree ${q?"group-active":""}`,children:Y.map((m,u)=>{const j=m.distinguishedName||u,D=m.children&&m.children.length>0,R=v.has(j);let H=!1,U=!1,V=!1;if(z!==-1){const M=z,L=ne;u===M&&(H=!0),M<L?(u>M&&u<=Math.floor(L)&&(U=!0),u>=M&&u<Math.ceil(L)&&(V=!0)):M>L&&(u>Math.floor(L)&&u<=M&&(U=!0),u>=Math.ceil(L)&&u<M&&(V=!0))}const ie=f.has(j)&&j!==k;return e.jsxs("li",{className:`
                             org-leaf
-                            ${B?"conn-l":""}
+                            ${U?"conn-l":""}
                             ${V?"conn-r":""}
-                            ${W?"conn-v":""}
-                            ${he?"conn-descendant":""}
-                        `,children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(Ve,{node:m,isExpanded:Y,toggleNode:()=>re(E),hasChildren:X,isMatch:!1,parentId:l}),X&&Y&&G(m.children,E,E)]},E)}),S&&e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx("div",{className:"org-card group-node",onClick:()=>n(m=>new Set([...m,s])),onKeyDown:m=>{(m.key==="Enter"||m.key===" ")&&(m.preventDefault(),n(u=>new Set([...u,s])))},role:"button",tabIndex:0,title:"Expandir todos",children:e.jsxs("div",{className:"card-body",style:{alignItems:"center",justifyContent:"center",padding:"12px"},children:[e.jsxs("span",{style:{fontWeight:600,color:"var(--text-secondary)"},children:["+",le," Colaboradores"]}),e.jsx(Q,{size:16,color:"var(--text-secondary)"})]})})]})]})};return i?e.jsxs("div",{className:"loading-container",children:[e.jsx(ke,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):p?e.jsxs("div",{className:"error-container",children:[e.jsx($e,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",p]})]}):e.jsx(J.Provider,{value:{hoveredNodeId:h,setHoveredNodeId:z,focusedNodeId:c,setFocusedNodeId:L,ancestorIds:I},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(ze,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(Oe,{data:t,onSelect:oe}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:se,disabled:!c,title:"Centralizar Seleção",style:{opacity:c?1:.4},children:e.jsx(je,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ne,title:"Reduzir Zoom",children:e.jsx(Fe,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(g*100),"%"]}),e.jsx("button",{onClick:ae,title:"Aumentar Zoom",children:e.jsx(De,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ie,title:"Resetar",children:e.jsx(Se,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(ye,{size:18})," Login"]})]})]}),e.jsx("main",{className:`canvas ${T?"grabbing":""}`,ref:k,onMouseDown:ee,onMouseMove:te,onMouseUp:Z,onMouseLeave:Z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${g})`},children:G(t)})}),e.jsx("style",{children:`
+                            ${H?"conn-v":""}
+                            ${ie?"conn-descendant":""}
+                        `,children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(W,{node:m,isExpanded:R,toggleNode:()=>X(j),hasChildren:D,isMatch:!1,parentId:s}),D&&R&&G(m.children,j)]},j)})})};return n?e.jsxs("div",{className:"loading-container",children:[e.jsx(be,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):p?e.jsxs("div",{className:"error-container",children:[e.jsx(Ie,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",p]})]}):e.jsx(Q.Provider,{value:{hoveredNodeId:y,setHoveredNodeId:c,focusedNodeId:i,setFocusedNodeId:x,ancestorIds:f},children:e.jsxs("div",{className:"organogram-page",children:[e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(ke,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(He,{data:t,onSelect:ee}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:ae,disabled:!i,title:"Centralizar Seleção",style:{opacity:i?1:.4},children:e.jsx(ye,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:re,title:"Reduzir Zoom",children:e.jsx(Re,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(N*100),"%"]}),e.jsx("button",{onClick:te,title:"Aumentar Zoom",children:e.jsx(_e,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:oe,title:"Resetar",children:e.jsx(Ne,{size:14})})]}),e.jsxs("a",{href:"/login",className:"btn-login",children:[e.jsx(xe,{size:18})," Login"]})]})]}),e.jsx("main",{className:`canvas ${A?"grabbing":""}`,ref:w,onMouseDown:B,onMouseMove:S,onMouseUp:Z,onMouseLeave:Z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${N})`},children:G(t)})}),e.jsx("style",{children:`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -376,6 +377,69 @@ import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
                         align-items: center;
                     }
 
+                    /* --- Grid Layout (For large teams > 8) --- */
+                    .org-grid-wrapper {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr); /* 3 Columns */
+                        gap: 24px;
+                        padding-top: 60px; /* Space for parent connector */
+                        position: relative;
+                        width: 100%;
+                        max-width: 1200px;
+                    }
+
+                    /* Grid Parent Connector */
+                    .org-grid-wrapper::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 50%;
+                        width: 2px;
+                        height: 60px;
+                        background-color: var(--line-color);
+                        transform: translateX(-50%);
+                        transition: background-color 0.2s;
+                    }
+
+                    .org-grid-wrapper.grid-active::before {
+                        background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
+                    }
+
+                    .grid-item {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        position: relative;
+                    }
+
+                    /* Grid Item "Line Up" to form 'Comb' look?
+                       Or just let them float? User said "linha de conexão deve ser mantida".
+                       Usually means a line from the top of the card connects to the grid structure.
+                       Let's add a small line up from each card that fades out or connects to a conceptual bar.
+                       But in a 3-col grid, connecting to a single bar is messy.
+                       Simple approach: Just the card. The parent line connects to the *Group*.
+                       However, let's add a small vertical ticker on top of each card to imply connection.
+                    */
+                     .grid-item::before {
+                        content: '';
+                        position: absolute;
+                        top: -15px;
+                        width: 2px;
+                        height: 15px;
+                        background-color: var(--line-color);
+                     }
+
+                     .grid-item.grid-item-active::before {
+                        background-color: var(--line-active);
+                     }
+
+                    /* Compact Card for Grid */
+                    .card-grid {
+                        width: 100%; /* Fill grid cell */
+                        max-width: 320px;
+                    }
+
                     /* --- Connectors --- */
                     /* Vertical line from parent (ul::before) */
                     .org-tree::before {
@@ -441,66 +505,7 @@ import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
                         border-left: 2px solid var(--line-color); /* Add border-left back for the corner curve? No. */
                         border-radius: 16px 0 0 0;
                     }
-                    /* Wait, border-radius needs the vertical border to curve. */
-                    /* Since I removed border-left from ::after, the curve might look broken for first-child::after if I relied on border-left. */
-                    /* Actually, ::after is "Center to Right". ::before is "Left to Center". */
-                    /* If I am first child (Leftmost), I have ::after (going to center). ::before is hidden. */
-                    /* If I am last child (Rightmost), I have ::before (going to center). ::after is hidden. */
 
-                    /* The "corner" is where the horizontal line meets the vertical line FROM THE PARENT? No. */
-                    /* The corner is where the horizontal line meets the vertical line TO THE CHILD? No. */
-                    /* In standard tree, the vertical line drops from parent, hits the bar. */
-                    /* The bar splits to children. */
-                    /* At the child end, the horizontal bar meets the vertical line down to the card. */
-                    /* If I separated horizontal and vertical, the "corner" is formed by the intersection. */
-                    /* It is a sharp 90 degree turn. */
-                    /* If we want rounded corners, we need the border-radius on the element that has both borders. */
-                    /* But now I separated them. */
-                    /* So we lose rounded corners at the "T" junction above the card? */
-                    /* Actually, standard tree has rounded corners at the PARENT end? */
-                    /* "last-child::before": Is the line from Left-Edge to Center. */
-                    /* It has border-right (Vertical Up to Parent?) and border-top. */
-                    /* Wait, standard tree CSS relies on border-right of ::before to be the vertical line? */
-                    /* No, usually ul::before is the vertical line. */
-
-                    /* Let's stick to sharp corners or simple corners for now to ensure robustness of highlighting. */
-                    /* The separation gives us control. Rounded corners can be added later if needed, but are complex with path tracing. */
-
-                    .org-leaf:last-child::before {
-                        border-right: 2px solid var(--line-color);
-                        border-radius: 0 16px 0 0;
-                    }
-                     .org-leaf:first-child::after {
-                        border-left: 2px solid var(--line-color);
-                        border-radius: 16px 0 0 0;
-                    }
-                    /* Re-adding border-left/right for corners on outer nodes implies vertical lines exist there. */
-                    /* But ::before/::after are 30px high. */
-                    /* And my vertical connector is centered. */
-                    /* If I have border-right on last-child::before (which is "Left to Center"), that vertical line is at the CENTER of the node? */
-                    /* Yes, ::before is right: 50%. border-right is at the center. */
-                    /* So this creates a vertical line at the center, going up? */
-                    /* Yes. This connects to the parent vertical line. */
-                    /* So removing border-left from ::after generally breaks the "Center Up" connection for first-child? */
-
-                    /* Refined Plan: */
-                    /* The vertical line UP to the parent is formed by: */
-                    /* 1. ul::before (Parent down to middle of children). */
-                    /* 2. For last-child: ::before border-right (at center). */
-                    /* 3. For first-child: ::after border-left (at center). */
-                    /* 4. For middle children: No vertical line up needed? They are under the bar. */
-
-                    /* Actually, usually the parent line drops to the siblings' common bar. */
-                    /* The common bar is formed by all siblings. */
-                    /* No vertical line UP from specific siblings is needed to meet the parent, except to close the gap? */
-                    /* ul::before height is 30px. */
-                    /* li padding-top is 0 in standard tree? No, usually 20px. */
-                    /* The horizontal bar is at the top of li. */
-                    /* So ul::before meets li top. */
-
-                    /* My Vertical Connector (down to card) is separate. */
-                    /* So I should keep the corner logic for the top junctions if possible, but highlighting them is tricky. */
-                    /* Let's disable rounded corners for now to ensure the lines meet perfectly without gaps. */
                     .org-leaf:last-child::before { border-right: none; border-radius: 0; }
                     .org-leaf:first-child::after { border-left: none; border-radius: 0; }
 
@@ -762,4 +767,4 @@ import{a,j as e,c as pe}from"./index-Q695sD3D.js";/**
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
 
-                `})]})})};pe.createRoot(document.getElementById("root")).render(e.jsx(a.StrictMode,{children:e.jsx(Ze,{})}));
+                `})]})})};se.createRoot(document.getElementById("root")).render(e.jsx(a.StrictMode,{children:e.jsx(Fe,{})}));
