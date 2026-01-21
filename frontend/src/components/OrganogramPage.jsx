@@ -713,16 +713,18 @@ const OrganogramPage = () => {
                     .org-leaf.conn-active::before,
                     .org-leaf.conn-active::after {
                         border-color: var(--line-active);
-                        /* Use drop-shadow to only highlight the border line, not the bounding box */
-                        filter: drop-shadow(0 0 2px var(--line-active));
+                        /* Remove shadows/filters to prevent "ghost box" artifacts */
+                        box-shadow: none;
+                        filter: none;
                         z-index: 1;
+                        pointer-events: none;
                     }
 
-                    /* Pulse Animation */
+                    /* Pulse Animation (Opacity only) */
                     @keyframes pulse-line {
-                        0% { opacity: 0.6; }
-                        50% { opacity: 1; filter: drop-shadow(0 0 4px var(--line-active)); }
-                        100% { opacity: 0.6; }
+                        0% { opacity: 0.5; }
+                        50% { opacity: 1; }
+                        100% { opacity: 0.5; }
                     }
 
                     .org-leaf.conn-active::before,
