@@ -17,6 +17,7 @@ const OrganogramContext = createContext({
     hoveredNodeId: null,
     setHoveredNodeId: () => {},
     focusedNodeId: null,
+    setFocusedNodeId: () => {},
     ancestorIds: new Set(),
 });
 
@@ -60,7 +61,7 @@ const getInitials = (name) => {
 // --- Components ---
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, ancestorIds } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
@@ -411,7 +412,7 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, ancestorIds }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
