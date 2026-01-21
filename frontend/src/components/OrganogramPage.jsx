@@ -396,7 +396,13 @@ const OrganogramPage = () => {
         const pivot = (displayNodes.length - 1) / 2;
 
         return (
-            <ul className={`org-tree ${isGroupActive ? 'group-active' : ''}`}>
+            <ul
+                className={`org-tree ${isGroupActive ? 'group-active' : ''}`}
+                style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${displayNodes.length}, 1fr)`,
+                }}
+            >
                 {displayNodes.map((node, index) => {
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
