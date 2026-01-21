@@ -970,10 +970,17 @@ def ad_tree():
             manifest = json.load(f)
 
         # A chave de entrada correta geralmente corresponde ao arquivo de entrada do projeto Vite
-        entry_point_key = 'src/main.jsx'
-        if entry_point_key not in manifest:
-            # Fallback para a primeira chave se o nome não for o esperado
-            entry_point_key = next(iter(manifest))
+        # Tenta chaves comuns para encontrar o ponto de entrada correto
+        possible_keys = ['index.html', 'src/main.jsx', 'src/main.tsx', 'src/main.js']
+        entry_point_key = next((key for key in possible_keys if key in manifest), None)
+
+        if not entry_point_key:
+            # Fallback para encontrar qualquer entrada marcada como isEntry: true
+            entry_point_key = next((key for key, value in manifest.items() if value.get('isEntry')), None)
+
+        if not entry_point_key:
+             # Fallback final (arriscado, pois pode pegar um chunk ou css)
+             entry_point_key = next(iter(manifest))
 
         entry_point = manifest[entry_point_key]
         js_file = entry_point.get('file')
