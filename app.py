@@ -473,7 +473,8 @@ def get_all_ous(conn):
             # O nome vem do atributo 'ou' para OUs e 'cn' para Containers/Builtin
             node_name = str(ou_val) if 'organizationalUnit' in obj_class else str(cn_val)
 
-            nodes[dn] = {
+            # Store nodes with lowercase DN keys to handle case-insensitivity of AD
+            nodes[dn.lower()] = {
                 'text': node_name,
                 'dn': dn,
                 'nodes': []
@@ -487,13 +488,15 @@ def get_all_ous(conn):
 
     tree_roots = []
     # Second pass: link nodes together.
-    for dn, node in nodes.items():
-        # Determine the parent DN by removing the first component of the current DN.
-        parent_dn = ','.join(dn.split(',')[1:])
+    for dn_lower, node in nodes.items():
+        # Determine the parent DN by removing the first component of the current DN (lowercase key).
+        # Note: We use the key (dn_lower) to calculate the parent key.
+        parts = dn_lower.split(',')
+        parent_dn_lower = ','.join(parts[1:]) if len(parts) > 1 else None
 
         # If the parent DN exists in our dictionary, it's a child of that parent.
-        if parent_dn in nodes:
-            nodes[parent_dn]['nodes'].append(node)
+        if parent_dn_lower and parent_dn_lower in nodes:
+            nodes[parent_dn_lower]['nodes'].append(node)
         # Otherwise, it's a root node in our hierarchy.
         else:
             tree_roots.append(node)
