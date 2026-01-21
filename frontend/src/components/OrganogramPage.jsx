@@ -713,14 +713,15 @@ const OrganogramPage = () => {
                     .org-leaf.conn-active::before,
                     .org-leaf.conn-active::after {
                         border-color: var(--line-active);
-                        box-shadow: 0 -1px 4px rgba(59, 130, 246, 0.4);
+                        /* Use drop-shadow to only highlight the border line, not the bounding box */
+                        filter: drop-shadow(0 0 2px var(--line-active));
                         z-index: 1;
                     }
 
                     /* Pulse Animation */
                     @keyframes pulse-line {
                         0% { opacity: 0.6; }
-                        50% { opacity: 1; box-shadow: 0 0 8px var(--line-active); }
+                        50% { opacity: 1; filter: drop-shadow(0 0 4px var(--line-active)); }
                         100% { opacity: 0.6; }
                     }
 
