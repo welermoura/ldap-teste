@@ -730,20 +730,32 @@ const OrganogramPage = () => {
                         max-width: 1200px;
                     }
 
-                    /* Grid Parent Connector */
+                    /* Grid Parent Connector - Vertical Stem */
                     .org-grid-wrapper::before {
                         content: '';
                         position: absolute;
                         top: 0;
                         left: 50%;
                         width: 2px;
-                        height: 60px;
+                        height: 30px; /* Halfway down */
                         background-color: var(--line-color);
                         transform: translateX(-50%);
                         transition: background-color 0.2s;
                     }
 
-                    .org-grid-wrapper.grid-active::before {
+                    /* Grid Horizontal Bus Bar */
+                    .org-grid-wrapper::after {
+                        content: '';
+                        position: absolute;
+                        top: 30px; /* Starts where the stem ends */
+                        left: 16.66%; /* Starts at the center of the first column (100/3/2 = 16.66) */
+                        right: 16.66%; /* Ends at the center of the last column */
+                        height: 2px;
+                        background-color: var(--line-color);
+                    }
+
+                    .org-grid-wrapper.grid-active::before,
+                    .org-grid-wrapper.grid-active::after {
                         background-color: var(--line-active);
                         animation: pulse-line 2s infinite ease-in-out;
                     }
@@ -755,25 +767,24 @@ const OrganogramPage = () => {
                         position: relative;
                     }
 
-                    /* Grid Item "Line Up" to form 'Comb' look?
-                       Or just let them float? User said "linha de conexão deve ser mantida".
-                       Usually means a line from the top of the card connects to the grid structure.
-                       Let's add a small line up from each card that fades out or connects to a conceptual bar.
-                       But in a 3-col grid, connecting to a single bar is messy.
-                       Simple approach: Just the card. The parent line connects to the *Group*.
-                       However, let's add a small vertical ticker on top of each card to imply connection.
-                    */
+                    /* Grid Item Connections */
                      .grid-item::before {
                         content: '';
                         position: absolute;
-                        top: -15px;
+                        top: -30px; /* Connects up to the grid padding area */
                         width: 2px;
-                        height: 15px;
+                        height: 30px;
                         background-color: var(--line-color);
+                        z-index: 0;
                      }
+
+                     /* Grid Horizontal Connector (The 'Bus') */
+                     /* We put a pseudo element on the grid items in the first row to connect them?
+                        No, that's hard. Better to put a background line on the wrapper. */
 
                      .grid-item.grid-item-active::before {
                         background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
                      }
 
                     /* Compact Card for Grid */
