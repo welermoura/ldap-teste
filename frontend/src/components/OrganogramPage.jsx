@@ -343,6 +343,9 @@ const OrganogramPage = () => {
         const displayNodes = shouldGroup ? nodes.slice(0, GROUP_LIMIT) : nodes;
         const remainingCount = nodes.length - GROUP_LIMIT;
 
+        // Determine target for path logic
+        const targetId = hoveredNodeId || focusedNodeId;
+
         return (
             <ul className="org-tree">
                 {displayNodes.map((node, index) => {
@@ -354,8 +357,13 @@ const OrganogramPage = () => {
                     const isPathActive = (ancestorIds.has(parentId) && ancestorIds.has(key)) ||
                                          (hoveredNodeId === parentId);
 
+                    // Downward Connection Logic (Pass-through ancestor)
+                    // If this node is in the ancestor path AND is NOT the final target,
+                    // it means the path flows through it to a child.
+                    const isPassThrough = ancestorIds.has(key) && key !== targetId;
+
                     return (
-                        <li key={key} className={`org-leaf ${isPathActive ? 'conn-active' : ''}`}>
+                        <li key={key} className={`org-leaf ${isPathActive ? 'conn-active' : ''} ${isPassThrough ? 'conn-descendant' : ''}`}>
                             <NodeCard
                                 node={node}
                                 isExpanded={isExpanded}
@@ -752,6 +760,16 @@ const OrganogramPage = () => {
                     /* Prevent active state from highlighting outer arms */
                     .org-leaf:first-child.conn-active::before { border-color: transparent; }
                     .org-leaf:last-child.conn-active::after { border-color: transparent; }
+
+                    /* Highlight downward line for pass-through ancestors */
+                    .org-leaf.conn-descendant > ul::before {
+                        background-color: var(--line-active);
+                    }
+
+                    /* Highlight vertical connector for only-child */
+                    .org-leaf:only-child.conn-active > .org-card::before {
+                        background-color: var(--line-active);
+                    }
 
                     /* --- Card Styles --- */
                     .org-card {
