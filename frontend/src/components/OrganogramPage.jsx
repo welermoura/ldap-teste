@@ -767,8 +767,8 @@ const OrganogramPage = () => {
                         position: relative;
                     }
 
-                    /* Grid Item Connections */
-                     .grid-item::before {
+                    /* Grid Item Connections - Top Row Only */
+                     .grid-item:nth-child(-n+3)::before {
                         content: '';
                         position: absolute;
                         top: -30px; /* Connects up to the grid padding area */
