@@ -641,7 +641,7 @@ const OrganogramPage = () => {
 
                     .org-leaf {
                         position: relative;
-                        padding: 60px 24px 0 24px; /* Increased spacing */
+                        padding: 60px 32px 0 32px; /* Increased horizontal spacing to prevent overlap */
                         display: flex;
                         flex-direction: column;
                         align-items: center;
@@ -681,8 +681,25 @@ const OrganogramPage = () => {
                     /* Exceptions */
                     .tree-wrapper > .org-tree::before { display: none; }
                     .tree-wrapper > .org-tree > .org-leaf { padding-top: 0; }
-                    .org-leaf:only-child::after, .org-leaf:only-child::before { display: none; }
-                    .org-leaf:only-child { padding-top: 0; }
+                    /* Ensure vertical connector remains for only-child, just hide horizontal arms */
+                    .org-leaf:only-child::after { display: none; }
+                    .org-leaf:only-child::before { display: none; }
+                    /* But we need a vertical line for only-child if padding exists */
+                    /* Actually, standard tree usually relies on the parent's UL having a line down.
+                       If we keep padding-top: 60px, we need a line to bridge it.
+                       Let's add a specific connector for only-child */
+                    .org-leaf:only-child { padding-top: 60px; }
+                    .org-leaf:only-child > .org-card::before {
+                        content: '';
+                        position: absolute;
+                        top: -30px; /* Bridge the gap from the parent's line */
+                        left: 50%;
+                        width: 2px;
+                        height: 30px;
+                        background-color: var(--line-color);
+                        transform: translateX(-50%);
+                    }
+
                     .org-leaf:first-child::before, .org-leaf:last-child::after { border: 0 none; }
 
                     /* Corners */
