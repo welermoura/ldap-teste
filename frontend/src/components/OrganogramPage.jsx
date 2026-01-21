@@ -60,7 +60,7 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
+const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem }) => {
     const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
@@ -106,6 +106,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             id={nodeId}
             className={`
                 org-card
+                ${isGridItem ? 'card-grid' : ''}
                 ${isMatch ? 'highlight' : ''}
                 ${isExecutive ? 'executive' : ''}
                 ${isHovered ? 'state-active' : ''}
@@ -174,7 +175,6 @@ const OrganogramPage = () => {
     const [error, setError] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [expandedNodes, setExpandedNodes] = useState(new Set());
-    const [expandedGroups, setExpandedGroups] = useState(new Set()); // For "+N others"
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
     const [ancestorIds, setAncestorIds] = useState(new Set());
@@ -333,15 +333,11 @@ const OrganogramPage = () => {
     };
 
     // Recursively render tree
-    const renderTree = (nodes, parentId = null, parentKey = null) => {
+    const renderTree = (nodes, parentId = null) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
-        const GROUP_LIMIT = 8;
-        const isGroupExpanded = parentKey && expandedGroups.has(parentKey);
-        const shouldGroup = nodes.length > GROUP_LIMIT && !isGroupExpanded;
-
-        const displayNodes = shouldGroup ? nodes.slice(0, GROUP_LIMIT) : nodes;
-        const remainingCount = nodes.length - GROUP_LIMIT;
+        const GRID_THRESHOLD = 8;
+        const useGrid = nodes.length > GRID_THRESHOLD;
 
         // Determine target for path logic
         const targetId = hoveredNodeId || focusedNodeId;
@@ -350,17 +346,54 @@ const OrganogramPage = () => {
         // 1. Identify which child is part of the active path (ancestor or target)
         let activeChildIndex = -1;
         if (targetId || ancestorIds.size > 0) {
-            activeChildIndex = displayNodes.findIndex(node => {
+            activeChildIndex = nodes.findIndex(node => {
                 const nid = node.distinguishedName;
                 return (nid === targetId) || (ancestorIds.has(nid));
             });
         }
 
-        // 2. Determine Pivot (Center of the group)
-        const pivot = (displayNodes.length - 1) / 2;
-
         // If an active path exists within this group, the line to the parent must be active
         const isGroupActive = activeChildIndex !== -1;
+
+        if (useGrid) {
+            return (
+                <div className={`org-grid-wrapper ${isGroupActive ? 'grid-active' : ''}`}>
+                    {nodes.map((node, index) => {
+                        const key = node.distinguishedName || index;
+                        const hasChildren = node.children && node.children.length > 0;
+                        const isExpanded = expandedNodes.has(key);
+
+                        // In Grid, we just show simple connection up to the container
+                        const isActive = activeChildIndex === index;
+
+                        return (
+                            <div key={key} className={`grid-item ${isActive ? 'grid-item-active' : ''}`}>
+                                <NodeCard
+                                    node={node}
+                                    isExpanded={isExpanded}
+                                    toggleNode={() => toggleNode(key)}
+                                    hasChildren={hasChildren}
+                                    isMatch={false}
+                                    parentId={parentId}
+                                    isGridItem={true}
+                                />
+                                {hasChildren && isExpanded && (
+                                    <div className="grid-sub-tree">
+                                        {renderTree(node.children, key)}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        // Standard Tree View (Flex Row)
+        const displayNodes = nodes; // No collapsing for standard view logic anymore
+
+        // 2. Determine Pivot (Center of the group)
+        const pivot = (displayNodes.length - 1) / 2;
 
         return (
             <ul className={`org-tree ${isGroupActive ? 'group-active' : ''}`}>
@@ -423,36 +456,10 @@ const OrganogramPage = () => {
                                 isMatch={false}
                                 parentId={parentId}
                             />
-                            {hasChildren && isExpanded && renderTree(node.children, key, key)}
+                            {hasChildren && isExpanded && renderTree(node.children, key)}
                         </li>
                     );
                 })}
-
-                {shouldGroup && (
-                    <li className="org-leaf">
-                         <div className="connector-vertical"></div>
-                         <div
-                            className="org-card group-node"
-                            onClick={() => setExpandedGroups(prev => new Set([...prev, parentKey]))}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    setExpandedGroups(prev => new Set([...prev, parentKey]));
-                                }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            title="Expandir todos"
-                         >
-                            <div className="card-body" style={{ alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-                                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
-                                    +{remainingCount} Colaboradores
-                                </span>
-                                <ChevronDown size={16} color="var(--text-secondary)" />
-                            </div>
-                         </div>
-                    </li>
-                )}
             </ul>
         );
     };
@@ -706,6 +713,69 @@ const OrganogramPage = () => {
                         align-items: center;
                     }
 
+                    /* --- Grid Layout (For large teams > 8) --- */
+                    .org-grid-wrapper {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr); /* 3 Columns */
+                        gap: 24px;
+                        padding-top: 60px; /* Space for parent connector */
+                        position: relative;
+                        width: 100%;
+                        max-width: 1200px;
+                    }
+
+                    /* Grid Parent Connector */
+                    .org-grid-wrapper::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 50%;
+                        width: 2px;
+                        height: 60px;
+                        background-color: var(--line-color);
+                        transform: translateX(-50%);
+                        transition: background-color 0.2s;
+                    }
+
+                    .org-grid-wrapper.grid-active::before {
+                        background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
+                    }
+
+                    .grid-item {
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        position: relative;
+                    }
+
+                    /* Grid Item "Line Up" to form 'Comb' look?
+                       Or just let them float? User said "linha de conexão deve ser mantida".
+                       Usually means a line from the top of the card connects to the grid structure.
+                       Let's add a small line up from each card that fades out or connects to a conceptual bar.
+                       But in a 3-col grid, connecting to a single bar is messy.
+                       Simple approach: Just the card. The parent line connects to the *Group*.
+                       However, let's add a small vertical ticker on top of each card to imply connection.
+                    */
+                     .grid-item::before {
+                        content: '';
+                        position: absolute;
+                        top: -15px;
+                        width: 2px;
+                        height: 15px;
+                        background-color: var(--line-color);
+                     }
+
+                     .grid-item.grid-item-active::before {
+                        background-color: var(--line-active);
+                     }
+
+                    /* Compact Card for Grid */
+                    .card-grid {
+                        width: 100%; /* Fill grid cell */
+                        max-width: 320px;
+                    }
+
                     /* --- Connectors --- */
                     /* Vertical line from parent (ul::before) */
                     .org-tree::before {
@@ -771,66 +841,7 @@ const OrganogramPage = () => {
                         border-left: 2px solid var(--line-color); /* Add border-left back for the corner curve? No. */
                         border-radius: 16px 0 0 0;
                     }
-                    /* Wait, border-radius needs the vertical border to curve. */
-                    /* Since I removed border-left from ::after, the curve might look broken for first-child::after if I relied on border-left. */
-                    /* Actually, ::after is "Center to Right". ::before is "Left to Center". */
-                    /* If I am first child (Leftmost), I have ::after (going to center). ::before is hidden. */
-                    /* If I am last child (Rightmost), I have ::before (going to center). ::after is hidden. */
 
-                    /* The "corner" is where the horizontal line meets the vertical line FROM THE PARENT? No. */
-                    /* The corner is where the horizontal line meets the vertical line TO THE CHILD? No. */
-                    /* In standard tree, the vertical line drops from parent, hits the bar. */
-                    /* The bar splits to children. */
-                    /* At the child end, the horizontal bar meets the vertical line down to the card. */
-                    /* If I separated horizontal and vertical, the "corner" is formed by the intersection. */
-                    /* It is a sharp 90 degree turn. */
-                    /* If we want rounded corners, we need the border-radius on the element that has both borders. */
-                    /* But now I separated them. */
-                    /* So we lose rounded corners at the "T" junction above the card? */
-                    /* Actually, standard tree has rounded corners at the PARENT end? */
-                    /* "last-child::before": Is the line from Left-Edge to Center. */
-                    /* It has border-right (Vertical Up to Parent?) and border-top. */
-                    /* Wait, standard tree CSS relies on border-right of ::before to be the vertical line? */
-                    /* No, usually ul::before is the vertical line. */
-
-                    /* Let's stick to sharp corners or simple corners for now to ensure robustness of highlighting. */
-                    /* The separation gives us control. Rounded corners can be added later if needed, but are complex with path tracing. */
-
-                    .org-leaf:last-child::before {
-                        border-right: 2px solid var(--line-color);
-                        border-radius: 0 16px 0 0;
-                    }
-                     .org-leaf:first-child::after {
-                        border-left: 2px solid var(--line-color);
-                        border-radius: 16px 0 0 0;
-                    }
-                    /* Re-adding border-left/right for corners on outer nodes implies vertical lines exist there. */
-                    /* But ::before/::after are 30px high. */
-                    /* And my vertical connector is centered. */
-                    /* If I have border-right on last-child::before (which is "Left to Center"), that vertical line is at the CENTER of the node? */
-                    /* Yes, ::before is right: 50%. border-right is at the center. */
-                    /* So this creates a vertical line at the center, going up? */
-                    /* Yes. This connects to the parent vertical line. */
-                    /* So removing border-left from ::after generally breaks the "Center Up" connection for first-child? */
-
-                    /* Refined Plan: */
-                    /* The vertical line UP to the parent is formed by: */
-                    /* 1. ul::before (Parent down to middle of children). */
-                    /* 2. For last-child: ::before border-right (at center). */
-                    /* 3. For first-child: ::after border-left (at center). */
-                    /* 4. For middle children: No vertical line up needed? They are under the bar. */
-
-                    /* Actually, usually the parent line drops to the siblings' common bar. */
-                    /* The common bar is formed by all siblings. */
-                    /* No vertical line UP from specific siblings is needed to meet the parent, except to close the gap? */
-                    /* ul::before height is 30px. */
-                    /* li padding-top is 0 in standard tree? No, usually 20px. */
-                    /* The horizontal bar is at the top of li. */
-                    /* So ul::before meets li top. */
-
-                    /* My Vertical Connector (down to card) is separate. */
-                    /* So I should keep the corner logic for the top junctions if possible, but highlighting them is tricky. */
-                    /* Let's disable rounded corners for now to ensure the lines meet perfectly without gaps. */
                     .org-leaf:last-child::before { border-right: none; border-radius: 0; }
                     .org-leaf:first-child::after { border-left: none; border-radius: 0; }
 

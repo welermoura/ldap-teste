@@ -1,0 +1,28 @@
+[
+  {
+    "distinguishedName": "CN=CEO,OU=Users,DC=example,DC=com",
+    "name": "Chief Executive",
+    "title": "CEO",
+    "department": "Executive",
+    "children": [
+      {
+        "distinguishedName": "CN=Director,OU=Users,DC=example,DC=com",
+        "name": "Director Big Team",
+        "title": "Director",
+        "department": "Management",
+        "children": [
+          { "distinguishedName": "CN=Sub1,OU=Users,DC=example,DC=com", "name": "Subordinate One", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub2,OU=Users,DC=example,DC=com", "name": "Subordinate Two", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub3,OU=Users,DC=example,DC=com", "name": "Subordinate Three", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub4,OU=Users,DC=example,DC=com", "name": "Subordinate Four", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub5,OU=Users,DC=example,DC=com", "name": "Subordinate Five", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub6,OU=Users,DC=example,DC=com", "name": "Subordinate Six", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub7,OU=Users,DC=example,DC=com", "name": "Subordinate Seven", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub8,OU=Users,DC=example,DC=com", "name": "Subordinate Eight", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub9,OU=Users,DC=example,DC=com", "name": "Subordinate Nine", "title": "Worker", "department": "Tech" },
+          { "distinguishedName": "CN=Sub10,OU=Users,DC=example,DC=com", "name": "Subordinate Ten", "title": "Worker", "department": "Tech" }
+        ]
+      }
+    ]
+  }
+]
