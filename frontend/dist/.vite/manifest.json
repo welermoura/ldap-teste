@@ -1,34 +1,34 @@
 {
-  "_index-CYWzNrwl.js": {
-    "file": "assets/index-CYWzNrwl.js",
+  "_index-DQ3P1g1z.css": {
+    "file": "assets/index-DQ3P1g1z.css",
+    "src": "_index-DQ3P1g1z.css"
+  },
+  "_index-Q695sD3D.js": {
+    "file": "assets/index-Q695sD3D.js",
     "name": "index",
     "css": [
       "assets/index-DQ3P1g1z.css"
     ]
   },
-  "_index-DQ3P1g1z.css": {
-    "file": "assets/index-DQ3P1g1z.css",
-    "src": "_index-DQ3P1g1z.css"
-  },
   "index.html": {
-    "file": "assets/main-dqlnoRDb.js",
+    "file": "assets/main-D8WiLPQ7.js",
     "name": "main",
     "src": "index.html",
     "isEntry": true,
     "imports": [
-      "_index-CYWzNrwl.js"
+      "_index-Q695sD3D.js"
     ],
     "css": [
       "assets/main-B-KDcPXC.css"
     ]
   },
   "organograma.html": {
-    "file": "assets/organograma-Ctgi5mzg.js",
+    "file": "assets/organograma-gHmmHjY4.js",
     "name": "organograma",
     "src": "organograma.html",
     "isEntry": true,
     "imports": [
-      "_index-CYWzNrwl.js"
+      "_index-Q695sD3D.js"
     ]
   }
 }

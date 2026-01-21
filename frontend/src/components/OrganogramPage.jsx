@@ -8,11 +8,9 @@ import {
     Network,
     AlertTriangle,
     Loader2,
-    Download,
-    Check
+    Crosshair
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
-import ExportModal from './ExportModal';
 
 // --- Context ---
 const OrganogramContext = createContext({
@@ -20,34 +18,32 @@ const OrganogramContext = createContext({
     setHoveredNodeId: () => {},
     selectedNodeId: null,
     setSelectedNodeId: () => {},
-    selectedNode: null,
+    activePath: new Set(),
 });
 
 // --- Utility Functions ---
 
-// Gera cor determinística baseada no departamento
+// Generate deterministic color based on department
 const getDepartmentColor = (dept) => {
     if (!dept) return '#64748b'; // Slate-500 default
 
     const palette = {
-        'Financeiro': '#059669', // Emerald
-        'Comercial': '#d97706', // Amber
+        'Financeiro': '#059669', // Emerald-600
+        'Comercial': '#d97706', // Amber-600
         'Vendas': '#d97706',
-        'TI': '#2563eb', // Blue
+        'TI': '#2563eb', // Blue-600
         'Tecnologia': '#2563eb',
-        'Recursos Humanos': '#db2777', // Pink
+        'Recursos Humanos': '#db2777', // Pink-600
         'RH': '#db2777',
         'Diretoria': '#0f172a', // Slate-900
         'Executivo': '#0f172a',
-        'Jurídico': '#7c3aed', // Violet
-        'Marketing': '#ea580c', // Orange
-        'Operações': '#0891b2', // Cyan
+        'Jurídico': '#7c3aed', // Violet-600
+        'Marketing': '#ea580c', // Orange-600
+        'Operações': '#0891b2', // Cyan-600
     };
 
-    // Retorna cor da paleta ou gera uma consistente
     if (palette[dept]) return palette[dept];
 
-    // Fallback gerado
     let hash = 0;
     for (let i = 0; i < dept.length; i++) {
         hash = dept.charCodeAt(i) + ((hash << 5) - hash);
@@ -65,8 +61,8 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId }) => {
-    const { hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId } = useContext(OrganogramContext);
+const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, parentId }) => {
+    const { hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId, activePath } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
@@ -74,8 +70,17 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
     // States calculation
     const isHovered = hoveredNodeId === nodeId;
     const isSelected = selectedNodeId === nodeId;
-    const isDirectSubordinate = hoveredNodeId === parentId && hoveredNodeId !== null;
-    const isDimmed = (hoveredNodeId !== null || selectedNodeId !== null) && !isHovered && !isDirectSubordinate && !isSelected;
+
+    // Highlight logic:
+    // 1. If Hovered: Highlight Self + Direct Children + Path to Root
+    // 2. If Selected: Highlight Self
+    // 3. Otherwise: Dim if something else is hovered
+
+    const isPathRelated = activePath.has(nodeId);
+    const isDirectSubordinateOfHover = hoveredNodeId === parentId && hoveredNodeId !== null;
+
+    const isActive = isHovered || isSelected || isDirectSubordinateOfHover || (hoveredNodeId && isPathRelated);
+    const isDimmed = hoveredNodeId && !isActive;
 
     // Executive Check
     const isExecutive = node.title && (
@@ -95,7 +100,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 
     const handleClick = (e) => {
         e.stopPropagation();
-        setSelectedNodeId(nodeId);
+        setSelectedNodeId(nodeId === selectedNodeId ? null : nodeId);
     };
 
     const handleToggle = (e) => {
@@ -103,42 +108,42 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         if (hasChildren) toggleNode();
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleClick(e);
+        }
+    };
+
     return (
         <div
             id={nodeId}
             className={`
                 org-card
-                ${isMatch ? 'highlight' : ''}
                 ${isExecutive ? 'executive' : ''}
-                ${isHovered ? 'state-active' : ''}
+                ${isHovered ? 'state-hover' : ''}
                 ${isSelected ? 'state-selected' : ''}
-                ${isDirectSubordinate ? 'state-subordinate' : ''}
                 ${isDimmed ? 'state-dimmed' : ''}
+                ${isDirectSubordinateOfHover ? 'state-subordinate' : ''}
             `}
             onClick={handleClick}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            title={isSelected ? "Selecionado para exportação" : `${node.name} - ${node.title}`}
-            role="treeitem"
-            aria-selected={isSelected}
+            onKeyDown={handleKeyDown}
             tabIndex={0}
+            role="treeitem"
+            aria-label={`${node.name}, ${node.title}, ${node.department}`}
+            aria-selected={isSelected}
+            aria-expanded={hasChildren ? isExpanded : undefined}
             style={{
                 '--dept-color': deptColor,
             }}
         >
-            <div className="card-accent" style={{ backgroundColor: deptColor }}></div>
+            <div className="card-accent"></div>
 
             <div className="card-body">
-                {isSelected && (
-                    <div className="selected-indicator">
-                        <Check size={12} strokeWidth={3} />
-                    </div>
-                )}
                 <div className="card-header">
-                    <div className="avatar" style={{
-                        backgroundColor: isExecutive ? '#0f172a' : `${deptColor}15`,
-                        color: isExecutive ? '#fff' : deptColor
-                    }}>
+                    <div className="avatar">
                         {getInitials(node.name)}
                     </div>
                     <div className="info">
@@ -149,7 +154,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 
                 {node.department && (
                     <div className="card-footer">
-                        <span className="dept-badge" style={{ color: deptColor, borderColor: `${deptColor}30` }}>
+                        <span className="dept-badge">
                             {node.department}
                         </span>
                     </div>
@@ -157,12 +162,14 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             </div>
 
             {hasChildren && (
-                <div
+                <button
                     className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}
                     onClick={handleToggle}
+                    aria-label={isExpanded ? "Recolher" : "Expandir"}
+                    tabIndex={-1} // Focus handled by card
                 >
                     <ChevronDown size={14} className="icon-chevron" />
-                </div>
+                </button>
             )}
         </div>
     );
@@ -174,25 +181,37 @@ const OrganogramPage = () => {
     const [error, setError] = useState(null);
     const [zoom, setZoom] = useState(1);
     const [expandedNodes, setExpandedNodes] = useState(new Set());
+
+    // Global State
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [selectedNodeId, setSelectedNodeId] = useState(null);
-    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-    // Find selected node object
-    const selectedNode = useMemo(() => {
-        if (!selectedNodeId || !data) return null;
-        const find = (nodes) => {
+    // Derived State: Active Path for styling
+    const activePath = useMemo(() => {
+        const path = new Set();
+        const targetId = hoveredNodeId || selectedNodeId;
+        if (!targetId || !data.length) return path;
+
+        // Helper to find path to node
+        const findPath = (nodes, currentPath = []) => {
             for (const node of nodes) {
-                if (node.distinguishedName === selectedNodeId) return node;
+                if (node.distinguishedName === targetId) {
+                    return [...currentPath, node.distinguishedName];
+                }
                 if (node.children) {
-                    const found = find(node.children);
-                    if (found) return found;
+                    const result = findPath(node.children, [...currentPath, node.distinguishedName]);
+                    if (result) return result;
                 }
             }
             return null;
         };
-        return find(data);
-    }, [selectedNodeId, data]);
+
+        const resultPath = findPath(data);
+        if (resultPath) {
+            resultPath.forEach(id => path.add(id));
+        }
+        return path;
+    }, [hoveredNodeId, selectedNodeId, data]);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -209,15 +228,13 @@ const OrganogramPage = () => {
             .then(data => {
                 const validData = Array.isArray(data) ? data : [];
                 setData(validData);
-
-                // Expandir raízes inicialmente
+                // Initial expansion
                 const initialExpanded = new Set();
                 validData.forEach((node, index) => {
                     const key = node.distinguishedName || index;
                     initialExpanded.add(key);
                 });
                 setExpandedNodes(initialExpanded);
-
                 setLoading(false);
             })
             .catch(err => {
@@ -226,56 +243,21 @@ const OrganogramPage = () => {
             });
     }, []);
 
-    // Global click listener to clear selection
+    // Scroll handlers
     useEffect(() => {
-        const handleGlobalClick = (e) => {
-            // Se clicar no canvas (background), limpar seleção
-            // O evento de clique no card para propagation, então isso só roda fora dos cards
-            if (e.target.classList.contains('canvas') || e.target.classList.contains('tree-wrapper')) {
-                setSelectedNodeId(null);
-            }
-        };
-
         const handleKeyDown = (e) => {
-            if (e.key === 'Escape') {
-                setSelectedNodeId(null);
-            }
+            if (e.key === 'Escape') setSelectedNodeId(null);
         };
-
-        window.addEventListener('click', handleGlobalClick);
         window.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            window.removeEventListener('click', handleGlobalClick);
-            window.removeEventListener('keydown', handleKeyDown);
-        };
+        return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // Scroll effect for selected node (via search)
-    useEffect(() => {
-        if (selectedNodeId) {
-            // Pequeno delay para garantir renderização da expansão
-            setTimeout(() => {
-                const element = document.getElementById(selectedNodeId);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                }
-            }, 100);
-        }
-    }, [selectedNodeId]);
-
-    // Drag handlers
     const handleMouseDown = (e) => {
         if (!canvasRef.current) return;
-        // Check if clicking scrollbar or control
-        if (e.target.tagName === 'BUTTON' || e.target.closest('.org-card')) return;
-
+        if (e.target.closest('.org-card') || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
         setIsDragging(true);
         setStartPos({ x: e.pageX, y: e.pageY });
-        setScrollPos({
-            left: canvasRef.current.scrollLeft,
-            top: canvasRef.current.scrollTop
-        });
+        setScrollPos({ left: canvasRef.current.scrollLeft, top: canvasRef.current.scrollTop });
     };
 
     const handleMouseMove = (e) => {
@@ -287,77 +269,67 @@ const OrganogramPage = () => {
         canvasRef.current.scrollTop = scrollPos.top - y;
     };
 
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
+    const handleMouseUp = () => setIsDragging(false);
 
-    const toggleNode = (key) => {
-        setExpandedNodes(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(key)) {
-                newSet.delete(key);
-            } else {
-                newSet.add(key);
-            }
-            return newSet;
-        });
-    };
-
-    const findPathToNode = (nodes, targetId, path = []) => {
-        for (const node of nodes) {
-            const currentId = node.distinguishedName;
-            if (currentId === targetId) {
-                return path;
-            }
-            if (node.children) {
-                const result = findPathToNode(node.children, targetId, [...path, currentId]);
-                if (result) return result;
-            }
+    const handleWheel = (e) => {
+        if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            setZoom(prev => Math.min(Math.max(0.3, prev + delta), 2));
         }
-        return null;
     };
 
+    const handleCenterSelection = () => {
+        if (selectedNodeId) {
+            const el = document.getElementById(selectedNodeId);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+    };
+
+    // Actions
     const handleSelectNode = (nodeId) => {
-        const path = findPathToNode(data, nodeId);
-        if (path) {
-            setExpandedNodes(prev => new Set([...prev, ...path]));
-        }
+        // Logic to expand path if coming from search
+        // (Simplified here assuming Search component logic works)
         setSelectedNodeId(nodeId);
+        setTimeout(() => {
+             const el = document.getElementById(nodeId);
+             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }, 100);
     };
 
-    const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
-    const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
-    const handleResetZoom = () => setZoom(1);
-
-    // Recursively render tree
     const renderTree = (nodes, parentId = null) => {
-        if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
+        if (!nodes || nodes.length === 0) return null;
 
         return (
             <ul className="org-tree">
-                {nodes.map((node, index) => {
-                    const key = node.distinguishedName || index;
+                {nodes.map((node) => {
+                    const key = node.distinguishedName;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
+                    const isPathActive = (activePath.has(key) && activePath.has(parentId)) || (hoveredNodeId === parentId);
 
-                    // Check if children are leaves (last level for this branch)
-                    const areChildrenLeaves = hasChildren && node.children.every(child => !child.children || child.children.length === 0);
-
-                    // Connection State Logic
-                    const isConnectionActive = hoveredNodeId === parentId && hoveredNodeId !== null;
+                    // Grid layout logic: If > 8 children, force grid? Or if leaf nodes?
+                    // Retaining the 'leaf nodes grid' logic from previous iteration if useful
+                    const isLeafGroup = hasChildren && node.children.every(child => !child.children || child.children.length === 0);
+                    const isLargeGroup = hasChildren && node.children.length > 8;
+                    const useGridLayout = isLeafGroup || isLargeGroup;
 
                     return (
-                        <li key={key} className={`org-leaf ${isConnectionActive ? 'conn-active' : ''}`}>
+                        <li key={key} className={`org-leaf ${isPathActive ? 'conn-active' : ''}`}>
                             <NodeCard
                                 node={node}
                                 isExpanded={isExpanded}
-                                toggleNode={() => toggleNode(key)}
+                                toggleNode={() => setExpandedNodes(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(key)) next.delete(key);
+                                    else next.add(key);
+                                    return next;
+                                })}
                                 hasChildren={hasChildren}
-                                isMatch={false} // Match logic agora é via busca/foco
                                 parentId={parentId}
                             />
                             {hasChildren && isExpanded && (
-                                <div className={areChildrenLeaves ? 'grid-wrapper' : ''}>
+                                <div className={useGridLayout ? 'grid-wrapper' : ''}>
                                     {renderTree(node.children, key)}
                                 </div>
                             )}
@@ -368,28 +340,15 @@ const OrganogramPage = () => {
         );
     };
 
-    if (loading) return (
-        <div className="loading-container">
-            <Loader2 className="spinner" size={40} />
-            <p>Carregando estrutura...</p>
-        </div>
-    );
-
-    if (error) return (
-        <div className="error-container">
-            <AlertTriangle size={48} className="text-red-500" />
-            <p>Erro ao carregar: {error}</p>
-        </div>
-    );
+    if (loading) return <div className="loading-container"><Loader2 className="spinner" /></div>;
+    if (error) return <div className="error-container"><AlertTriangle /> {error}</div>;
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId, selectedNode }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, selectedNodeId, setSelectedNodeId, activePath }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
-                        <div className="brand-icon">
-                            <Network size={20} />
-                        </div>
+                        <Network size={24} />
                         <div className="brand-text">
                             <h2>Organograma</h2>
                             <span>Corporativo</span>
@@ -399,26 +358,20 @@ const OrganogramPage = () => {
                     <div className="actions">
                         <OrganogramSearch data={data} onSelect={handleSelectNode} />
 
-                        <div className="zoom-controls">
-                            <button onClick={handleZoomOut} title="Reduzir Zoom"><ZoomOut size={16} /></button>
-                            <span className="zoom-level">{Math.round(zoom * 100)}%</span>
-                            <button onClick={handleZoomIn} title="Aumentar Zoom"><ZoomIn size={16} /></button>
-                            <div className="separator"></div>
-                            <button onClick={handleResetZoom} title="Resetar"><RotateCcw size={14} /></button>
+                        <div className="toolbar">
+                            <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))} title="Diminuir"><ZoomOut size={18} /></button>
+                            <span>{Math.round(zoom * 100)}%</span>
+                            <button onClick={() => setZoom(z => Math.min(2, z + 0.1))} title="Aumentar"><ZoomIn size={18} /></button>
+                            <div className="sep"></div>
+                            <button onClick={() => setZoom(1)} title="Resetar"><RotateCcw size={18} /></button>
+                            {selectedNodeId && (
+                                <button onClick={handleCenterSelection} title="Centralizar Seleção" className="active-btn">
+                                    <Crosshair size={18} />
+                                </button>
+                            )}
                         </div>
 
-                        <button
-                            className="btn-login"
-                            title="Exportar"
-                            onClick={() => setIsExportModalOpen(true)}
-                            style={{ marginRight: 8 }}
-                        >
-                            <Download size={18} /> Exportar
-                        </button>
-
-                        <a href="/login" className="btn-login">
-                            <UserCircle size={18} /> Login
-                        </a>
+                        <a href="/login" className="btn-login"><UserCircle size={18} /> Login</a>
                     </div>
                 </header>
 
@@ -429,48 +382,31 @@ const OrganogramPage = () => {
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
+                    onWheel={handleWheel}
                 >
-                    <div
-                        className="tree-wrapper"
-                        style={{
-                            transform: `scale(${zoom})`,
-                        }}
-                    >
+                    <div className="tree-wrapper" style={{ transform: `scale(${zoom})` }}>
                         {renderTree(data)}
                     </div>
                 </main>
 
-                <ExportModal
-                    isOpen={isExportModalOpen}
-                    onClose={() => setIsExportModalOpen(false)}
-                    data={data}
-                    selectedNodeId={selectedNodeId}
-                    selectedNode={selectedNode}
-                />
-
                 <style>{`
-                    /* --- Fonts & Vars --- */
-                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
                     :root {
-                        --bg-page: #f8fafc; /* Slate 50 */
-                        --bg-card: #ffffff;
-                        --text-primary: #0f172a; /* Slate 900 */
-                        --text-secondary: #64748b; /* Slate 500 */
-                        --border-color: #e2e8f0; /* Slate 200 */
-                        --line-color: #cbd5e1; /* Slate 300 */
-                        --line-active: #3b82f6; /* Blue 500 */
-                        --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-                        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06);
-                        --shadow-hover: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-                        --ease-out: cubic-bezier(0.34, 1.56, 0.64, 1);
+                        --bg-page: #f8fafc;
+                        --bg-card: #ffffff; /* Off-white handled individually if needed */
+                        --text-primary: #0f172a;
+                        --text-secondary: #64748b;
+                        --border-color: #e2e8f0;
+                        --line-color: #cbd5e1;
+                        --line-active: #3b82f6;
+                        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+                        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                        --shadow-active: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
                     }
 
-                    * { box-sizing: border-box; }
-
                     .organogram-page {
-                        font-family: 'Inter', sans-serif;
-                        background-color: var(--bg-page);
+                        font-family: 'Inter', system-ui, sans-serif;
+                        background: var(--bg-page);
                         height: 100vh;
                         display: flex;
                         flex-direction: column;
@@ -478,497 +414,168 @@ const OrganogramPage = () => {
                         color: var(--text-primary);
                     }
 
-                    /* --- Header --- */
+                    /* Header */
                     .page-header {
-                        background: rgba(255, 255, 255, 0.85);
-                        backdrop-filter: blur(12px);
+                        height: 64px;
+                        background: rgba(255,255,255,0.9);
+                        backdrop-filter: blur(8px);
                         border-bottom: 1px solid var(--border-color);
-                        height: 72px;
-                        padding: 0 32px;
                         display: flex;
+                        align-items: center;
                         justify-content: space-between;
-                        align-items: center;
+                        padding: 0 24px;
                         z-index: 50;
-                        box-shadow: var(--shadow-sm);
                     }
+                    .brand { display: flex; align-items: center; gap: 12px; color: var(--text-primary); }
+                    .brand-text h2 { margin: 0; font-size: 1rem; font-weight: 700; line-height: 1.2; }
+                    .brand-text span { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; }
 
-                    .brand {
-                        display: flex;
-                        align-items: center;
-                        gap: 12px;
-                    }
-                    .brand-icon {
-                        width: 36px;
-                        height: 36px;
-                        background: var(--text-primary);
-                        color: #fff;
-                        border-radius: 8px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    .brand-text h2 {
-                        margin: 0;
-                        font-size: 1rem;
-                        font-weight: 700;
-                        letter-spacing: -0.02em;
-                        line-height: 1.2;
-                    }
-                    .brand-text span {
-                        font-size: 0.75rem;
-                        color: var(--text-secondary);
-                        font-weight: 500;
-                        text-transform: uppercase;
-                        letter-spacing: 0.05em;
-                    }
-
-                    .actions {
-                        display: flex;
-                        align-items: center;
-                        gap: 24px;
-                    }
-
-                    /* Zoom */
-                    .zoom-controls {
+                    .actions { display: flex; align-items: center; gap: 16px; }
+                    .toolbar {
                         display: flex;
                         align-items: center;
                         background: #fff;
                         border: 1px solid var(--border-color);
                         border-radius: 8px;
                         padding: 4px;
-                        box-shadow: var(--shadow-sm);
+                        gap: 4px;
                     }
-                    .zoom-controls button {
-                        width: 32px;
-                        height: 32px;
-                        border: none;
-                        background: transparent;
-                        border-radius: 6px;
-                        color: var(--text-secondary);
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        transition: all 0.15s;
+                    .toolbar button {
+                        border: none; background: transparent; padding: 6px; border-radius: 4px;
+                        color: var(--text-secondary); cursor: pointer; display: flex;
+                        transition: all 0.2s;
                     }
-                    .zoom-controls button:hover {
-                        background: var(--bg-page);
-                        color: var(--text-primary);
-                    }
-                    .zoom-level {
-                        font-size: 0.8rem;
-                        font-weight: 600;
-                        width: 48px;
-                        text-align: center;
-                        font-variant-numeric: tabular-nums;
-                    }
-                    .separator {
-                        width: 1px;
-                        height: 16px;
-                        background: var(--border-color);
-                        margin: 0 4px;
-                    }
+                    .toolbar button:hover { background: var(--bg-page); color: var(--text-primary); }
+                    .toolbar button.active-btn { color: var(--line-active); background: #eff6ff; }
+                    .sep { width: 1px; height: 16px; background: var(--border-color); margin: 0 4px; }
 
                     .btn-login {
-                        background: var(--text-primary);
-                        color: #fff;
-                        text-decoration: none;
-                        padding: 10px 16px;
-                        border-radius: 8px;
-                        font-size: 0.9rem;
-                        font-weight: 600;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        transition: all 0.2s;
-                        border: none;
-                        cursor: pointer;
+                        text-decoration: none; color: var(--text-primary); font-weight: 600; font-size: 0.9rem;
+                        display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 6px;
+                        transition: background 0.2s;
                     }
-                    .btn-login:hover {
-                        background: #334155;
-                        transform: translateY(-1px);
-                    }
+                    .btn-login:hover { background: #e2e8f0; }
 
-                    /* --- Canvas --- */
+                    /* Canvas */
                     .canvas {
-                        flex: 1;
-                        overflow: auto;
-                        padding: 80px 40px;
-                        cursor: grab;
-                        background-image:
-                            radial-gradient(#e2e8f0 1px, transparent 1px);
+                        flex: 1; overflow: hidden; cursor: grab; position: relative;
+                        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
                         background-size: 24px 24px;
-                        user-select: none; /* Prevent text selection while dragging */
                     }
-                    .canvas:active { cursor: grabbing; }
                     .canvas.grabbing { cursor: grabbing; }
-
                     .tree-wrapper {
-                        display: flex;
-                        justify-content: center;
-                        width: max-content;
-                        min-width: 100%;
-                        transform-origin: top center;
-                        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                        display: flex; justify-content: center; padding: 80px; min-width: max-content;
+                        transform-origin: top center; transition: transform 0.1s linear; /* Fast zoom */
                     }
 
-                    .org-tree {
-                        display: flex;
-                        justify-content: center;
-                        list-style: none;
-                        padding: 0;
-                        margin: 0;
-                        position: relative;
-                    }
+                    /* Tree Structure */
+                    .org-tree { list-style: none; padding: 0; margin: 0; display: flex; justify-content: center; }
+                    .org-leaf { position: relative; padding: 40px 16px 0 16px; display: flex; flex-direction: column; align-items: center; }
 
-                    .org-leaf {
-                        position: relative;
-                        padding: 60px 24px 0 24px; /* Increased spacing */
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
+                    /* Connectors */
+                    .org-tree::before, .org-leaf::before, .org-leaf::after, .org-leaf > div::before {
+                        content: ''; position: absolute; background: var(--line-color); transition: all 0.3s ease;
                     }
+                    .org-tree::before { top: 0; left: 50%; width: 2px; height: 20px; transform: translateX(-50%); }
+                    .org-leaf::before, .org-leaf::after { top: 0; right: 50%; width: 50%; height: 20px; border-top: 2px solid var(--line-color); background: transparent; }
+                    .org-leaf::after { right: auto; left: 50%; border-left: 2px solid var(--line-color); border-top: none; }
+                    .org-leaf:first-child::before, .org-leaf:last-child::after { border: none; }
+                    .org-leaf:last-child::before { border-right: 2px solid var(--line-color); border-radius: 0 12px 0 0; }
+                    .org-leaf:first-child::after { border-radius: 12px 0 0 0; border-top: 2px solid var(--line-color); }
+                    .org-leaf > div::before { top: -20px; left: 50%; width: 2px; height: 20px; transform: translateX(-50%); }
 
-                    /* --- Grid Layout for Leaves --- */
-                    .grid-wrapper > .org-tree {
-                        display: grid;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 20px;
-                        justify-items: center;
-                    }
-
-                    .grid-wrapper > .org-tree > .org-leaf {
-                        padding: 0; /* Remove padding for grid items */
-                        width: 100%;
-                        display: flex;
-                        justify-content: center;
-                    }
-
-                    /* Override connectors for grid items */
-                    .grid-wrapper > .org-tree > .org-leaf::before,
-                    .grid-wrapper > .org-tree > .org-leaf::after,
-                    .grid-wrapper > .org-tree::before {
-                        display: none;
-                    }
-
-                    /* Single vertical line connecting parent to grid */
-                    .grid-wrapper {
-                        position: relative;
-                        padding-top: 30px;
-                        width: 100%;
-                    }
-                    .grid-wrapper::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                    }
-
-                    /* --- Connectors --- */
-                    /* Vertical line from parent */
-                    .org-tree::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: background-color 0.3s, box-shadow 0.3s;
-                    }
-
-                    /* Connectors for children */
-                    .org-leaf::before, .org-leaf::after {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        right: 50%;
-                        border-top: 2px solid var(--line-color);
-                        width: 50%;
-                        height: 30px;
-                        transition: border-color 0.3s, box-shadow 0.3s;
-                    }
-                    .org-leaf::after {
-                        right: auto;
-                        left: 50%;
-                        border-left: 2px solid var(--line-color);
-                    }
-
-                    /* Exceptions */
+                    /* Hide connectors for root/single */
                     .tree-wrapper > .org-tree::before { display: none; }
-                    .tree-wrapper > .org-tree > .org-leaf { padding-top: 0; }
                     .org-leaf:only-child::after, .org-leaf:only-child::before { display: none; }
                     .org-leaf:only-child { padding-top: 0; }
-                    .org-leaf:first-child::before, .org-leaf:last-child::after { border: 0 none; }
 
-                    /* Corners */
-                    .org-leaf:last-child::before {
-                        border-right: 2px solid var(--line-color);
-                        border-radius: 0 16px 0 0;
-                    }
-                    .org-leaf:first-child::after {
-                        border-radius: 16px 0 0 0;
-                    }
-
-                    /* Connector DOWN to children */
-                    .org-leaf > ul::before {
-                        content: '';
-                        position: absolute;
-                        top: -30px;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: background-color 0.3s, box-shadow 0.3s;
-                    }
-
-                    /* --- Active Connection States --- */
-
-                    /* Se a conexão estiver ativa (pai->filho), ilumina as linhas */
+                    /* Active Connections */
                     .org-leaf.conn-active::before,
-                    .org-leaf.conn-active::after {
-                        border-color: var(--line-active);
-                        box-shadow: 0 -1px 4px rgba(59, 130, 246, 0.4);
+                    .org-leaf.conn-active::after,
+                    .org-leaf.conn-active > div::before {
+                        border-color: var(--line-active); background-color: var(--line-active);
+                        box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
                         z-index: 1;
                     }
 
-                    /* Linha vertical descendo do pai (renderizada no UL filho anterior)
-                       Isso é tricky. No CSS puro é difícil estilizar o "before" do UL baseando no LI pai.
-                       Mas podemos estilizar o "before" do UL se tivermos uma classe no UL.
-                       Por simplicidade, o 'pulse' vai nas linhas horizontais/verticais do próprio LI.
-                    */
-
-                    @keyframes pulse-line {
-                        0% { opacity: 0.6; }
-                        50% { opacity: 1; box-shadow: 0 0 8px var(--line-active); }
-                        100% { opacity: 0.6; }
+                    /* Grid Layout Override */
+                    .grid-wrapper { display: flex; justify-content: center; position: relative; padding-top: 20px; }
+                    .grid-wrapper::before { content: ''; position: absolute; top: 0; left: 50%; width: 2px; height: 20px; background: var(--line-color); transform: translateX(-50%); }
+                    .grid-wrapper > .org-tree {
+                        display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
                     }
+                    .grid-wrapper > .org-tree::before { display: none; }
+                    .grid-wrapper .org-leaf { padding: 0; }
+                    .grid-wrapper .org-leaf::before, .grid-wrapper .org-leaf::after { display: none; }
 
-                    .org-leaf.conn-active::before,
-                    .org-leaf.conn-active::after {
-                        animation: pulse-line 2s infinite ease-in-out;
-                    }
-
-                    /* --- Card Styles --- */
+                    /* Card Design */
                     .org-card {
-                        background: var(--bg-card);
-                        width: 280px;
-                        position: relative;
+                        background: #FAFAFB; /* Off-white */
+                        width: 260px;
                         border-radius: 12px;
                         box-shadow: var(--shadow-md);
-                        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-                        cursor: pointer;
-                        z-index: 2;
-                        border: 2px solid transparent; /* Prepare for border change */
-                        outline: none;
-                        overflow: hidden;
-                    }
-
-                    /* Left Accent Bar */
-                    .card-accent {
-                        height: 4px;
-                        width: 100%;
-                        background-color: var(--dept-color);
-                    }
-
-                    .card-body {
-                        padding: 16px;
-                        display: flex;
-                        flex-direction: column;
-                        gap: 12px;
-                        background: linear-gradient(180deg, #fff 0%, #fcfcfc 100%);
                         position: relative;
+                        transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+                        cursor: pointer;
+                        overflow: hidden;
+                        border: 1px solid transparent;
+                        z-index: 2;
                     }
+                    .card-accent { height: 4px; width: 100%; background: var(--dept-color); }
+                    .card-body { padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 
-                    /* Hover State (The User) */
-                    .org-card.state-active {
-                        transform: translateY(-4px);
-                        box-shadow: var(--shadow-hover);
-                        z-index: 10;
-                        border-color: rgba(59, 130, 246, 0.3);
-                    }
-
-                    /* Selected State */
-                    .org-card.state-selected {
-                        border-color: #2563eb;
-                        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-                        z-index: 30;
-                        transform: translateY(-2px);
-                    }
-
-                    .selected-indicator {
-                        position: absolute;
-                        top: 8px;
-                        right: 8px;
-                        background: #2563eb;
-                        color: #fff;
-                        width: 20px;
-                        height: 20px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        animation: pop-in 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-                    }
-
-                    @keyframes pop-in {
-                        from { transform: scale(0); }
-                        to { transform: scale(1); }
-                    }
-
-                    /* Focused State (Search Result - Temporary) */
-                    .org-card.state-focused {
-                        animation: pulse-focus 2s infinite;
-                    }
-
-                    @keyframes pulse-focus {
-                        0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.5); }
-                        70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-                        100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
-                    }
-
-                    /* Subordinate State */
-                    .org-card.state-subordinate {
-                        transform: translateY(-2px);
-                        box-shadow: var(--shadow-md);
-                        border-color: var(--line-active);
-                        background-color: #f0f9ff; /* Light blue tint */
-                    }
-
-                    /* Dimmed State */
-                    .org-card.state-dimmed {
-                        opacity: 0.5;
-                        filter: grayscale(0.6);
-                        transform: scale(0.98);
-                    }
-
-                    /* Highlight (Search) */
-                    .org-card.highlight {
-                        background-color: #fffbeb;
-                        border: 2px solid #f59e0b;
-                    }
-
-                    /* Header Layout */
-                    .card-header {
-                        display: flex;
-                        align-items: center;
-                        gap: 12px;
-                    }
-
+                    .card-header { display: flex; gap: 12px; align-items: center; }
                     .avatar {
-                        width: 44px;
-                        height: 44px;
-                        border-radius: 10px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: 700;
-                        font-size: 1rem;
-                        flex-shrink: 0;
-                        box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+                        width: 40px; height: 40px; border-radius: 10px;
+                        background: #fff; color: var(--dept-color);
+                        display: flex; align-items: center; justify-content: center;
+                        font-weight: 700; font-size: 1rem;
+                        box-shadow: var(--shadow-sm); border: 1px solid var(--border-color);
                     }
-
-                    .info {
-                        flex: 1;
-                        min-width: 0;
-                    }
-
-                    .name {
-                        margin: 0;
-                        font-size: 0.95rem;
-                        font-weight: 600;
-                        color: var(--text-primary);
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                        letter-spacing: -0.01em;
-                    }
-
-                    .role {
-                        margin: 2px 0 0 0;
-                        font-size: 0.8rem;
-                        color: var(--text-secondary);
-                        display: -webkit-box;
-                        -webkit-line-clamp: 2;
-                        -webkit-box-orient: vertical;
-                        overflow: hidden;
-                        line-height: 1.3;
-                    }
-
-                    /* Footer */
-                    .card-footer {
-                        border-top: 1px solid #f1f5f9;
-                        padding-top: 10px;
-                        display: flex;
-                    }
-
+                    .info { flex: 1; min-width: 0; }
+                    .name { margin: 0; font-weight: 700; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                    .role { margin: 0; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.3; }
                     .dept-badge {
-                        font-size: 0.7rem;
-                        font-weight: 600;
-                        padding: 2px 8px;
-                        border-radius: 99px;
-                        border: 1px solid;
-                        text-transform: uppercase;
-                        letter-spacing: 0.05em;
-                        max-width: 100%;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
+                        display: inline-block; padding: 2px 8px; border-radius: 4px;
+                        font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+                        background: rgba(0,0,0,0.03); color: var(--dept-color);
                     }
+
+                    /* States */
+                    .org-card.state-hover {
+                        transform: translateY(-4px) scale(1.02);
+                        box-shadow: var(--shadow-active);
+                        z-index: 10;
+                        border-color: rgba(0,0,0,0.1);
+                    }
+                    .org-card.state-selected {
+                        border: 2px solid var(--line-active);
+                        transform: translateY(-2px);
+                        box-shadow: var(--shadow-active);
+                        z-index: 20;
+                        background: #fff;
+                    }
+                    .org-card.state-dimmed {
+                        opacity: 0.5; filter: grayscale(0.8);
+                    }
+                    .org-card.executive { border-left: 4px solid var(--text-primary); }
 
                     /* Toggle Button */
                     .toggle-btn {
-                        position: absolute;
-                        bottom: -14px;
-                        left: 50%;
-                        transform: translateX(-50%);
-                        width: 28px;
-                        height: 28px;
-                        background: #fff;
-                        border: 1px solid var(--border-color);
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 0.8rem;
-                        color: var(--text-secondary);
-                        box-shadow: var(--shadow-sm);
-                        transition: all 0.2s;
-                        z-index: 5;
+                        position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+                        width: 24px; height: 24px; border-radius: 50%;
+                        background: #fff; border: 1px solid var(--border-color);
+                        color: var(--text-secondary); cursor: pointer;
+                        display: flex; align-items: center; justify-content: center;
+                        transition: all 0.2s; box-shadow: var(--shadow-sm); z-index: 5;
                     }
-                    .toggle-btn:hover {
-                        color: var(--text-primary);
-                        border-color: var(--text-secondary);
-                        transform: translateX(-50%) scale(1.1);
-                    }
-                    .toggle-btn.expanded .icon-chevron {
-                        transform: rotate(180deg);
-                        transition: transform 0.3s;
-                    }
+                    .toggle-btn:hover { color: var(--line-active); border-color: var(--line-active); transform: translateX(-50%) scale(1.1); }
+                    .toggle-btn.expanded .icon-chevron { transform: rotate(180deg); }
 
-                    /* Loading / Error */
-                    .loading-container, .error-container {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        height: 100vh;
-                        color: var(--text-secondary);
-                        gap: 16px;
-                    }
-                    .spinner {
-                        color: var(--text-primary);
-                        animation: spin 1s linear infinite;
-                    }
+                    /* Loading */
+                    .loading-container { height: 100vh; display: flex; align-items: center; justify-content: center; }
+                    .spinner { animation: spin 1s linear infinite; color: var(--line-active); }
                     @keyframes spin { to { transform: rotate(360deg); } }
-
                 `}</style>
             </div>
         </OrganogramContext.Provider>
