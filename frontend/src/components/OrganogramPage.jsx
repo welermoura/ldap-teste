@@ -740,9 +740,9 @@ const OrganogramPage = () => {
                         cursor: pointer;
                         z-index: 2;
                         border: 1px solid transparent;
-                        overflow: hidden;
                         display: flex;
                         flex-direction: row;
+                        outline: none; /* Remove native focus ring, we use custom */
                     }
 
                     /* Left Accent Bar (Vertical now, as requested "barra lateral colorida") */
@@ -759,7 +759,8 @@ const OrganogramPage = () => {
                         display: flex;
                         flex-direction: column;
                         gap: 10px;
-                        background: var(--bg-card);
+                        /* Background handled by parent .org-card */
+                        border-radius: 0 12px 12px 0;
                     }
 
                     /* Hover State */
@@ -788,7 +789,7 @@ const OrganogramPage = () => {
 
                     /* Ancestor State */
                     .org-card.state-ancestor {
-                         border: 1px dashed var(--line-active);
+                         /* No border to avoid "ghost box" effect */
                          box-shadow: var(--shadow-md);
                     }
 
