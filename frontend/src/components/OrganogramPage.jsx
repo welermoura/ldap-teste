@@ -340,6 +340,9 @@ const OrganogramPage = () => {
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
 
+                    // Check if children are leaves (last level for this branch)
+                    const areChildrenLeaves = hasChildren && node.children.every(child => !child.children || child.children.length === 0);
+
                     // Connection State Logic
                     const isConnectionActive = hoveredNodeId === parentId && hoveredNodeId !== null;
 
@@ -353,7 +356,11 @@ const OrganogramPage = () => {
                                 isMatch={false} // Match logic agora é via busca/foco
                                 parentId={parentId}
                             />
-                            {hasChildren && isExpanded && renderTree(node.children, key)}
+                            {hasChildren && isExpanded && (
+                                <div className={areChildrenLeaves ? 'grid-wrapper' : ''}>
+                                    {renderTree(node.children, key)}
+                                </div>
+                            )}
                         </li>
                     );
                 })}
@@ -620,6 +627,45 @@ const OrganogramPage = () => {
                         display: flex;
                         flex-direction: column;
                         align-items: center;
+                    }
+
+                    /* --- Grid Layout for Leaves --- */
+                    .grid-wrapper > .org-tree {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 20px;
+                        justify-items: center;
+                    }
+
+                    .grid-wrapper > .org-tree > .org-leaf {
+                        padding: 0; /* Remove padding for grid items */
+                        width: 100%;
+                        display: flex;
+                        justify-content: center;
+                    }
+
+                    /* Override connectors for grid items */
+                    .grid-wrapper > .org-tree > .org-leaf::before,
+                    .grid-wrapper > .org-tree > .org-leaf::after,
+                    .grid-wrapper > .org-tree::before {
+                        display: none;
+                    }
+
+                    /* Single vertical line connecting parent to grid */
+                    .grid-wrapper {
+                        position: relative;
+                        padding-top: 30px;
+                        width: 100%;
+                    }
+                    .grid-wrapper::before {
+                        content: '';
+                        position: absolute;
+                        top: 0;
+                        left: 50%;
+                        width: 2px;
+                        height: 30px;
+                        background-color: var(--line-color);
+                        transform: translateX(-50%);
                     }
 
                     /* --- Connectors --- */
