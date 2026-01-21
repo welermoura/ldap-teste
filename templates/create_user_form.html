@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}Criar Novo Usuário - Gestão AD{% endblock %}
+
+{% from "_macros.html" import render_page_header %}
+
+{% block page_title %}
+    {{ render_page_header('<i class="fas fa-user-plus me-2"></i>Criar Novo Usuário') }}
+{% endblock %}
+
+{% block content %}
+<div class="card glass-card">
+    <div class="card-body">
+        <p class="card-text mb-4">Preencha os dados básicos do novo usuário e, em seguida, busque por um usuário modelo para copiar as permissões e atributos.</p>
+
+        <form method="POST" action="{{ url_for('create_user_form') }}" class="needs-validation" novalidate>
+            {{ form.hidden_tag() }}
+
+            <fieldset>
+                <legend class="h5 mb-3">Dados do Novo Usuário</legend>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.first_name) }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.last_name) }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.sam_account) }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.matricula) }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.telephone) }}
+                    </div>
+                </div>
+            </fieldset>
+
+            <hr class="my-4">
+
+            <fieldset>
+                <legend class="h5 mb-3">Usuário Modelo</legend>
+                 <div class="mb-3">
+                    {{ render_field(form.model_name, placeholder='Digite o nome ou login do usuário modelo para buscar') }}
+                </div>
+            </fieldset>
+
+            <div class="mt-4 text-end">
+                {{ form.submit(class="btn btn-primary btn-lg", id="submitBtn") }}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Alerta para Validação -->
+<div class="modal fade" id="validationModal" tabindex="-1" aria-labelledby="validationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="validationModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Atenção</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="validationModalBody">
+        <!-- Mensagem de erro será inserida aqui -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
+    const validationModalBody = document.getElementById('validationModalBody');
+
+    if (form) {
+        // Campos obrigatórios e seus labels
+        const requiredFields = [
+            { id: 'first_name', label: 'Primeiro Nome' },
+            { id: 'last_name', label: 'Sobrenome' },
+            { id: 'sam_account', label: 'Login de Usuário' },
+            { id: 'matricula', label: 'Matrícula', numeric: true },
+            { id: 'model_name', label: 'Nome do Usuário Modelo' }
+        ];
+
+        form.addEventListener('submit', function(event) {
+            for (const field of requiredFields) {
+                const inputElement = document.getElementById(field.id);
+                if (inputElement) {
+                    const value = inputElement.value.trim();
+
+                    if (!value) {
+                        event.preventDefault();
+                        validationModalBody.textContent = `O campo "${field.label}" deve ser preenchido.`;
+                        validationModal.show();
+                        inputElement.focus();
+                        return; // Para a validação no primeiro erro
+                    }
+
+                    if (field.numeric && !/^\d+$/.test(value)) {
+                        event.preventDefault();
+                        validationModalBody.textContent = `O campo "${field.label}" aceita apenas números.`;
+                        validationModal.show();
+                        inputElement.focus();
+                        return;
+                    }
+                }
+            }
+        });
+
+        // Validação em tempo real para campos numéricos
+        const matriculaInput = document.getElementById('matricula');
+        if (matriculaInput) {
+            matriculaInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '');
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

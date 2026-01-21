@@ -1,0 +1,946 @@
+{% extends "base.html" %}
+
+{% block title %}Detalhes de {{ get_attr_value(user, 'displayName') or 'Usuário' }}{% endblock %}
+
+{% from "_macros.html" import render_page_header %}
+
+{% block page_title %}
+    {% set title_text = '<i class="fas fa-user-circle me-2"></i>Detalhes de: ' ~ (get_attr_value(user, 'displayName') or 'N/A') %}
+    {{ render_page_header(title_text, back_url=url_for('manage_users')) }}
+{% endblock %}
+
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4 mb-4">
+        <div class="card glass-card">
+            <div class="card-header">
+                <h5 class="mb-0">Status da Conta</h5>
+            </div>
+            <div class="card-body">
+                {% set status = get_user_status(user) %}
+                <p><strong>Status:</strong> <span class="badge rounded-pill bg-{{ 'success' if status == 'Ativo' else 'danger' }} fs-6">{{ status }}</span></p>
+                <p class="mt-3"><strong>Expiração da Senha:</strong><br><span class="text-highlight">{{ password_expiry_info }}</span></p>
+            </div>
+        </div>
+
+        {% if absence_scheduled %}
+        <div class="card glass-card mt-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Ausência Agendada</h5>
+            </div>
+            <div class="card-body">
+                <p>Uma ausência está agendada para este usuário.</p>
+                <p><strong>Início:</strong> {{ absence_info.deactivation }}</p>
+                <p><strong>Fim:</strong> {{ absence_info.reactivation }}</p>
+                {% if check_permission(action='can_disable') %}
+                    <button id="cancel-absence-btn" class="btn btn-warning w-100 mt-2">
+                        <i class="fas fa-calendar-times me-2"></i>Cancelar Agendamento
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card glass-card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Ações Rápidas</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if check_permission(action='can_disable') %}
+                        {% if status == 'Desativado' %}
+                            <form action="{{ url_for('toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                                {{ form.csrf_token }}
+                                <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-circle me-2"></i>Reativar Conta</button>
+                            </form>
+                        {% elif status == 'Ativo' %}
+                            <button type="button" class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#scheduleAbsenceModal">
+                                <i class="fas fa-calendar-alt me-2"></i>Agendar Ausência
+                            </button>
+                            <form id="deactivate-form" action="{{ url_for('toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                                {{ form.csrf_token }}
+                                <button type="button" id="deactivate-btn" class="btn btn-danger w-100"><i class="fas fa-ban me-2"></i>Desativar Permanente</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+
+                    {% if check_permission(action='can_reset_password') %}
+                    <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                        {{ form.csrf_token }}
+                        <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
+                    </form>
+                    {% endif %}
+
+                    {% if check_permission(action='can_edit') %}
+                        <a href="{{ url_for('edit_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Editar Usuário</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if check_permission(action='can_delete_user') %}
+        <div class="card border-danger mt-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Zona de Perigo</h5>
+            </div>
+            <div class="card-body text-center">
+                <p>A exclusão de um usuário é uma ação irreversível e removerá permanentemente o objeto do Active Directory.</p>
+                <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#deleteUserModal">
+                    <i class="fas fa-trash-alt me-2"></i>Excluir Usuário
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card glass-card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="user-details-tabs" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab">Geral</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="endereco-tab" data-bs-toggle="tab" data-bs-target="#endereco" type="button" role="tab">Endereço</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="telefones-tab" data-bs-toggle="tab" data-bs-target="#telefones" type="button" role="tab">Telefones</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="organizacao-tab" data-bs-toggle="tab" data-bs-target="#organizacao" type="button" role="tab">Organização</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="organograma-tab" data-bs-toggle="tab" data-bs-target="#organograma" type="button" role="tab">Organograma</button></li>
+                    {% if check_permission(action='can_manage_groups') %}
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="memberof-tab" data-bs-toggle="tab" data-bs-target="#memberof" type="button" role="tab">Membro de</button></li>
+                    {% endif %}
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content p-2" id="user-details-content">
+                    <div class="tab-pane fade show active" id="geral" role="tabpanel">
+                        <table class="table glass-table table-borderless">
+                            <tr><td style="width: 30%;"><strong>Nome:</strong></td><td>{{ get_attr_value(user, 'givenName') }}</td></tr>
+                            <tr><td><strong>Iniciais:</strong></td><td>{{ get_attr_value(user, 'initials') }}</td></tr>
+                            <tr><td><strong>Sobrenome:</strong></td><td>{{ get_attr_value(user, 'sn') }}</td></tr>
+                            <tr><td><strong>Nome de Exibição:</strong></td><td>{{ get_attr_value(user, 'displayName') }}</td></tr>
+                            <tr><td><strong>Descrição:</strong></td><td>{{ get_attr_value(user, 'description') }}</td></tr>
+                            <tr><td><strong>Escritório:</strong></td><td>{{ get_attr_value(user, 'physicalDeliveryOfficeName') }}</td></tr>
+                            <tr><td><strong>E-mail:</strong></td><td>{{ get_attr_value(user, 'mail') }}</td></tr>
+                            <tr><td><strong>Página da Web:</strong></td><td>{{ get_attr_value(user, 'wWWHomePage') }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="endereco" role="tabpanel">
+                         <table class="table glass-table table-borderless">
+                            <tr><td style="width: 30%;"><strong>Rua:</strong></td><td>{{ get_attr_value(user, 'streetAddress') }}</td></tr>
+                            <tr><td><strong>Caixa Postal:</strong></td><td>{{ get_attr_value(user, 'postOfficeBox') }}</td></tr>
+                            <tr><td><strong>Cidade:</strong></td><td>{{ get_attr_value(user, 'l') }}</td></tr>
+                            <tr><td><strong>Estado/Província:</strong></td><td>{{ get_attr_value(user, 'st') }}</td></tr>
+                            <tr><td><strong>CEP:</strong></td><td>{{ get_attr_value(user, 'postalCode') }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="telefones" role="tabpanel">
+                        <table class="table glass-table table-borderless">
+                            <tr><td style="width: 30%;"><strong>Telefone Principal:</strong></td><td>{{ get_attr_value(user, 'telephoneNumber') }}</td></tr>
+                            <tr><td><strong>Telefone Residencial:</strong></td><td>{{ get_attr_value(user, 'homePhone') }}</td></tr>
+                            <tr><td><strong>Pager:</strong></td><td>{{ get_attr_value(user, 'pager') }}</td></tr>
+                            <tr><td><strong>Celular:</strong></td><td>{{ get_attr_value(user, 'mobile') }}</td></tr>
+                            <tr><td><strong>Fax:</strong></td><td>{{ get_attr_value(user, 'facsimileTelephoneNumber') }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="organizacao" role="tabpanel">
+                        <table class="table glass-table table-borderless">
+                            <tr><td style="width: 30%;"><strong>Cargo:</strong></td><td>{{ get_attr_value(user, 'title') }}</td></tr>
+                            <tr><td><strong>Departamento:</strong></td><td>{{ get_attr_value(user, 'department') }}</td></tr>
+                            <tr><td><strong>Empresa:</strong></td><td>{{ get_attr_value(user, 'company') }}</td></tr>
+                            <tr><td><strong>Matrícula:</strong></td><td>{{ get_attr_value(user, 'extensionAttribute4') }}</td></tr>
+                        </table>
+                    </div>
+                    <div class="tab-pane fade" id="organograma" role="tabpanel">
+                        <table class="table glass-table table-borderless">
+                            <tr>
+                                <td style="width: 30%;"><strong>Gerente:</strong></td>
+                                <td>
+                                    {% if manager_info %}
+                                        <a href="{{ url_for('view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
+                                    {% else %}
+                                        <span class="text-muted">N/A</span>
+                                    {% endif %}
+                                    {% if check_permission(action='can_edit') %}
+                                        <button class="btn btn-sm btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#changeManagerModal">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+
+                        <h6 class="mt-4 mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                            Supervisiona:
+                            {% if check_permission(action='can_edit') %}
+                                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addSubordinateModal">
+                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                </button>
+                            {% endif %}
+                        </h6>
+                        {% if direct_reports_info %}
+                            <div class="list-group glass-list-group" style="max-height: 200px; overflow-y: auto;">
+                                {% for dr in direct_reports_info %}
+                                    <div class="list-group-item bg-transparent text-white border-0 ps-0 d-flex justify-content-between align-items-center">
+                                        <a href="{{ url_for('view_user', username=dr.sam) }}" class="text-decoration-none text-white">
+                                            <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
+                                        </a>
+                                        {% if check_permission(action='can_edit') %}
+                                            <button class="btn btn-sm btn-danger remove-subordinate-btn" data-subordinate-sam="{{ dr.sam }}" data-subordinate-name="{{ dr.name }}">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Não supervisiona ninguém.</p>
+                        {% endif %}
+                    </div>
+                    {% if check_permission(action='can_manage_groups') %}
+                    <div class="tab-pane fade" id="memberof" role="tabpanel" aria-labelledby="memberof-tab">
+                        <div class="d-flex justify-content-between mb-3">
+                            <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addGroupModal">
+                                <i class="fas fa-plus me-2"></i>Adicionar a Grupo
+                            </button>
+                            <input type="text" id="group-membership-search" class="form-control form-control-sm w-50" placeholder="Filtrar grupos...">
+                        </div>
+                        <div id="memberof-list-container" class="table-responsive" style="min-height: 200px;">
+                            <!-- O conteúdo será carregado via JS -->
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Agendar Ausência -->
+<div class="modal fade" id="scheduleAbsenceModal" tabindex="-1" aria-labelledby="scheduleAbsenceModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="scheduleAbsenceModalLabel">Agendar Ausência para {{ get_attr_value(user, 'displayName') }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="scheduleAbsenceForm" action="{{ url_for('schedule_absence', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+        {{ form.csrf_token }}
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="deactivation_date" class="form-label">Data de Desativação (Início da Ausência)</label>
+            <input type="date" class="form-control" id="deactivation_date" name="deactivation_date" required>
+          </div>
+          <div class="mb-3">
+            <label for="reactivation_date" class="form-label">Data de Reativação (Fim da Ausência)</label>
+            <input type="date" class="form-control" id="reactivation_date" name="reactivation_date" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Agendamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Alterar Gerente -->
+<div class="modal fade" id="changeManagerModal" tabindex="-1" aria-labelledby="changeManagerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changeManagerModalLabel">Alterar Gerente de {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="managerSearchInput" class="form-label">Buscar Gerente (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="managerSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="managerSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Subordinado -->
+<div class="modal fade" id="addSubordinateModal" tabindex="-1" aria-labelledby="addSubordinateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSubordinateModalLabel">Adicionar Subordinado para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="subordinateSearchInput" class="form-label">Buscar Subordinado (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="subordinateSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="subordinateSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar a Grupo -->
+<div class="modal fade" id="addGroupModal" tabindex="-1" aria-labelledby="addGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addGroupModalLabel">Adicionar {{ get_attr_value(user, 'displayName') }} a um Grupo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="groupSearchInput" class="form-label">Buscar por nome de grupo:</label>
+                    <input type="text" class="form-control" id="groupSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="groupSearchResults" style="max-height: 300px; overflow-y: auto;">
+                    <!-- Resultados da busca aparecerão aqui -->
+                </div>
+                <div id="temporal-add-fields" class="mt-3 p-3 border rounded glass-form-section" style="display: none;">
+                    <h5><i class="fas fa-clock me-2"></i>Acesso Temporário</h5>
+                    <p>Defina a data de início e fim para a participação no grupo selecionado.</p>
+                     <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label for="add-group-start-date" class="form-label">Data de Início</label>
+                            <input type="date" id="add-group-start-date" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <label for="add-group-end-date" class="form-label">Data de Fim</label>
+                            <input type="date" id="add-group-end-date" class="form-control">
+                        </div>
+                    </div>
+                    <div class="text-end mt-2">
+                         <button id="confirm-temp-add-btn" class="btn btn-info"><i class="fas fa-check me-2"></i>Confirmar Adição Temporária</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Exclusão de Usuário -->
+{% if check_permission(action='can_delete_user') %}
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+        {{ delete_form.hidden_tag() }}
+        <div class="modal-body">
+          <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
+          <p>Para confirmar, por favor, digite o <strong>cargo</strong> e o <strong>login</strong> do usuário nos campos abaixo.</p>
+
+          <div class="mb-3">
+            <label for="confirm_title" class="form-label">Digite o Cargo: <strong class="text-highlight">{{ get_attr_value(user, 'title') or 'N/A' }}</strong></label>
+            {{ delete_form.confirm_title(class="form-control", autocomplete="off") }}
+          </div>
+          <div class="mb-3">
+            <label for="confirm_sam" class="form-label">Digite o Login: <strong class="text-highlight">{{ get_attr_value(user, 'sAMAccountName') }}</strong></label>
+            {{ delete_form.confirm_sam(class="form-control", autocomplete="off") }}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          {{ delete_form.submit(class="btn btn-danger") }}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+<!-- Modal Resetar Senha -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Resetar Senha para {{ get_attr_value(user, 'displayName') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="resetPasswordFormModal">
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nova Senha</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" id="confirmResetPasswordBtn" class="btn btn-primary">Resetar Senha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // === Elementos da DOM ===
+    const memberOfTab = document.getElementById('memberof-tab');
+    const memberOfContainer = document.getElementById('memberof-list-container');
+    const groupMembershipSearchInput = document.getElementById('group-membership-search');
+    const addGroupModalEl = document.getElementById('addGroupModal');
+    const addGroupModal = new bootstrap.Modal(addGroupModalEl);
+    const groupSearchInput = document.getElementById('groupSearchInput');
+    const groupSearchResults = document.getElementById('groupSearchResults');
+    const temporalFieldsContainer = document.getElementById('temporal-add-fields');
+    const startDateInput = document.getElementById('add-group-start-date');
+    const endDateInput = document.getElementById('add-group-end-date');
+    const confirmTempAddBtn = document.getElementById('confirm-temp-add-btn');
+    const deactivateBtn = document.getElementById('deactivate-btn');
+    const resetPasswordBtn = document.getElementById('reset-password-btn');
+    const cancelAbsenceBtn = document.getElementById('cancel-absence-btn');
+    const resetPasswordModalEl = document.getElementById('resetPasswordModal');
+    const resetPasswordModal = new bootstrap.Modal(resetPasswordModalEl);
+    const confirmResetPasswordBtn = document.getElementById('confirmResetPasswordBtn');
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+
+    // Elementos do Organograma
+    const managerSearchInput = document.getElementById('managerSearchInput');
+    const managerSearchResults = document.getElementById('managerSearchResults');
+    const changeManagerModalEl = document.getElementById('changeManagerModal');
+    const changeManagerModal = new bootstrap.Modal(changeManagerModalEl);
+
+    const subordinateSearchInput = document.getElementById('subordinateSearchInput');
+    const subordinateSearchResults = document.getElementById('subordinateSearchResults');
+    const addSubordinateModalEl = document.getElementById('addSubordinateModal');
+    const addSubordinateModal = new bootstrap.Modal(addSubordinateModalEl);
+    const organogramaTab = document.getElementById('organograma-tab');
+
+
+    // === Variáveis de Estado ===
+    const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
+    const csrfToken = "{{ form.csrf_token._value() }}";
+    let allUserGroups = [];
+    let tabLoaded = false;
+    let searchTimeout;
+    let selectedGroupForTempAdd = null;
+
+    // === Funções de Renderização ===
+    function renderGroups(groups) {
+        memberOfContainer.innerHTML = '';
+        if (!groups || groups.length === 0) {
+            memberOfContainer.innerHTML = '<div class="alert alert-info m-2">Este usuário não é membro de nenhum grupo.</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover glass-table mb-0';
+        table.innerHTML = `<thead><tr><th>Nome do Grupo</th><th>Descrição</th><th class="text-end">Ação</th></tr></thead>`;
+        const tbody = table.createTBody();
+
+        groups.forEach(group => {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><a href="/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
+                <td>${escapeHTML(group.description) || 'N/A'}</td>
+                <td class="text-end">
+                    <button class="btn btn-danger btn-sm remove-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Remover do grupo">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            `;
+        });
+        memberOfContainer.appendChild(table);
+    }
+
+    function renderSearchResults(groups) {
+        groupSearchResults.innerHTML = '';
+        if (!groups || groups.length === 0) {
+            groupSearchResults.innerHTML = '<p class="text-muted p-2">Nenhum grupo encontrado.</p>';
+            return;
+        }
+        groups.forEach(group => {
+            const resultItem = document.createElement('div');
+            resultItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+            resultItem.innerHTML = `
+                <div>
+                    <strong>${escapeHTML(group.cn)}</strong>
+                    <small class="d-block text-muted">${escapeHTML(group.description) || 'Sem descrição'}</small>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-primary add-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Adicionar permanentemente">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                    <button class="btn btn-sm btn-info add-group-temp-btn" data-group-name="${escapeHTML(group.cn)}" title="Adicionar com data de expiração">
+                        <i class="fas fa-clock"></i> Temp
+                    </button>
+                </div>
+            `;
+            groupSearchResults.appendChild(resultItem);
+        });
+    }
+
+    // === Funções de API ===
+    async function fetchUserGroups() {
+        if (tabLoaded) return;
+        showLoading(memberOfContainer, 'Carregando grupos...');
+        try {
+            const response = await fetch(`/api/user_groups/${username}`);
+            if (!response.ok) throw new Error('Falha ao buscar os grupos do usuário.');
+            allUserGroups = await response.json();
+            renderGroups(allUserGroups);
+            tabLoaded = true;
+        } catch (error) {
+            showError(memberOfContainer, 'Não foi possível carregar os grupos.');
+            console.error('Erro:', error);
+        }
+    }
+
+    async function removeGroup(groupName) {
+        setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover o usuário do grupo "${groupName}"?`, async () => {
+            try {
+                const response = await fetch('/api/remove_user_from_group', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ username, group_name: groupName })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast('Usuário removido do grupo com sucesso.', 'success');
+                tabLoaded = false; // Força recarregamento
+                fetchUserGroups();
+            } catch (error) {
+                showToast(`Falha ao remover do grupo: ${error.message}`, 'error');
+                console.error('Erro ao remover grupo:', error);
+            }
+        });
+    }
+
+    async function addGroup(groupName) {
+        try {
+            const response = await fetch('/api/add_user_to_group', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({ username, group_name: groupName })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+            showToast('Usuário adicionado ao grupo com sucesso.', 'success');
+            tabLoaded = false; // Força recarregamento
+            fetchUserGroups();
+            addGroupModal.hide();
+        } catch (error) {
+            showToast(`Falha ao adicionar ao grupo: ${error.message}`, 'error');
+            console.error('Erro ao adicionar grupo:', error);
+        }
+    }
+
+    async function addGroupTemp(groupName, startDate, endDate) {
+        if (!startDate || !endDate) {
+            showToast('Por favor, selecione data de início e fim.', 'error');
+            return;
+        }
+        try {
+            const response = await fetch('/api/add_user_to_group_temp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({
+                    username: username,
+                    group_name: groupName,
+                    start_date: startDate,
+                    end_date: endDate
+                })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+            showToast('Usuário adicionado temporariamente ao grupo com sucesso.', 'success');
+            tabLoaded = false; // Força recarregamento
+            fetchUserGroups();
+            addGroupModal.hide();
+        } catch (error) {
+            showToast(`Falha ao adicionar temporariamente ao grupo: ${error.message}`, 'error');
+            console.error('Erro ao adicionar grupo temporariamente:', error);
+        }
+    }
+
+
+    async function searchGroups(query) {
+        if (query.length < 3) {
+            groupSearchResults.innerHTML = '<p class="text-muted p-2">Digite pelo menos 3 caracteres para buscar.</p>';
+            return;
+        }
+        showLoading(groupSearchResults, 'Buscando...');
+        try {
+            const response = await fetch(`/api/search_groups?q=${encodeURIComponent(query)}&username=${encodeURIComponent(username)}`);
+            if (!response.ok) throw new Error('Falha na busca.');
+            const groups = await response.json();
+            renderSearchResults(groups);
+        } catch(error) {
+            showError(groupSearchResults, 'Erro na busca.');
+            console.error('Erro ao buscar grupos:', error);
+        }
+    }
+
+    // === Funções Auxiliares ===
+    function showLoading(container, message) {
+        container.innerHTML = `<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">${message}</p></div>`;
+    }
+
+    function showError(container, message) {
+        container.innerHTML = `<div class="alert alert-danger m-2">${message}</div>`;
+    }
+
+    function escapeHTML(str) {
+        if (str === null || typeof str === 'undefined') return '';
+        const p = document.createElement('p');
+        p.textContent = str;
+        return p.innerHTML;
+    }
+
+    // === Event Listeners ===
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
+
+    if (groupMembershipSearchInput) {
+        groupMembershipSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allUserGroups.filter(group =>
+                group.cn.toLowerCase().includes(query) || (group.description && group.description.toLowerCase().includes(query))
+            );
+            renderGroups(filteredGroups);
+        });
+    }
+
+    if (memberOfContainer) {
+        memberOfContainer.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-group-btn');
+            if (removeBtn) {
+                removeGroup(removeBtn.dataset.groupName);
+            }
+        });
+    }
+
+    groupSearchInput.addEventListener('keyup', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            searchGroups(groupSearchInput.value);
+        }, 300); // Debounce
+    });
+
+    if (groupSearchResults) {
+        groupSearchResults.addEventListener('click', function(e) {
+            const addBtn = e.target.closest('.add-group-btn');
+            if (addBtn) {
+                addGroup(addBtn.dataset.groupName);
+            }
+
+            const addTempBtn = e.target.closest('.add-group-temp-btn');
+            if (addTempBtn) {
+                selectedGroupForTempAdd = addTempBtn.dataset.groupName;
+                temporalFieldsContainer.style.display = 'block';
+                const today = new Date().toISOString().split('T')[0];
+                startDateInput.value = today;
+                endDateInput.value = '';
+                startDateInput.focus();
+            }
+        });
+    }
+
+    if (confirmTempAddBtn) {
+        confirmTempAddBtn.addEventListener('click', function() {
+            if (selectedGroupForTempAdd) {
+                addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
+            }
+        });
+    }
+
+    // Limpa os campos de data quando o modal é fechado
+    addGroupModalEl.addEventListener('hidden.bs.modal', function() {
+        temporalFieldsContainer.style.display = 'none';
+        startDateInput.value = '';
+        endDateInput.value = '';
+        groupSearchInput.value = '';
+        groupSearchResults.innerHTML = '';
+        selectedGroupForTempAdd = null;
+    });
+
+    // --- Ações da Página com Modal de Confirmação ---
+    if(deactivateBtn) {
+        deactivateBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            setupConfirmationModal(
+                'Confirmar Desativação',
+                'Tem certeza que deseja desativar esta conta permanentemente?',
+                () => document.getElementById('deactivate-form').submit()
+            );
+        });
+    }
+
+    if(resetPasswordBtn) {
+        resetPasswordBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            resetPasswordModal.show();
+        });
+    }
+
+    confirmResetPasswordBtn.addEventListener('click', async function() {
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        if (!newPassword || newPassword !== confirmPassword) {
+            showToast('As senhas não coincidem ou estão em branco.', 'error', 'Erro de Validação');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/reset_password/${username}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ new_password: newPassword })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Ocorreu um erro desconhecido.');
+            }
+
+            showToast(result.message || 'Senha resetada com sucesso!', 'success', 'Sucesso');
+            resetPasswordModal.hide();
+
+        } catch (error) {
+            showToast(`Falha ao resetar a senha: ${error.message}`, 'error', 'Erro');
+            console.error('Erro ao resetar senha:', error);
+        }
+    });
+
+    resetPasswordModalEl.addEventListener('hidden.bs.modal', function() {
+        newPasswordInput.value = '';
+        confirmPasswordInput.value = '';
+    });
+
+    if(cancelAbsenceBtn) {
+        cancelAbsenceBtn.addEventListener('click', function() {
+            // Chama a função global de base.html, passando o callback para recarregar a página
+            handleCancelAbsence(username, csrfToken, () => {
+                setTimeout(() => window.location.reload(), 1500);
+            });
+        });
+    }
+
+    // === Lógica do Organograma ===
+
+    // Função genérica de busca de usuários para o Organograma
+    async function searchUsersForHierarchy(query, resultsContainer, type) {
+        if (query.length < 3) {
+            resultsContainer.innerHTML = '<p class="text-muted p-2">Digite pelo menos 3 caracteres.</p>';
+            return;
+        }
+        resultsContainer.innerHTML = '<div class="text-center p-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
+
+        try {
+            const response = await fetch(`/api/search_ad?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Falha na busca.');
+            const results = await response.json();
+
+            resultsContainer.innerHTML = '';
+            const users = results.filter(item => item.type === 'user'); // Filtra apenas usuários
+
+            if (users.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-muted p-2">Nenhum usuário encontrado.</p>';
+                return;
+            }
+
+            users.forEach(user => {
+                const item = document.createElement('button');
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex w-100 justify-content-between">
+                        <h6 class="mb-1">${escapeHTML(user.name)}</h6>
+                        <small>${escapeHTML(user.sam)}</small>
+                    </div>
+                    <small class="text-muted">${escapeHTML(user.ou_path || '')}</small>
+                `;
+                item.onclick = () => {
+                    if (type === 'manager') {
+                        setManager(user.sam);
+                    } else if (type === 'subordinate') {
+                        addSubordinate(user.sam);
+                    }
+                };
+                resultsContainer.appendChild(item);
+            });
+
+        } catch (error) {
+            console.error('Erro na busca:', error);
+            resultsContainer.innerHTML = '<p class="text-danger p-2">Erro ao buscar usuários.</p>';
+        }
+    }
+
+    async function setManager(managerSam) {
+        setupConfirmationModal('Confirmar Gerente', `Definir ${managerSam} como gerente de ${username}?`, async () => {
+            try {
+                const response = await fetch('/api/set_manager', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ user_sam: username, manager_sam: managerSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao definir gerente.');
+
+                showToast('Gerente atualizado com sucesso.', 'success');
+                changeManagerModal.hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    async function addSubordinate(subordinateSam) {
+        setupConfirmationModal('Adicionar Subordinado', `Definir ${username} como gerente de ${subordinateSam}?`, async () => {
+            try {
+                const response = await fetch('/api/add_subordinate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ manager_sam: username, subordinate_sam: subordinateSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao adicionar subordinado.');
+
+                showToast('Subordinado adicionado com sucesso.', 'success');
+                addSubordinateModal.hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    async function removeSubordinate(subordinateSam, subordinateName) {
+        setupConfirmationModal('Remover Subordinado', `Remover ${subordinateName} (${subordinateSam}) da lista de supervisionados?`, async () => {
+            try {
+                const response = await fetch('/api/remove_subordinate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ subordinate_sam: subordinateSam })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao remover subordinado.');
+
+                showToast('Subordinado removido com sucesso.', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                showToast(`Erro: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    // Listeners para Organograma
+    if (managerSearchInput) {
+        let timeout;
+        managerSearchInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => searchUsersForHierarchy(managerSearchInput.value, managerSearchResults, 'manager'), 400);
+        });
+    }
+
+    if (subordinateSearchInput) {
+        let timeout;
+        subordinateSearchInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => searchUsersForHierarchy(subordinateSearchInput.value, subordinateSearchResults, 'subordinate'), 400);
+        });
+    }
+
+    // Delegação de eventos para botões de remover subordinado (pois a lista pode ser longa/dinâmica)
+    const organogramaPane = document.getElementById('organograma');
+    if (organogramaPane) {
+        organogramaPane.addEventListener('click', function(e) {
+            const btn = e.target.closest('.remove-subordinate-btn');
+            if (btn) {
+                const sam = btn.dataset.subordinateSam;
+                const name = btn.dataset.subordinateName;
+                removeSubordinate(sam, name);
+            }
+        });
+    }
+
+    // Limpar modais ao fechar
+    changeManagerModalEl.addEventListener('hidden.bs.modal', () => {
+        managerSearchInput.value = '';
+        managerSearchResults.innerHTML = '';
+    });
+    addSubordinateModalEl.addEventListener('hidden.bs.modal', () => {
+        subordinateSearchInput.value = '';
+        subordinateSearchResults.innerHTML = '';
+    });
+
+});
+</script>
+<style>
+/* Custom styles for glass tabs */
+.nav-tabs .nav-link {
+    background-color: transparent;
+    border: none;
+    color: var(--text-muted-color);
+    transition: color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+.nav-tabs .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: transparent;
+    color: #fff;
+}
+.nav-tabs .nav-link:hover {
+    color: #fff;
+}
+.nav-tabs {
+    border-bottom: 1px solid var(--glass-border-color);
+}
+.tab-content .table td {
+    padding-top: 0.9rem;
+    padding-bottom: 0.9rem;
+}
+</style>
+{% endblock %}
