@@ -65,6 +65,18 @@ const getInitials = (name) => {
 
 const AggregateGroup = ({ nodes, parentName }) => {
     const [showAll, setShowAll] = useState(false);
+    const { focusedNodeId } = useContext(OrganogramContext);
+
+    // Automatically expand if the focused node is inside this group
+    useEffect(() => {
+        if (focusedNodeId) {
+            const isFocusedInGroup = nodes.some(node => node.distinguishedName === focusedNodeId);
+            if (isFocusedInGroup) {
+                setShowAll(true);
+            }
+        }
+    }, [focusedNodeId, nodes]);
+
     const initialLimit = 12;
     const displayNodes = showAll ? nodes : nodes.slice(0, initialLimit);
     const hasMore = nodes.length > initialLimit;
