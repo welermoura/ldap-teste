@@ -11,7 +11,11 @@ import {
     LocateFixed,
     CheckCircle2,
     Clock,
-    XCircle
+    XCircle,
+    Mail,
+    Phone,
+    MapPin,
+    ChevronRight
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -627,18 +631,36 @@ const OrganogramPage = () => {
                         left: tooltipData.x + 20,
                         top: tooltipData.y + 20
                     }}>
-                        <div className="tooltip-row">
-                            <span className="tooltip-label">Escritório:</span>
-                            <span className="tooltip-value">{tooltipData.node.office || '-'}</span>
+                        <div className="tooltip-header">
+                            Contato <ChevronRight size={14} />
                         </div>
-                        <div className="tooltip-row">
-                            <span className="tooltip-label">Email:</span>
-                            <span className="tooltip-value">{tooltipData.node.mail || '-'}</span>
-                        </div>
-                        <div className="tooltip-row">
-                            <span className="tooltip-label">Telefone:</span>
-                            <span className="tooltip-value">{tooltipData.node.telephoneNumber || '-'}</span>
-                        </div>
+
+                        {tooltipData.node.mail && (
+                            <div className="tooltip-row">
+                                <Mail size={16} className="icon-tooltip" />
+                                <a href={`mailto:${tooltipData.node.mail}`} className="tooltip-link">
+                                    {tooltipData.node.mail}
+                                </a>
+                            </div>
+                        )}
+
+                        {tooltipData.node.telephoneNumber && (
+                            <div className="tooltip-row">
+                                <Phone size={16} className="icon-tooltip" />
+                                <a href={`tel:${tooltipData.node.telephoneNumber}`} className="tooltip-link">
+                                    {tooltipData.node.telephoneNumber}
+                                </a>
+                            </div>
+                        )}
+
+                        {tooltipData.node.office && (
+                            <div className="tooltip-row">
+                                <MapPin size={16} className="icon-tooltip" />
+                                <span className="tooltip-text">
+                                    {tooltipData.node.office}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1344,37 +1366,57 @@ const OrganogramPage = () => {
                     /* Tooltip */
                     .node-tooltip {
                         position: fixed;
-                        background: rgba(255, 255, 255, 0.95);
-                        backdrop-filter: blur(8px);
+                        background: #fff;
                         border: 1px solid var(--border-color);
                         border-radius: 8px;
-                        padding: 12px;
-                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+                        padding: 16px;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
                         z-index: 100;
-                        pointer-events: none;
-                        min-width: 200px;
+                        pointer-events: auto; /* Allow clicking links */
+                        width: max-content; /* Dynamic width */
+                        max-width: 300px;
                         animation: fadeIn 0.2s ease-out;
                         color: var(--text-primary);
                     }
                     @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+                    .tooltip-header {
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        margin-bottom: 12px;
+                        display: flex;
+                        align-items: center;
+                        gap: 4px;
+                        color: #0f172a;
+                    }
+
                     .tooltip-row {
                         display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 4px;
-                        font-size: 0.85rem;
+                        align-items: center;
+                        gap: 12px;
+                        margin-bottom: 8px;
+                        font-size: 0.9rem;
                     }
                     .tooltip-row:last-child { margin-bottom: 0; }
 
-                    .tooltip-label {
-                        font-weight: 600;
-                        color: var(--text-secondary);
-                        margin-right: 12px;
+                    .icon-tooltip {
+                        color: #64748b;
+                        flex-shrink: 0;
                     }
-                    .tooltip-value {
-                        text-align: right;
-                        color: var(--text-primary);
-                        max-width: 150px;
+
+                    .tooltip-link {
+                        color: #2563eb; /* Blue-600 */
+                        text-decoration: none;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    .tooltip-link:hover {
+                        text-decoration: underline;
+                    }
+
+                    .tooltip-text {
+                        color: #334155; /* Slate-700 */
                         white-space: nowrap;
                         overflow: hidden;
                         text-overflow: ellipsis;
