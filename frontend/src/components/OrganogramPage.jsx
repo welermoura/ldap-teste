@@ -420,7 +420,7 @@ const OrganogramPage = () => {
     };
 
     // Recursively render tree
-    const renderTree = (nodes, parentNode = null, parentColor = null) => {
+    const renderTree = (nodes, parentNode = null, parentColor = null, depth = 0) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
         const GRID_THRESHOLD = 8;
@@ -467,8 +467,8 @@ const OrganogramPage = () => {
                         // In Grid, we just show simple connection up to the container
                         const isActive = activeChildIndex === index;
 
-                        // Logic: If has children, get new color. If leaf, inherit parent color.
-                        const myColor = hasChildren ? getNodeColor(index) : (parentColor || getNodeColor(index));
+                        // Logic: If has children, get new color (rotated by depth). If leaf, inherit parent color.
+                        const myColor = hasChildren ? getNodeColor(index + depth) : (parentColor || getNodeColor(index + depth));
 
                         return (
                             <div key={key} className={`grid-item ${isActive ? 'grid-item-active' : ''}`}>
@@ -484,7 +484,7 @@ const OrganogramPage = () => {
                                 />
                                 {hasChildren && isExpanded && (
                                     <div className="grid-sub-tree">
-                                        {renderTree(node.children, node, myColor)}
+                                        {renderTree(node.children, node, myColor, depth + 1)}
                                     </div>
                                 )}
                             </div>
@@ -513,9 +513,9 @@ const OrganogramPage = () => {
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
 
-                    // Logic: If has children, get new color. If leaf, inherit parent color.
+                    // Logic: If has children, get new color (rotated by depth). If leaf, inherit parent color.
                     // Fallback to dynamic color if no parent color (e.g. root leaves)
-                    const myColor = hasChildren ? getNodeColor(index) : (parentColor || getNodeColor(index));
+                    const myColor = hasChildren ? getNodeColor(index + depth) : (parentColor || getNodeColor(index + depth));
 
                     // --- Connector Logic ---
                     let isVerticalActive = false;
@@ -572,7 +572,7 @@ const OrganogramPage = () => {
                                 parentId={parentNode ? parentNode.distinguishedName : null}
                                 assignedColor={myColor}
                             />
-                            {hasChildren && isExpanded && renderTree(node.children, node, myColor)}
+                            {hasChildren && isExpanded && renderTree(node.children, node, myColor, depth + 1)}
                         </li>
                     );
                 })}
