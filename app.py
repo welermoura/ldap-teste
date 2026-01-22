@@ -670,24 +670,27 @@ def api_public_organogram_data():
             if entry['type'] != 'searchResEntry':
                 continue
 
-            attrs = entry['attributes']
+            raw_attrs = entry['attributes']
+            # Create a case-insensitive dictionary for robust attribute lookup
+            attrs = {k.lower(): v for k, v in raw_attrs.items()}
             dn = entry['dn']
 
             # Helper to get first item from list or value
-            def get_first(val):
+            def get_first(key):
+                val = attrs.get(key.lower())
                 if isinstance(val, list):
                     return val[0] if val else None
                 return val
 
-            manager_dn_raw = get_first(attrs.get('manager'))
+            manager_dn_raw = get_first('manager')
 
             users[dn.lower()] = {
-                'name': get_first(attrs.get('displayName')),
-                'title': get_first(attrs.get('title')),
-                'department': get_first(attrs.get('department')),
-                'office': get_first(attrs.get('physicalDeliveryOfficeName')),
-                'mail': get_first(attrs.get('mail')),
-                'telephoneNumber': get_first(attrs.get('telephoneNumber')),
+                'name': get_first('displayName'),
+                'title': get_first('title'),
+                'department': get_first('department'),
+                'office': get_first('physicalDeliveryOfficeName'),
+                'mail': get_first('mail'),
+                'telephoneNumber': get_first('telephoneNumber'),
                 'manager_dn': manager_dn_raw.lower() if manager_dn_raw else None,
                 'distinguishedName': dn,
                 'children': []
