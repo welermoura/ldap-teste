@@ -424,23 +424,54 @@ const OrganogramPage = () => {
     const renderTree = (nodes, parentNode = null, parentColor = null, depth = 0) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
-        const GRID_THRESHOLD = 8;
+        const GRID_THRESHOLD = 3;
 
-        // --- Aggregate Box Logic ---
-        // Used when > 8 nodes and ALL are leaves (have no children)
-        const isLeafGroup = nodes.length > GRID_THRESHOLD && nodes.every(n => !n.children || n.children.length === 0);
+        // --- Split Children Logic ---
+        // Used when > GRID_THRESHOLD nodes
+        // We separate nodes into two groups: Branch Nodes (have children) and Leaf Nodes (no children)
+        // If we have MANY nodes (> GRID_THRESHOLD), we might want to aggregate the leaves.
 
-        if (isLeafGroup) {
-            return (
-                <AggregateGroup
-                    nodes={nodes}
-                    parentName={parentNode ? parentNode.name : 'Unknown'}
-                    assignedColor={parentColor}
-                />
-            );
+        const branchNodes = [];
+        const leafNodes = [];
+
+        nodes.forEach(node => {
+            if (node.children && node.children.length > 0) {
+                branchNodes.push(node);
+            } else {
+                leafNodes.push(node);
+            }
+        });
+
+        const totalNodes = nodes.length;
+        const shouldUseAggregation = totalNodes > GRID_THRESHOLD && leafNodes.length > 0;
+
+        // If aggregating, we render branch nodes normally, and put all leaves into one AggregateGroup
+        // The displayNodes array will contain: [...branchNodes, { isAggregate: true, nodes: leafNodes }]
+
+        let displayNodes = [];
+
+        if (shouldUseAggregation) {
+            // Sort branch nodes by name
+            branchNodes.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Add branch nodes first
+            displayNodes = [...branchNodes];
+
+            // Add aggregate group if there are leaves
+            if (leafNodes.length > 0) {
+                displayNodes.push({
+                    isAggregate: true,
+                    nodes: leafNodes,
+                    // Use a deterministic ID for the aggregate group to handle keys
+                    distinguishedName: `aggregate-${parentNode ? parentNode.distinguishedName : 'root'}`
+                });
+            }
+        } else {
+            // Standard behavior: just render all nodes
+            displayNodes = nodes;
         }
 
-        const useGrid = nodes.length > GRID_THRESHOLD;
+        const useGrid = false; // Grid is replaced by the hybrid Aggregate logic
 
         // Determine target for path logic
         const targetId = hoveredNodeId || focusedNodeId;
@@ -455,49 +486,21 @@ const OrganogramPage = () => {
             });
         }
 
-        // If an active path exists within this group, the line to the parent must be active
-        const isGroupActive = activeChildIndex !== -1;
-
-        if (useGrid) {
-            return (
-                <div className={`org-grid-wrapper ${isGroupActive ? 'grid-active' : ''}`}>
-                    {nodes.map((node, index) => {
-                        const key = node.distinguishedName || index;
-                        const hasChildren = node.children && node.children.length > 0;
-                        const isExpanded = expandedNodes.has(key);
-
-                        // In Grid, we just show simple connection up to the container
-                        const isActive = activeChildIndex === index;
-
-                        // Logic: If has children, get new color (rotated by depth). If leaf, inherit parent color.
-                        const myColor = hasChildren ? getNodeColor(index + depth) : (parentColor || getNodeColor(index + depth));
-
-                        return (
-                            <div key={key} className={`grid-item ${isActive ? 'grid-item-active' : ''}`}>
-                                <NodeCard
-                                    node={node}
-                                    isExpanded={isExpanded}
-                                    toggleNode={() => toggleNode(key)}
-                                    hasChildren={hasChildren}
-                                    isMatch={false}
-                                    parentId={parentNode ? parentNode.distinguishedName : null}
-                                    isGridItem={true}
-                                    assignedColor={myColor}
-                                />
-                                {hasChildren && isExpanded && (
-                                    <div className="grid-sub-tree">
-                                        {renderTree(node.children, node, myColor, depth + 1)}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            );
+        // --- Path Calculation Logic ---
+        // Determine which child is part of the active path
+        // For Aggregate nodes, check if any of the contained leaf nodes are active
+        let activeChildIndex = -1;
+        if (targetId || ancestorIds.size > 0) {
+            activeChildIndex = displayNodes.findIndex(item => {
+                if (item.isAggregate) {
+                    return item.nodes.some(n => n.distinguishedName === targetId || ancestorIds.has(n.distinguishedName));
+                }
+                const nid = item.distinguishedName;
+                return (nid === targetId) || (ancestorIds.has(nid));
+            });
         }
 
-        // Standard Tree View (Flex Row)
-        const displayNodes = nodes;
+        const isGroupActive = activeChildIndex !== -1;
 
         // 2. Determine Pivot (Center of the group)
         const pivot = (displayNodes.length - 1) / 2;
@@ -510,13 +513,56 @@ const OrganogramPage = () => {
                     justifyContent: 'center',
                 }}
             >
-                {displayNodes.map((node, index) => {
+                {displayNodes.map((item, index) => {
+                    // Special rendering for Aggregate Group
+                    if (item.isAggregate) {
+                        const key = item.distinguishedName;
+
+                        // Connector Logic for Aggregate Group
+                        let isVerticalActive = false;
+                        let isLeftActive = false;
+                        let isRightActive = false;
+
+                        if (activeChildIndex !== -1) {
+                            const A = activeChildIndex;
+                            const P = pivot;
+                            if (index === A) isVerticalActive = true;
+                            if (A < P) {
+                                if (index > A && index <= Math.floor(P)) isLeftActive = true;
+                                if (index >= A && index < Math.ceil(P)) isRightActive = true;
+                            } else if (A > P) {
+                                if (index > Math.floor(P) && index <= A) isLeftActive = true;
+                                if (index >= Math.ceil(P) && index < A) isRightActive = true;
+                            }
+                        }
+
+                        // Aggregate group inherits parent color
+                        const aggColor = parentColor || getNodeColor(index + depth);
+
+                        return (
+                            <li key={key} className={`
+                                org-leaf
+                                ${isLeftActive ? 'conn-l' : ''}
+                                ${isRightActive ? 'conn-r' : ''}
+                                ${isVerticalActive ? 'conn-v' : ''}
+                            `}>
+                                <div className="connector-vertical"></div>
+                                <AggregateGroup
+                                    nodes={item.nodes}
+                                    parentName={parentNode ? parentNode.name : 'Unknown'}
+                                    assignedColor={aggColor}
+                                />
+                            </li>
+                        );
+                    }
+
+                    // Standard Rendering for Node
+                    const node = item;
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
 
                     // Logic: If has children, get new color (rotated by depth). If leaf, inherit parent color.
-                    // Fallback to dynamic color if no parent color (e.g. root leaves)
                     const myColor = hasChildren ? getNodeColor(index + depth) : (parentColor || getNodeColor(index + depth));
 
                     // --- Connector Logic ---
