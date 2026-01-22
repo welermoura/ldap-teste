@@ -506,8 +506,8 @@ const OrganogramPage = () => {
             <ul
                 className={`org-tree ${isGroupActive ? 'group-active' : ''}`}
                 style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${displayNodes.length}, 1fr)`,
+                    display: 'flex',
+                    justifyContent: 'center',
                 }}
             >
                 {displayNodes.map((node, index) => {
