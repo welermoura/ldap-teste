@@ -15,7 +15,9 @@ import {
     Mail,
     Phone,
     MapPin,
-    ChevronRight
+    ChevronRight,
+    ChevronsDown,
+    ChevronsUp
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -31,32 +33,21 @@ const OrganogramContext = createContext({
 
 // --- Utility Functions ---
 
-const getDepartmentColor = (dept) => {
-    if (!dept) return '#64748b'; // Slate-500 default
+const NODE_COLORS = [
+    '#059669', // Emerald
+    '#d97706', // Amber
+    '#2563eb', // Blue
+    '#db2777', // Pink
+    '#7c3aed', // Violet
+    '#ea580c', // Orange
+    '#0891b2', // Cyan
+    '#4f46e5', // Indigo
+    '#dc2626', // Red
+    '#65a30d', // Lime
+];
 
-    const palette = {
-        'Financeiro': '#059669', // Emerald
-        'Comercial': '#d97706', // Amber
-        'Vendas': '#d97706',
-        'TI': '#2563eb', // Blue
-        'Tecnologia': '#2563eb',
-        'Recursos Humanos': '#db2777', // Pink
-        'RH': '#db2777',
-        'Diretoria': '#0f172a', // Slate-900
-        'Executivo': '#0f172a',
-        'Jurídico': '#7c3aed', // Violet
-        'Marketing': '#ea580c', // Orange
-        'Operações': '#0891b2', // Cyan
-    };
-
-    if (palette[dept]) return palette[dept];
-
-    let hash = 0;
-    for (let i = 0; i < dept.length; i++) {
-        hash = dept.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const hue = Math.abs(hash % 360);
-    return `hsl(${hue}, 60%, 40%)`;
+const getNodeColor = (index) => {
+    return NODE_COLORS[index % NODE_COLORS.length];
 };
 
 const getInitials = (name) => {
@@ -121,9 +112,11 @@ const AggregateGroup = ({ nodes, parentName }) => {
     );
 };
 
-const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem }) => {
+const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem, assignedColor }) => {
     const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData } = useContext(OrganogramContext);
-    const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
+
+    // Use the assigned color from parent, or default to Slate-500 if root/undefined
+    const nodeColor = assignedColor || '#64748b';
 
     const nodeId = node.distinguishedName;
 
@@ -196,7 +189,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             style={{
-                '--dept-color': deptColor,
+                '--dept-color': nodeColor,
             }}
             role="button"
             aria-expanded={isExpanded}
@@ -208,8 +201,8 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             <div className="card-body">
                 <div className="card-header">
                     <div className="avatar" style={{
-                        backgroundColor: isExecutive ? '#0f172a' : `${deptColor}10`,
-                        color: isExecutive ? '#fff' : deptColor
+                        backgroundColor: isExecutive ? '#0f172a' : `${nodeColor}10`,
+                        color: isExecutive ? '#fff' : nodeColor
                     }}>
                         {getInitials(node.name)}
                     </div>
@@ -222,9 +215,9 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                 {node.department && (
                     <div className="card-footer">
                         <span className="dept-badge" style={{
-                             backgroundColor: `${deptColor}08`,
-                             color: deptColor,
-                             borderColor: `${deptColor}20`
+                             backgroundColor: `${nodeColor}08`,
+                             color: nodeColor,
+                             borderColor: `${nodeColor}20`
                         }}>
                             {node.department}
                         </span>
@@ -386,6 +379,25 @@ const OrganogramPage = () => {
         });
     };
 
+    const handleExpandAll = () => {
+        const allIds = new Set();
+        const traverse = (nodes) => {
+            if (!nodes) return;
+            nodes.forEach(node => {
+                allIds.add(node.distinguishedName);
+                if (node.children) traverse(node.children);
+            });
+        };
+        traverse(data);
+        setExpandedNodes(allIds);
+    };
+
+    const handleCollapseAll = () => {
+        const rootIds = new Set();
+        data.forEach(node => rootIds.add(node.distinguishedName));
+        setExpandedNodes(rootIds);
+    };
+
     const handleSelectNode = (nodeId) => {
         const path = findPathToNode(data, nodeId);
         if (path) {
@@ -454,6 +466,7 @@ const OrganogramPage = () => {
 
                         // In Grid, we just show simple connection up to the container
                         const isActive = activeChildIndex === index;
+                        const assignedColor = getNodeColor(index);
 
                         return (
                             <div key={key} className={`grid-item ${isActive ? 'grid-item-active' : ''}`}>
@@ -465,6 +478,7 @@ const OrganogramPage = () => {
                                     isMatch={false}
                                     parentId={parentNode ? parentNode.distinguishedName : null}
                                     isGridItem={true}
+                                    assignedColor={assignedColor}
                                 />
                                 {hasChildren && isExpanded && (
                                     <div className="grid-sub-tree">
@@ -496,6 +510,7 @@ const OrganogramPage = () => {
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
+                    const assignedColor = getNodeColor(index);
 
                     // --- Connector Logic ---
                     let isVerticalActive = false;
@@ -550,6 +565,7 @@ const OrganogramPage = () => {
                                 hasChildren={hasChildren}
                                 isMatch={false}
                                 parentId={parentNode ? parentNode.distinguishedName : null}
+                                assignedColor={assignedColor}
                             />
                             {hasChildren && isExpanded && renderTree(node.children, node)}
                         </li>
@@ -591,6 +607,9 @@ const OrganogramPage = () => {
                         <OrganogramSearch data={data} onSelect={handleSelectNode} />
 
                         <div className="zoom-controls">
+                            <button onClick={handleExpandAll} title="Expandir Tudo"><ChevronsDown size={16} /></button>
+                            <button onClick={handleCollapseAll} title="Recolher Tudo"><ChevronsUp size={16} /></button>
+                            <div className="separator"></div>
                             <button onClick={handleCenterFocused} disabled={!focusedNodeId} title="Centralizar Seleção" style={{ opacity: focusedNodeId ? 1 : 0.4 }}>
                                 <LocateFixed size={16} />
                             </button>
@@ -601,10 +620,6 @@ const OrganogramPage = () => {
                             <div className="separator"></div>
                             <button onClick={handleResetZoom} title="Resetar"><RotateCcw size={14} /></button>
                         </div>
-
-                        <a href="/login" className="btn-login">
-                            <UserCircle size={18} /> Login
-                        </a>
                     </div>
                 </header>
 
