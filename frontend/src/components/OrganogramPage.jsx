@@ -59,7 +59,7 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const AggregateGroup = ({ nodes, parentName }) => {
+const AggregateGroup = ({ nodes, parentName, assignedColor }) => {
     const [showAll, setShowAll] = useState(false);
     const { focusedNodeId } = useContext(OrganogramContext);
 
@@ -97,6 +97,7 @@ const AggregateGroup = ({ nodes, parentName }) => {
                             toggleNode={() => {}}
                             isMatch={false}
                             parentId={null}
+                            assignedColor={assignedColor}
                         />
                     ))}
                 </div>
@@ -434,6 +435,7 @@ const OrganogramPage = () => {
                 <AggregateGroup
                     nodes={nodes}
                     parentName={parentNode ? parentNode.name : 'Unknown'}
+                    assignedColor={parentColor}
                 />
             );
         }
