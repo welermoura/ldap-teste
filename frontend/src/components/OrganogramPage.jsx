@@ -628,10 +628,6 @@ const OrganogramPage = () => {
                         top: tooltipData.y + 20
                     }}>
                         <div className="tooltip-row">
-                            <span className="tooltip-label">Empresa:</span>
-                            <span className="tooltip-value">{tooltipData.node.company || '-'}</span>
-                        </div>
-                        <div className="tooltip-row">
                             <span className="tooltip-label">Escritório:</span>
                             <span className="tooltip-value">{tooltipData.node.office || '-'}</span>
                         </div>
