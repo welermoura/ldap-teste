@@ -10,38 +10,37 @@ def run():
             page.goto("http://localhost:5001/organograma")
             print("Page loaded.")
 
+            # Wait for data load
             page.wait_for_selector(".org-card")
-            print("Root node found.")
 
-            # Based on mock_data, we need to navigate deep to find a leaf group > 8
-            # The mock data has "Director Big Team" -> 10 children (leaves).
-            # So expanding Director should show the aggregate box if implemented correctly.
+            # Simulate Search
+            # We want to find "Subordinate Fifteen". It is > 12, so normally hidden.
+            # In the real app, "OrganogramSearch" component handles this.
+            # We can simulate the effect by programmatically focusing the node via console or if we can trigger the search input.
 
-            # Expand CEO
-            ceo_locator = page.get_by_text("Chief Executive")
-            if ceo_locator.count() > 0:
-                 ceo_locator.click()
-                 time.sleep(1)
-
-            # Expand Director
-            director_locator = page.get_by_text("Director Big Team")
-            if director_locator.count() > 0:
-                print("Director found. Expanding...")
-                director_locator.click()
+            # Let's try to type in the search input if it exists
+            search_input = page.locator("input[placeholder='Buscar...']")
+            if search_input.count() > 0:
+                print("Search input found. Typing...")
+                search_input.fill("Fifteen")
+                time.sleep(1)
+                page.keyboard.press("ArrowDown")
+                page.keyboard.press("Enter")
                 time.sleep(2)
 
-                # Check for Aggregate Box
-                if page.locator(".aggregate-box").count() > 0:
-                    print("SUCCESS: Aggregate Box found.")
-                    header_text = page.locator(".aggregate-header h5").inner_text()
-                    print(f"Header: {header_text}")
+                # Check if "Subordinate Fifteen" is visible
+                target = page.get_by_text("Subordinate Fifteen")
+                if target.is_visible():
+                    print("SUCCESS: Hidden target found and visible.")
                 else:
-                    print("FAILURE: Aggregate Box NOT found. Grid wrapper might be present.")
-                    if page.locator(".org-grid-wrapper").count() > 0:
-                        print("Found org-grid-wrapper instead.")
+                    print("FAILURE: Target not visible.")
+            else:
+                # Fallback: manually expand parent and check if it auto-expands?
+                # No, the requirement is about auto-expanding when *focused*.
+                # If we can't use search, we can't easily test "focus" from outside without search component working.
+                print("Search input not found or implemented in mock?")
 
-            page.screenshot(path="aggregate_verification.png", full_page=True)
-            print("Screenshot saved to aggregate_verification.png")
+            page.screenshot(path="search_verification.png", full_page=True)
 
         except Exception as e:
             print(f"Error: {e}")
