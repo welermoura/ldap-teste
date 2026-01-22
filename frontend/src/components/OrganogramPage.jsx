@@ -8,7 +8,10 @@ import {
     Network,
     AlertTriangle,
     Loader2,
-    LocateFixed
+    LocateFixed,
+    CheckCircle2,
+    Clock,
+    XCircle
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -59,6 +62,32 @@ const getInitials = (name) => {
 };
 
 // --- Components ---
+
+const CompactNodeCard = ({ node }) => {
+    const getStatusIcon = () => {
+        // Placeholder status logic - replace with actual property if available
+        // Randomly assigning for visual demonstration based on name length
+        const len = node.name.length;
+        if (len % 3 === 0) return <CheckCircle2 size={16} className="text-green-500" fill="white" />;
+        if (len % 3 === 1) return <Clock size={16} className="text-amber-500" fill="white" />;
+        return <XCircle size={16} className="text-red-500" fill="white" />;
+    };
+
+    return (
+        <div className="compact-user-card">
+            <div className="compact-avatar" style={{ backgroundColor: getDepartmentColor(node.department) + '20', color: getDepartmentColor(node.department) }}>
+                {getInitials(node.name)}
+                <div className="status-indicator">
+                    {getStatusIcon()}
+                </div>
+            </div>
+            <div className="compact-info">
+                <div className="compact-name" title={node.name}>{node.name}</div>
+                <div className="compact-role" title={node.title}>{node.title || 'Cargo não definido'}</div>
+            </div>
+        </div>
+    );
+};
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem }) => {
     const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds } = useContext(OrganogramContext);
@@ -333,10 +362,45 @@ const OrganogramPage = () => {
     };
 
     // Recursively render tree
-    const renderTree = (nodes, parentId = null) => {
+    const renderTree = (nodes, parentNode = null) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
         const GRID_THRESHOLD = 8;
+
+        // --- Aggregate Box Logic ---
+        // Used when > 8 nodes and ALL are leaves (have no children)
+        const isLeafGroup = nodes.length > GRID_THRESHOLD && nodes.every(n => !n.children || n.children.length === 0);
+
+        if (isLeafGroup) {
+            const showCount = nodes.length;
+            const parentName = parentNode ? parentNode.name : 'Unknown';
+            const displayNodes = nodes.slice(0, 12); // Initial limit, expandable?
+            const hasMore = nodes.length > 12;
+
+            return (
+                <div className="aggregate-box-wrapper">
+                    {/* Single vertical connector from parent */}
+                    <div className="connector-vertical-aggregate"></div>
+
+                    <div className="aggregate-box">
+                        <div className="aggregate-header">
+                            <h5>Pessoas que respondem a {parentName} ({showCount})</h5>
+                        </div>
+                        <div className="aggregate-grid">
+                            {displayNodes.map((node) => (
+                                <CompactNodeCard key={node.distinguishedName} node={node} />
+                            ))}
+                        </div>
+                        {hasMore && (
+                            <div className="aggregate-footer">
+                                <button className="btn-view-more">Visualizar mais</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
         const useGrid = nodes.length > GRID_THRESHOLD;
 
         // Determine target for path logic
@@ -374,12 +438,12 @@ const OrganogramPage = () => {
                                     toggleNode={() => toggleNode(key)}
                                     hasChildren={hasChildren}
                                     isMatch={false}
-                                    parentId={parentId}
+                                    parentId={parentNode ? parentNode.distinguishedName : null}
                                     isGridItem={true}
                                 />
                                 {hasChildren && isExpanded && (
                                     <div className="grid-sub-tree">
-                                        {renderTree(node.children, key)}
+                                        {renderTree(node.children, node)}
                                     </div>
                                 )}
                             </div>
@@ -390,7 +454,7 @@ const OrganogramPage = () => {
         }
 
         // Standard Tree View (Flex Row)
-        const displayNodes = nodes; // No collapsing for standard view logic anymore
+        const displayNodes = nodes;
 
         // 2. Determine Pivot (Center of the group)
         const pivot = (displayNodes.length - 1) / 2;
@@ -460,9 +524,9 @@ const OrganogramPage = () => {
                                 toggleNode={() => toggleNode(key)}
                                 hasChildren={hasChildren}
                                 isMatch={false}
-                                parentId={parentId}
+                                parentId={parentNode ? parentNode.distinguishedName : null}
                             />
-                            {hasChildren && isExpanded && renderTree(node.children, key)}
+                            {hasChildren && isExpanded && renderTree(node.children, node)}
                         </li>
                     );
                 })}
@@ -533,7 +597,7 @@ const OrganogramPage = () => {
                             transform: `scale(${zoom})`,
                         }}
                     >
-                        {renderTree(data)}
+                        {renderTree(data, null)}
                     </div>
                 </main>
 
@@ -717,6 +781,122 @@ const OrganogramPage = () => {
                         display: flex;
                         flex-direction: column;
                         align-items: center;
+                    }
+
+                    /* --- Aggregate Box Layout --- */
+                    .aggregate-box-wrapper {
+                        padding-top: 60px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        position: relative;
+                        width: 100%;
+                    }
+
+                    .connector-vertical-aggregate {
+                        position: absolute;
+                        top: 0;
+                        left: 50%;
+                        width: 2px;
+                        height: 60px;
+                        background-color: var(--line-color);
+                        transform: translateX(-50%);
+                    }
+
+                    .aggregate-box {
+                        background: #fff;
+                        border: 1px solid var(--border-color);
+                        border-radius: 12px;
+                        box-shadow: var(--shadow-md);
+                        width: 100%;
+                        max-width: 900px;
+                        padding: 20px;
+                    }
+
+                    .aggregate-header h5 {
+                        margin: 0 0 16px 0;
+                        font-size: 0.95rem;
+                        color: var(--text-secondary);
+                        font-weight: 500;
+                    }
+
+                    .aggregate-grid {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 16px;
+                    }
+
+                    .aggregate-footer {
+                        margin-top: 16px;
+                        display: flex;
+                        justify-content: center;
+                    }
+
+                    .btn-view-more {
+                        background: transparent;
+                        border: none;
+                        color: var(--line-active);
+                        font-weight: 600;
+                        cursor: pointer;
+                        font-size: 0.9rem;
+                    }
+                    .btn-view-more:hover { text-decoration: underline; }
+
+                    /* Compact User Card */
+                    .compact-user-card {
+                        display: flex;
+                        align-items: center;
+                        gap: 12px;
+                        padding: 8px;
+                        border-radius: 8px;
+                        transition: background-color 0.2s;
+                    }
+                    .compact-user-card:hover {
+                        background-color: #f8fafc;
+                    }
+
+                    .compact-avatar {
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: 600;
+                        font-size: 0.85rem;
+                        position: relative;
+                        flex-shrink: 0;
+                    }
+
+                    .status-indicator {
+                        position: absolute;
+                        bottom: -2px;
+                        right: -2px;
+                        background: #fff;
+                        border-radius: 50%;
+                        display: flex;
+                        padding: 1px;
+                    }
+
+                    .compact-info {
+                        min-width: 0;
+                    }
+
+                    .compact-name {
+                        font-weight: 600;
+                        font-size: 0.9rem;
+                        color: var(--text-primary);
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    .compact-role {
+                        font-size: 0.8rem;
+                        color: var(--text-secondary);
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
                     }
 
                     /* --- Grid Layout (For large teams > 8) --- */
