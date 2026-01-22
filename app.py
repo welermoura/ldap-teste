@@ -653,7 +653,7 @@ def api_public_organogram_data():
 
         # Buscar todos os usuários ativos com seus gerentes
         search_filter = "(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
-        attributes = ['displayName', 'title', 'manager', 'distinguishedName', 'department']
+        attributes = ['displayName', 'title', 'manager', 'distinguishedName', 'department', 'company', 'physicalDeliveryOfficeName', 'mail', 'telephoneNumber']
 
         # Paged search para garantir que pegamos todos
         entry_generator = conn.extend.standard.paged_search(
@@ -685,6 +685,10 @@ def api_public_organogram_data():
                 'name': get_first(attrs.get('displayName')),
                 'title': get_first(attrs.get('title')),
                 'department': get_first(attrs.get('department')),
+                'company': get_first(attrs.get('company')),
+                'office': get_first(attrs.get('physicalDeliveryOfficeName')),
+                'mail': get_first(attrs.get('mail')),
+                'telephoneNumber': get_first(attrs.get('telephoneNumber')),
                 'manager_dn': manager_dn_raw.lower() if manager_dn_raw else None,
                 'distinguishedName': dn,
                 'children': []
