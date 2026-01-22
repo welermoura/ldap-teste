@@ -63,27 +63,42 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const CompactNodeCard = ({ node }) => {
-    const getStatusIcon = () => {
-        // Placeholder status logic - replace with actual property if available
-        // Randomly assigning for visual demonstration based on name length
-        const len = node.name.length;
-        if (len % 3 === 0) return <CheckCircle2 size={16} className="text-green-500" fill="white" />;
-        if (len % 3 === 1) return <Clock size={16} className="text-amber-500" fill="white" />;
-        return <XCircle size={16} className="text-red-500" fill="white" />;
-    };
+const AggregateGroup = ({ nodes, parentName }) => {
+    const [showAll, setShowAll] = useState(false);
+    const initialLimit = 12;
+    const displayNodes = showAll ? nodes : nodes.slice(0, initialLimit);
+    const hasMore = nodes.length > initialLimit;
 
     return (
-        <div className="compact-user-card">
-            <div className="compact-avatar" style={{ backgroundColor: getDepartmentColor(node.department) + '20', color: getDepartmentColor(node.department) }}>
-                {getInitials(node.name)}
-                <div className="status-indicator">
-                    {getStatusIcon()}
+        <div className="aggregate-box-wrapper">
+            {/* Single vertical connector from parent */}
+            <div className="connector-vertical-aggregate"></div>
+
+            <div className="aggregate-box">
+                <div className="aggregate-header">
+                    <h5>Pessoas que respondem a {parentName} ({nodes.length})</h5>
                 </div>
-            </div>
-            <div className="compact-info">
-                <div className="compact-name" title={node.name}>{node.name}</div>
-                <div className="compact-role" title={node.title}>{node.title || 'Cargo não definido'}</div>
+                <div className="aggregate-grid">
+                    {displayNodes.map((node) => (
+                        <NodeCard
+                            key={node.distinguishedName}
+                            node={node}
+                            isGridItem={true}
+                            hasChildren={false}
+                            isExpanded={false}
+                            toggleNode={() => {}}
+                            isMatch={false}
+                            parentId={null}
+                        />
+                    ))}
+                </div>
+                {hasMore && (
+                    <div className="aggregate-footer">
+                        <button className="btn-view-more" onClick={() => setShowAll(!showAll)}>
+                            {showAll ? 'Visualizar menos' : 'Visualizar mais'}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -372,32 +387,11 @@ const OrganogramPage = () => {
         const isLeafGroup = nodes.length > GRID_THRESHOLD && nodes.every(n => !n.children || n.children.length === 0);
 
         if (isLeafGroup) {
-            const showCount = nodes.length;
-            const parentName = parentNode ? parentNode.name : 'Unknown';
-            const displayNodes = nodes.slice(0, 12); // Initial limit, expandable?
-            const hasMore = nodes.length > 12;
-
             return (
-                <div className="aggregate-box-wrapper">
-                    {/* Single vertical connector from parent */}
-                    <div className="connector-vertical-aggregate"></div>
-
-                    <div className="aggregate-box">
-                        <div className="aggregate-header">
-                            <h5>Pessoas que respondem a {parentName} ({showCount})</h5>
-                        </div>
-                        <div className="aggregate-grid">
-                            {displayNodes.map((node) => (
-                                <CompactNodeCard key={node.distinguishedName} node={node} />
-                            ))}
-                        </div>
-                        {hasMore && (
-                            <div className="aggregate-footer">
-                                <button className="btn-view-more">Visualizar mais</button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <AggregateGroup
+                    nodes={nodes}
+                    parentName={parentNode ? parentNode.name : 'Unknown'}
+                />
             );
         }
 
