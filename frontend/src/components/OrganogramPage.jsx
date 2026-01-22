@@ -1374,7 +1374,7 @@ const OrganogramPage = () => {
                         z-index: 100;
                         pointer-events: auto; /* Allow clicking links */
                         width: max-content; /* Dynamic width */
-                        max-width: 300px;
+                        max-width: 450px; /* Increased to accommodate long emails */
                         animation: fadeIn 0.2s ease-out;
                         color: var(--text-primary);
                     }
@@ -1407,9 +1407,8 @@ const OrganogramPage = () => {
                     .tooltip-link {
                         color: #2563eb; /* Blue-600 */
                         text-decoration: none;
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
+                        white-space: normal; /* Allow wrapping if needed */
+                        word-break: break-word; /* Break long emails */
                     }
                     .tooltip-link:hover {
                         text-decoration: underline;
@@ -1417,9 +1416,8 @@ const OrganogramPage = () => {
 
                     .tooltip-text {
                         color: #334155; /* Slate-700 */
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
+                        white-space: normal;
+                        word-break: break-word;
                     }
 
                 `}</style>
