@@ -737,7 +737,7 @@ const OrganogramPage = () => {
                         top: 0;
                         left: 50%;
                         width: 2px;
-                        height: 30px; /* Halfway down */
+                        height: 32px; /* Slight overlap with bus bar */
                         background-color: var(--line-color);
                         transform: translateX(-50%);
                         transition: background-color 0.2s;
@@ -771,9 +771,9 @@ const OrganogramPage = () => {
                      .grid-item:nth-child(-n+3)::before {
                         content: '';
                         position: absolute;
-                        top: -30px; /* Connects up to the grid padding area */
+                        top: -32px; /* Slight overlap with bus bar */
                         width: 2px;
-                        height: 30px;
+                        height: 32px;
                         background-color: var(--line-color);
                         z-index: 0;
                      }
