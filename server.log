@@ -4,8 +4,8 @@ Starting mock server on port 5001...
 [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5001
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [22/Jan/2026 11:35:50] "GET /organograma HTTP/1.1" 200 -
-127.0.0.1 - - [22/Jan/2026 11:35:50] "GET /ad-tree/assets/index-DQ3P1g1z.css HTTP/1.1" 200 -
-127.0.0.1 - - [22/Jan/2026 11:35:50] "GET /ad-tree/assets/organograma-C3wSr9Sc.js HTTP/1.1" 200 -
-127.0.0.1 - - [22/Jan/2026 11:35:50] "GET /ad-tree/assets/index-Q695sD3D.js HTTP/1.1" 200 -
-127.0.0.1 - - [22/Jan/2026 11:35:50] "GET /api/public/organogram_data HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jan/2026 11:53:48] "GET /organograma HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jan/2026 11:53:48] "GET /ad-tree/assets/index-Q695sD3D.js HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jan/2026 11:53:48] "GET /ad-tree/assets/organograma-C3wSr9Sc.js HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jan/2026 11:53:48] "GET /ad-tree/assets/index-DQ3P1g1z.css HTTP/1.1" 200 -
+127.0.0.1 - - [22/Jan/2026 11:53:48] "GET /api/public/organogram_data HTTP/1.1" 200 -
