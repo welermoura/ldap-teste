@@ -22,6 +22,7 @@ const OrganogramContext = createContext({
     focusedNodeId: null,
     setFocusedNodeId: () => {},
     ancestorIds: new Set(),
+    setTooltipData: () => {},
 });
 
 // --- Utility Functions ---
@@ -117,7 +118,7 @@ const AggregateGroup = ({ nodes, parentName }) => {
 };
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData } = useContext(OrganogramContext);
     const deptColor = useMemo(() => getDepartmentColor(node.department), [node.department]);
 
     const nodeId = node.distinguishedName;
@@ -140,13 +141,24 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         node.title.toLowerCase().includes('diretor')
     );
 
+    // Tooltip timer refs
+    const hoverTimer = useRef(null);
+
     const handleMouseEnter = (e) => {
         e.stopPropagation();
         setHoveredNodeId(nodeId);
+
+        // Start tooltip timer
+        if (hoverTimer.current) clearTimeout(hoverTimer.current);
+        hoverTimer.current = setTimeout(() => {
+            setTooltipData({ node, x: e.clientX, y: e.clientY });
+        }, 800); // 800ms delay
     };
 
     const handleMouseLeave = () => {
         setHoveredNodeId(null);
+        if (hoverTimer.current) clearTimeout(hoverTimer.current);
+        setTooltipData(null);
     };
 
     const handleKeyDown = (e) => {
@@ -234,6 +246,9 @@ const OrganogramPage = () => {
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
     const [ancestorIds, setAncestorIds] = useState(new Set());
+
+    // Tooltip State
+    const [tooltipData, setTooltipData] = useState(null);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -555,7 +570,7 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds }}>
+        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData }}>
             <div className="organogram-page">
                 <header className="page-header">
                     <div className="brand">
@@ -606,6 +621,30 @@ const OrganogramPage = () => {
                         {renderTree(data, null)}
                     </div>
                 </main>
+
+                {tooltipData && (
+                    <div className="node-tooltip" style={{
+                        left: tooltipData.x + 20,
+                        top: tooltipData.y + 20
+                    }}>
+                        <div className="tooltip-row">
+                            <span className="tooltip-label">Empresa:</span>
+                            <span className="tooltip-value">{tooltipData.node.company || '-'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                            <span className="tooltip-label">Escritório:</span>
+                            <span className="tooltip-value">{tooltipData.node.office || '-'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                            <span className="tooltip-label">Email:</span>
+                            <span className="tooltip-value">{tooltipData.node.mail || '-'}</span>
+                        </div>
+                        <div className="tooltip-row">
+                            <span className="tooltip-label">Telefone:</span>
+                            <span className="tooltip-value">{tooltipData.node.telephoneNumber || '-'}</span>
+                        </div>
+                    </div>
+                )}
 
                 <style>{`
                     /* --- Fonts & Vars --- */
@@ -1305,6 +1344,45 @@ const OrganogramPage = () => {
                         animation: spin 1s linear infinite;
                     }
                     @keyframes spin { to { transform: rotate(360deg); } }
+
+                    /* Tooltip */
+                    .node-tooltip {
+                        position: fixed;
+                        background: rgba(255, 255, 255, 0.95);
+                        backdrop-filter: blur(8px);
+                        border: 1px solid var(--border-color);
+                        border-radius: 8px;
+                        padding: 12px;
+                        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+                        z-index: 100;
+                        pointer-events: none;
+                        min-width: 200px;
+                        animation: fadeIn 0.2s ease-out;
+                        color: var(--text-primary);
+                    }
+                    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+                    .tooltip-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 4px;
+                        font-size: 0.85rem;
+                    }
+                    .tooltip-row:last-child { margin-bottom: 0; }
+
+                    .tooltip-label {
+                        font-weight: 600;
+                        color: var(--text-secondary);
+                        margin-right: 12px;
+                    }
+                    .tooltip-value {
+                        text-align: right;
+                        color: var(--text-primary);
+                        max-width: 150px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
 
                 `}</style>
             </div>
