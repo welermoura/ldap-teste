@@ -59,21 +59,18 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom }) => {
-    const [path, setPath] = useState('');
-    const containerRef = useRef(null);
+const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoom }) => {
+    const [paths, setPaths] = useState({ staticPaths: [], activePaths: [] });
 
     useEffect(() => {
-        const updatePath = () => {
+        const updatePaths = () => {
+            const staticPathsList = [];
+            const activePathsList = [];
             const activeId = hoveredNodeId || focusedNodeId;
-            if (!activeId) {
-                setPath('');
-                return;
-            }
 
+            // 1. Identify Aggregated Nodes
             // Map of DN -> Parent DN
             const parentMap = new Map();
-            // Set of IDs that are inside an aggregate group
             const aggregatedNodeSet = new Set();
 
             const traverse = (nodes, parentId = null) => {
@@ -85,7 +82,7 @@ const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom
                     if (!node.children || node.children.length === 0) {
                         leafNodes.push(node);
                     } else {
-                         traverse(node.children, node.distinguishedName);
+                         if (node.children) traverse(node.children, node.distinguishedName);
                     }
                 });
 
@@ -96,86 +93,120 @@ const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom
             };
             traverse(data);
 
-            const paths = [];
-
-            let currentId = activeId;
-            let parentId = parentMap.get(currentId);
-
-            // Special handling: if the ACTIVE node itself is aggregated, start drawing from the Box, not the node.
-            // This prevents the line from penetrating the box to find the specific card.
-            // We do this by swapping currentId to the aggregate box ID effectively.
-            // But we need to handle this in the loop.
-
-            while (parentId) {
-                let childEl;
-                let isAggregated = aggregatedNodeSet.has(currentId);
-
-                if (isAggregated) {
-                     // If aggregated, the connector should come from the Aggregate Box Top
-                     childEl = document.getElementById(`aggregate-${parentId}`);
-                } else {
-                     childEl = document.getElementById(currentId);
-                     // If not found (e.g. collapsed branch?), try finding aggregate box just in case logic mismatch
-                     if (!childEl) {
-                         const aggId = `aggregate-${parentId}`;
-                         childEl = document.getElementById(aggId);
-                     }
+            // 2. Build Set of "Active" Connections (Ancestor Chain)
+            // If activeId is present, we trace back to root.
+            // Any connection on this path is "active".
+            const activePairs = new Set(); // Set of "ChildDN"
+            if (activeId) {
+                let curr = activeId;
+                // If the active node is inside an aggregate, the "link" is technically Parent -> AggregateBox
+                // But we identify links by the Child ID usually.
+                // Let's just track the node DNs.
+                while(curr) {
+                    activePairs.add(curr);
+                    curr = parentMap.get(curr);
                 }
-
-                const parentEl = document.getElementById(parentId);
-
-                if (childEl && parentEl) {
-                    const childRect = childEl.getBoundingClientRect();
-                    const parentRect = parentEl.getBoundingClientRect();
-
-                    const startX = childRect.left + childRect.width / 2;
-                    const startY = childRect.top; // Top of Child (or Box)
-                    const endX = parentRect.left + parentRect.width / 2;
-                    const endY = parentRect.bottom; // Bottom of Parent
-
-                    const midY = (startY + endY) / 2;
-
-                    const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
-                    paths.push(d);
-                }
-
-                // If we were aggregated, we just drew line Parent -> Box.
-                // We do NOT draw a line inside the box.
-                // The loop continues upwards.
-
-                currentId = parentId;
-                parentId = parentMap.get(currentId);
             }
 
-            setPath(paths.join(' '));
+            // 3. Generate Paths for ALL visible nodes
+            // We need to traverse visible nodes again.
+            // Visible means: Root is visible. Children are visible if Parent is expanded.
+
+            const processNode = (node, parentId) => {
+                if (!node) return;
+                const currentId = node.distinguishedName;
+
+                // If I have a parent, draw line Parent -> Me
+                if (parentId) {
+                    const isAggregated = aggregatedNodeSet.has(currentId);
+
+                    let childEl;
+                    // If aggregated, we only draw ONE line for the whole group (Parent -> Box).
+                    // We shouldn't draw lines for *every* aggregated child, just once for the group.
+                    // So if isAggregated is true, we check if we already processed this group?
+                    // Or we can just check if the element exists.
+
+                    if (isAggregated) {
+                        // The group box ID
+                        const aggId = `aggregate-${parentId}`;
+                        childEl = document.getElementById(aggId);
+                        // We only want to add this path ONCE per group.
+                        // But traverse visits every child.
+                        // We can deduplicate by using the aggId as key.
+                    } else {
+                        childEl = document.getElementById(currentId);
+                    }
+
+                    const parentEl = document.getElementById(parentId);
+
+                    if (childEl && parentEl) {
+                        const childRect = childEl.getBoundingClientRect();
+                        const parentRect = parentEl.getBoundingClientRect();
+
+                        const startX = childRect.left + childRect.width / 2;
+                        const startY = childRect.top;
+                        const endX = parentRect.left + parentRect.width / 2;
+                        const endY = parentRect.bottom;
+
+                        const midY = (startY + endY) / 2;
+                        const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
+
+                        // Determine if this specific connection is "active"
+                        // It is active if the CHILD is in the activePairs set.
+                        // OR if the child is an aggregate box, it is active if any node INSIDE it is active?
+                        // Yes.
+
+                        let isActive = false;
+                        if (isAggregated) {
+                            // Check if ANY aggregated child of this parent is in activePairs
+                            // We need to know which nodes are in this group.
+                            // We can check if activeId is one of the siblings?
+                            // Simpler: if activeId is in aggregatedNodeSet AND its parent is parentId.
+                            if (activeId && aggregatedNodeSet.has(activeId) && parentMap.get(activeId) === parentId) {
+                                isActive = true;
+                            }
+                        } else {
+                            isActive = activePairs.has(currentId);
+                        }
+
+                        // Push to list
+                        // We need a unique key to prevent duplicates for aggregate boxes
+                        const key = isAggregated ? `agg-${parentId}` : currentId;
+
+                        const pathObj = { d, key, isActive };
+                        if (isActive) {
+                            activePathsList.push(pathObj);
+                        } else {
+                            staticPathsList.push(pathObj);
+                        }
+                    }
+                }
+
+                // Recurse if expanded
+                if (expandedNodes.has(currentId) && node.children) {
+                    node.children.forEach(child => processNode(child, currentId));
+                }
+            };
+
+            // Start processing from roots
+            data.forEach(root => processNode(root, null));
+
+            // Deduplicate lists based on key (needed for aggregate boxes)
+            const uniqueStatic = Array.from(new Map(staticPathsList.map(item => [item.key, item])).values());
+            const uniqueActive = Array.from(new Map(activePathsList.map(item => [item.key, item])).values());
+
+            setPaths({ staticPaths: uniqueStatic, activePaths: uniqueActive });
         };
 
-        // Update on mount, hover change, and window resize/scroll
-        updatePath();
-        window.addEventListener('resize', updatePath);
-        window.addEventListener('scroll', updatePath, true); // Capture scroll
-
-        // Also need to update when expansion changes (layout shift)
-        // We can use a MutationObserver or just polling/timeout?
-        // Since React handles expansion, a useEffect dependency is enough.
-        // But the animation takes time.
-
-        let animationFrame;
         const loop = () => {
-            updatePath();
-            animationFrame = requestAnimationFrame(loop);
+            updatePaths();
+            requestAnimationFrame(loop);
         };
-        loop();
+        const handle = requestAnimationFrame(loop);
+        return () => cancelAnimationFrame(handle);
 
-        return () => {
-            window.removeEventListener('resize', updatePath);
-            window.removeEventListener('scroll', updatePath, true);
-            cancelAnimationFrame(animationFrame);
-        };
+    }, [data, expandedNodes, hoveredNodeId, focusedNodeId, zoom]);
 
-    }, [hoveredNodeId, focusedNodeId, data, zoom, ancestorIds]);
-
-    // Render as a fixed overlay on top of everything
     return (
         <svg
             style={{
@@ -185,19 +216,36 @@ const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom
                 width: '100%',
                 height: '100%',
                 pointerEvents: 'none',
-                zIndex: 40, // Below Tooltip (100) but above cards (2/50)
+                zIndex: 1, // Base level for connectors
             }}
         >
-            <path
-                d={path}
-                stroke="#3b82f6"
-                strokeWidth="3"
-                fill="none"
-                strokeLinecap="round"
-                style={{
-                    filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))'
-                }}
-            />
+            {/* Static Gray Paths */}
+            {paths.staticPaths.map(p => (
+                <path
+                    key={p.key}
+                    d={p.d}
+                    stroke="#cbd5e1"
+                    strokeWidth="2"
+                    fill="none"
+                    strokeLinecap="round"
+                />
+            ))}
+
+            {/* Active Blue Paths (Overlay) */}
+            {paths.activePaths.map(p => (
+                <path
+                    key={p.key}
+                    d={p.d}
+                    stroke="#3b82f6"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                    style={{
+                        filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))',
+                        zIndex: 40 // Higher visual priority
+                    }}
+                />
+            ))}
         </svg>
     );
 };
@@ -682,11 +730,11 @@ const OrganogramPage = () => {
     return (
         <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData }}>
             <div className="organogram-page">
-                <ActiveConnector
+                <TreeConnectors
                     data={data}
+                    expandedNodes={expandedNodes}
                     hoveredNodeId={hoveredNodeId}
                     focusedNodeId={focusedNodeId}
-                    ancestorIds={ancestorIds}
                     zoom={zoom}
                 />
                 <header className="page-header">
@@ -1158,130 +1206,27 @@ const OrganogramPage = () => {
                         max-width: 320px;
                     }
 
-                    /* --- Connectors --- */
-                    /* Vertical line from parent (ul::before) */
-                    .org-tree::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: all 0.2s var(--ease-out);
-                    }
+                    /* --- Connectors (Legacy CSS Removed - Now SVG) --- */
+                    /* We keep spacing/padding, but remove visual borders */
 
-                    /* Horizontal Arms */
-                    .org-leaf::before, .org-leaf::after {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        right: 50%;
-                        border-top: 2px solid var(--line-color);
-                        width: 50%;
-                        height: 30px;
-                        transition: all 0.2s var(--ease-out);
-                    }
-                    .org-leaf::after {
-                        right: auto;
-                        left: 50%;
-                        border-left: none; /* REMOVED vertical line part */
-                    }
+                    .org-tree::before { display: none; }
+                    .org-leaf::before, .org-leaf::after { display: none; }
+                    .connector-vertical { display: none; } /* Removed, handled by SVG */
+                    .org-leaf > ul::before { display: none; }
 
-                    /* New Separate Vertical Connector */
-                    .connector-vertical {
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 60px; /* Covers the full padding-top */
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        z-index: 0;
-                        transition: all 0.2s var(--ease-out);
-                    }
+                    /* Aggregate Box Connector - also removed, handled by SVG */
+                    .connector-vertical-aggregate { display: none; }
 
-                    /* Exceptions */
-                    .tree-wrapper > .org-tree::before { display: none; }
-                    .tree-wrapper > .org-tree > .org-leaf { padding-top: 0; }
-                    .tree-wrapper > .org-tree > .org-leaf > .connector-vertical { display: none; } /* Root has no parent line */
-
-                    /* Only Child: Hide horizontal arms, keep vertical */
-                    .org-leaf:only-child::after { display: none; }
-                    .org-leaf:only-child::before { display: none; }
-                    /* Vertical connector handles the link for only-child naturally now */
-
-                    .org-leaf:first-child::before, .org-leaf:last-child::after { border: 0 none; }
-
-                    /* Corners */
-                    .org-leaf:last-child::before {
-                        border-right: 2px solid var(--line-color);
-                        border-radius: 0 16px 0 0;
-                    }
-                    .org-leaf:first-child::after {
-                        border-left: 2px solid var(--line-color); /* Add border-left back for the corner curve? No. */
-                        border-radius: 16px 0 0 0;
-                    }
-
-                    .org-leaf:last-child::before { border-right: none; border-radius: 0; }
-                    .org-leaf:first-child::after { border-left: none; border-radius: 0; }
-
-                    /* Connector DOWN to children (ul::before) */
-                    .org-leaf > ul::before {
-                        content: '';
-                        position: absolute;
-                        top: -30px;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: all 0.2s var(--ease-out);
-                    }
-
-                    /* --- Active Connection States --- */
-
-                    @keyframes pulse-line {
-                        0% { opacity: 0.6; }
-                        50% { opacity: 1; }
-                        100% { opacity: 0.6; }
-                    }
-
-                    /* Left Path Highlight */
-                    .org-leaf.conn-l::before {
-                        border-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Right Path Highlight */
-                    .org-leaf.conn-r::after {
-                        border-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Vertical Stem Highlight */
-                    .org-leaf.conn-v > .connector-vertical {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Descendant (Downward from ancestor) Highlight - LEGACY (Backup) */
-                    .org-leaf.conn-descendant > ul::before {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Group Active Highlight (New Logic - Up to Parent) */
-                    .org-tree.group-active::before {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
+                    /* Grid wrapper parent connectors also removed?
+                       Wait, Grid layout inside Aggregate box is local.
+                       The SVG handles Parent -> Box.
+                       The lines INSIDE the box (Grid) are probably fine to keep CSS?
+                       Or did we want those SVG too?
+                       User asked for "The line passing through the gray line".
+                       The user image showed the line OUTSIDE the box.
+                       So we only need to replace the Tree Structure lines.
+                       The Aggregate Grid lines are internal.
+                    */
 
                     /* --- Card Styles --- */
                     .org-card {

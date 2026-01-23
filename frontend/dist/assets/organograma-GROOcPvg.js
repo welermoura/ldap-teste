@@ -3,22 +3,22 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const he=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),ge=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(n,l,d)=>d?d.toUpperCase():l.toLowerCase()),W=t=>{const n=ge(t);return n.charAt(0).toUpperCase()+n.slice(1)},Q=(...t)=>t.filter((n,l,d)=>!!n&&n.trim()!==""&&d.indexOf(n)===l).join(" ").trim(),ue=t=>{for(const n in t)if(n.startsWith("aria-")||n==="role"||n==="title")return!0};/**
+ */const he=t=>t.replace(/([a-z0-9])([A-Z])/g,"$1-$2").toLowerCase(),ge=t=>t.replace(/^([A-Z])|[\s-_]+(\w)/g,(n,c,d)=>d?d.toUpperCase():c.toLowerCase()),ae=t=>{const n=ge(t);return n.charAt(0).toUpperCase()+n.slice(1)},se=(...t)=>t.filter((n,c,d)=>!!n&&n.trim()!==""&&d.indexOf(n)===c).join(" ").trim(),xe=t=>{for(const n in t)if(n.startsWith("aria-")||n==="role"||n==="title")return!0};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */var xe={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
+ */var ue={xmlns:"http://www.w3.org/2000/svg",width:24,height:24,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const me=r.forwardRef(({color:t="currentColor",size:n=24,strokeWidth:l=2,absoluteStrokeWidth:d,className:m="",children:h,iconNode:u,...p},f)=>r.createElement("svg",{ref:f,...xe,width:n,height:n,stroke:t,strokeWidth:d?Number(l)*24/Number(n):l,className:Q("lucide",m),...!h&&!ue(p)&&{"aria-hidden":"true"},...p},[...u.map(([b,y])=>r.createElement(b,y)),...Array.isArray(h)?h:[h]]));/**
+ */const me=r.forwardRef(({color:t="currentColor",size:n=24,strokeWidth:c=2,absoluteStrokeWidth:d,className:b="",children:g,iconNode:m,...h},f)=>r.createElement("svg",{ref:f,...ue,width:n,height:n,stroke:t,strokeWidth:d?Number(c)*24/Number(n):c,className:se("lucide",b),...!g&&!xe(h)&&{"aria-hidden":"true"},...h},[...m.map(([v,k])=>r.createElement(v,k)),...Array.isArray(g)?g:[g]]));/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const w=(t,n)=>{const l=r.forwardRef(({className:d,...m},h)=>r.createElement(me,{ref:h,iconNode:n,className:Q(`lucide-${he(W(t))}`,`lucide-${t}`,d),...m}));return l.displayName=W(t),l};/**
+ */const w=(t,n)=>{const c=r.forwardRef(({className:d,...b},g)=>r.createElement(me,{ref:g,iconNode:n,className:se(`lucide-${he(ae(t))}`,`lucide-${t}`,d),...b}));return c.displayName=ae(t),c};/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -28,12 +28,12 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ve=[["path",{d:"m9 18 6-6-6-6",key:"mthhwq"}]],we=w("chevron-right",ve);/**
+ */const ve=[["path",{d:"m9 18 6-6-6-6",key:"mthhwq"}]],ye=w("chevron-right",ve);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const ye=[["path",{d:"m7 6 5 5 5-5",key:"1lc07p"}],["path",{d:"m7 13 5 5 5-5",key:"1d48rs"}]],ke=w("chevrons-down",ye);/**
+ */const we=[["path",{d:"m7 6 5 5 5-5",key:"1lc07p"}],["path",{d:"m7 13 5 5 5-5",key:"1d48rs"}]],ke=w("chevrons-down",we);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -43,17 +43,17 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ce=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],ze=w("loader-circle",Ce);/**
+ */const Se=[["path",{d:"M21 12a9 9 0 1 1-6.219-8.56",key:"13zald"}]],Ce=w("loader-circle",Se);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Se=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],Ee=w("locate-fixed",Se);/**
+ */const ze=[["line",{x1:"2",x2:"5",y1:"12",y2:"12",key:"bvdh0s"}],["line",{x1:"19",x2:"22",y1:"12",y2:"12",key:"1tbv5k"}],["line",{x1:"12",x2:"12",y1:"2",y2:"5",key:"11lu5j"}],["line",{x1:"12",x2:"12",y1:"19",y2:"22",key:"x3vr5v"}],["circle",{cx:"12",cy:"12",r:"7",key:"fim9np"}],["circle",{cx:"12",cy:"12",r:"3",key:"1v7zrd"}]],Ie=w("locate-fixed",ze);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ie=[["path",{d:"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7",key:"132q7q"}],["rect",{x:"2",y:"4",width:"20",height:"16",rx:"2",key:"izxlao"}]],$e=w("mail",Ie);/**
+ */const Ee=[["path",{d:"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7",key:"132q7q"}],["rect",{x:"2",y:"4",width:"20",height:"16",rx:"2",key:"izxlao"}]],$e=w("mail",Ee);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
@@ -63,47 +63,47 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Le=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],_e=w("network",Le);/**
+ */const _e=[["rect",{x:"16",y:"16",width:"6",height:"6",rx:"1",key:"4q2zg0"}],["rect",{x:"2",y:"16",width:"6",height:"6",rx:"1",key:"8cvhb9"}],["rect",{x:"9",y:"2",width:"6",height:"6",rx:"1",key:"1egb70"}],["path",{d:"M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3",key:"1jsf9p"}],["path",{d:"M12 12V8",key:"2874zd"}]],Le=w("network",_e);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Re=[["path",{d:"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384",key:"9njp5v"}]],De=w("phone",Re);/**
+ */const Re=[["path",{d:"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384",key:"9njp5v"}]],Te=w("phone",Re);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Be=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],He=w("rotate-ccw",Be);/**
+ */const De=[["path",{d:"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8",key:"1357e3"}],["path",{d:"M3 3v5h5",key:"1xhq8a"}]],Pe=w("rotate-ccw",De);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Te=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Fe=w("search",Te);/**
+ */const Be=[["path",{d:"m21 21-4.34-4.34",key:"14j7rj"}],["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}]],Ge=w("search",Be);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Oe=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],Pe=w("triangle-alert",Oe);/**
+ */const Fe=[["path",{d:"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",key:"wmoenq"}],["path",{d:"M12 9v4",key:"juzpu7"}],["path",{d:"M12 17h.01",key:"p32p05"}]],Oe=w("triangle-alert",Fe);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ge=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],Ve=w("user",Ge);/**
+ */const He=[["path",{d:"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2",key:"975kel"}],["circle",{cx:"12",cy:"7",r:"4",key:"17ys0d"}]],qe=w("user",He);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ue=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],Xe=w("x",Ue);/**
+ */const Ue=[["path",{d:"M18 6 6 18",key:"1bl5f8"}],["path",{d:"m6 6 12 12",key:"d8bk6v"}]],Ve=w("x",Ue);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ye=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],qe=w("zoom-in",Ye);/**
+ */const Ye=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"11",x2:"11",y1:"8",y2:"14",key:"1vmskp"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],Ze=w("zoom-in",Ye);/**
  * @license lucide-react v0.562.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
- */const Ze=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],We=w("zoom-out",Ze),Ke=({data:t,onSelect:n})=>{const[l,d]=r.useState(""),[m,h]=r.useState(!1),u=r.useRef(null),p=r.useMemo(()=>{const s=[],i=C=>{C&&C.forEach(x=>{s.push({name:x.name,title:x.title,department:x.department,id:x.distinguishedName,distinguishedName:x.distinguishedName}),x.children&&i(x.children)})};return i(t),s},[t]),f=r.useMemo(()=>{if(!l||l.length<2)return[];const s=l.toLowerCase();return p.filter(i=>i.name&&i.name.toLowerCase().includes(s)).slice(0,8)},[l,p]);r.useEffect(()=>{const s=i=>{u.current&&!u.current.contains(i.target)&&h(!1)};return document.addEventListener("mousedown",s),()=>document.removeEventListener("mousedown",s)},[]);const b=s=>{d(s.name),h(!1),n(s.id)},y=()=>{d(""),h(!1)};return e.jsxs("div",{className:"search-component",ref:u,children:[e.jsxs("div",{className:`search-input-wrapper ${m?"active":""}`,children:[e.jsx(Fe,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:l,onChange:s=>{d(s.target.value),h(!0)},onFocus:()=>h(!0)}),l&&e.jsx("button",{className:"clear-btn",onClick:y,children:e.jsx(Xe,{size:14})})]}),m&&f.length>0&&e.jsx("div",{className:"search-dropdown",children:f.map(s=>e.jsxs("div",{className:"search-item",onClick:()=>b(s),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(Ve,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:s.name}),e.jsxs("span",{className:"item-meta",children:[s.title," • ",s.department]})]})]},s.id))}),m&&l.length>=2&&f.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
+ */const Xe=[["circle",{cx:"11",cy:"11",r:"8",key:"4ej97u"}],["line",{x1:"21",x2:"16.65",y1:"21",y2:"16.65",key:"13gj7c"}],["line",{x1:"8",x2:"14",y1:"11",y2:"11",key:"durymu"}]],We=w("zoom-out",Xe),Ke=({data:t,onSelect:n})=>{const[c,d]=r.useState(""),[b,g]=r.useState(!1),m=r.useRef(null),h=r.useMemo(()=>{const i=[],s=S=>{S&&S.forEach(u=>{i.push({name:u.name,title:u.title,department:u.department,id:u.distinguishedName,distinguishedName:u.distinguishedName}),u.children&&s(u.children)})};return s(t),i},[t]),f=r.useMemo(()=>{if(!c||c.length<2)return[];const i=c.toLowerCase();return h.filter(s=>s.name&&s.name.toLowerCase().includes(i)).slice(0,8)},[c,h]);r.useEffect(()=>{const i=s=>{m.current&&!m.current.contains(s.target)&&g(!1)};return document.addEventListener("mousedown",i),()=>document.removeEventListener("mousedown",i)},[]);const v=i=>{d(i.name),g(!1),n(i.id)},k=()=>{d(""),g(!1)};return e.jsxs("div",{className:"search-component",ref:m,children:[e.jsxs("div",{className:`search-input-wrapper ${b?"active":""}`,children:[e.jsx(Ge,{size:16,className:"search-icon"}),e.jsx("input",{type:"text",placeholder:"Buscar colaborador...",value:c,onChange:i=>{d(i.target.value),g(!0)},onFocus:()=>g(!0)}),c&&e.jsx("button",{className:"clear-btn",onClick:k,children:e.jsx(Ve,{size:14})})]}),b&&f.length>0&&e.jsx("div",{className:"search-dropdown",children:f.map(i=>e.jsxs("div",{className:"search-item",onClick:()=>v(i),children:[e.jsx("div",{className:"item-avatar",children:e.jsx(qe,{size:16})}),e.jsxs("div",{className:"item-info",children:[e.jsx("span",{className:"item-name",children:i.name}),e.jsxs("span",{className:"item-meta",children:[i.title," • ",i.department]})]})]},i.id))}),b&&c.length>=2&&f.length===0&&e.jsx("div",{className:"search-dropdown empty",children:e.jsx("span",{children:"Nenhum resultado encontrado"})}),e.jsx("style",{children:`
                 .search-component {
                     position: relative;
                     width: 300px;
@@ -204,17 +204,17 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
                     color: #94a3b8;
                     font-size: 0.9rem;
                 }
-            `})]})},X=r.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set,setTooltipData:()=>{}}),K=["#059669","#d97706","#2563eb","#db2777","#7c3aed","#ea580c","#0891b2","#4f46e5","#dc2626","#65a30d"],U=t=>K[t%K.length],Qe=t=>{if(!t)return"";const n=t.split(" ");return n.length>=2?`${n[0][0]}${n[n.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Je=({data:t,hoveredNodeId:n,focusedNodeId:l,ancestorIds:d,zoom:m})=>{const[h,u]=r.useState("");return r.useRef(null),r.useEffect(()=>{const p=()=>{const y=n||l;if(!y){u("");return}const s=new Map,i=new Set,C=(z,j=null)=>{const S=[];z.forEach(k=>{j&&s.set(k.distinguishedName,j),!k.children||k.children.length===0?S.push(k):C(k.children,k.distinguishedName)}),z.length>3&&S.length>0&&S.forEach(k=>i.add(k.distinguishedName))};C(t);const x=[];let v=y,g=s.get(v);for(;g;){let z;if(i.has(v))z=document.getElementById(`aggregate-${g}`);else if(z=document.getElementById(v),!z){const S=`aggregate-${g}`;z=document.getElementById(S)}const $=document.getElementById(g);if(z&&$){const S=z.getBoundingClientRect(),k=$.getBoundingClientRect(),H=S.left+S.width/2,A=S.top,M=k.left+k.width/2,_=k.bottom,T=(A+_)/2,F=`M ${H} ${A} V ${T} H ${M} V ${_}`;x.push(F)}v=g,g=s.get(v)}u(x.join(" "))};p(),window.addEventListener("resize",p),window.addEventListener("scroll",p,!0);let f;const b=()=>{p(),f=requestAnimationFrame(b)};return b(),()=>{window.removeEventListener("resize",p),window.removeEventListener("scroll",p,!0),cancelAnimationFrame(f)}},[n,l,t,m,d]),e.jsx("svg",{style:{position:"fixed",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:40},children:e.jsx("path",{d:h,stroke:"#3b82f6",strokeWidth:"3",fill:"none",strokeLinecap:"round",style:{filter:"drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))"}})})},et=({nodes:t,parentName:n,assignedColor:l,parentId:d})=>{const[m,h]=r.useState(!1),{focusedNodeId:u,hoveredNodeId:p}=r.useContext(X),f=r.useMemo(()=>t.some(i=>i.distinguishedName===u||i.distinguishedName===p),[t,u,p]);r.useEffect(()=>{u&&t.some(C=>C.distinguishedName===u)&&h(!0)},[u,t]);const b=12,y=m?t:t.slice(0,b),s=t.length>b;return e.jsxs("div",{className:"aggregate-box-wrapper",id:`aggregate-${d}`,children:[e.jsx("div",{className:`connector-vertical-aggregate ${f?"active":""}`}),e.jsxs("div",{className:`aggregate-box ${f?"box-active":""}`,children:[e.jsx("div",{className:"aggregate-header",children:e.jsxs("h5",{children:["Pessoas que respondem a ",n," (",t.length,")"]})}),e.jsx("div",{className:"aggregate-grid",children:y.map(i=>e.jsx(J,{node:i,isGridItem:!0,hasChildren:!1,isExpanded:!1,toggleNode:()=>{},isMatch:!1,parentId:null,assignedColor:l},i.distinguishedName))}),s&&e.jsx("div",{className:"aggregate-footer",children:e.jsx("button",{className:"btn-view-more",onClick:()=>h(!m),children:m?"Visualizar menos":"Visualizar mais"})})]})]})},J=({node:t,isExpanded:n,toggleNode:l,hasChildren:d,isMatch:m,parentId:h,isGridItem:u,assignedColor:p})=>{const{hoveredNodeId:f,setHoveredNodeId:b,focusedNodeId:y,setFocusedNodeId:s,ancestorIds:i,setTooltipData:C}=r.useContext(X),x=p||"#64748b",v=t.distinguishedName,g=f===v,z=y===v,j=f===h&&f!==null,$=i.has(v),H=(f!==null||y!==null)&&!(g||z||j||$),A=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),M=r.useRef(null),_=E=>{E.stopPropagation(),b(v),M.current&&clearTimeout(M.current),M.current=setTimeout(()=>{C({node:t,x:E.clientX,y:E.clientY})},800)},T=()=>{b(null),M.current&&clearTimeout(M.current),C(null)},F=E=>{(E.key==="Enter"||E.key===" ")&&(E.preventDefault(),s(v),d&&l())};return e.jsxs("div",{id:v,className:`
+            `})]})},ee=r.createContext({hoveredNodeId:null,setHoveredNodeId:()=>{},focusedNodeId:null,setFocusedNodeId:()=>{},ancestorIds:new Set,setTooltipData:()=>{}}),ne=["#059669","#d97706","#2563eb","#db2777","#7c3aed","#ea580c","#0891b2","#4f46e5","#dc2626","#65a30d"],J=t=>ne[t%ne.length],Qe=t=>{if(!t)return"";const n=t.split(" ");return n.length>=2?`${n[0][0]}${n[n.length-1][0]}`.toUpperCase():t[0].toUpperCase()},Je=({data:t,expandedNodes:n,hoveredNodeId:c,focusedNodeId:d,zoom:b})=>{const[g,m]=r.useState({staticPaths:[],activePaths:[]});return r.useEffect(()=>{const h=()=>{const k=[],i=[],s=c||d,S=new Map,u=new Set,C=(p,E=null)=>{const N=[];p.forEach(x=>{E&&S.set(x.distinguishedName,E),!x.children||x.children.length===0?N.push(x):x.children&&C(x.children,x.distinguishedName)}),p.length>3&&N.length>0&&N.forEach(x=>u.add(x.distinguishedName))};C(t);const y=new Set;if(s){let p=s;for(;p;)y.add(p),p=S.get(p)}const T=(p,E)=>{if(!p)return;const $=p.distinguishedName;if(E){const N=u.has($);let x;if(N){const M=`aggregate-${E}`;x=document.getElementById(M)}else x=document.getElementById($);const L=document.getElementById(E);if(x&&L){const M=x.getBoundingClientRect(),P=L.getBoundingClientRect(),z=M.left+M.width/2,O=M.top,Y=P.left+P.width/2,H=P.bottom,Z=(O+H)/2,X=`M ${z} ${O} V ${Z} H ${Y} V ${H}`;let B=!1;N?s&&u.has(s)&&S.get(s)===E&&(B=!0):B=y.has($);const W=N?`agg-${E}`:$,q={d:X,key:W,isActive:B};B?i.push(q):k.push(q)}}n.has($)&&p.children&&p.children.forEach(N=>T(N,$))};t.forEach(p=>T(p,null));const I=Array.from(new Map(k.map(p=>[p.key,p])).values()),D=Array.from(new Map(i.map(p=>[p.key,p])).values());m({staticPaths:I,activePaths:D})},f=()=>{h(),requestAnimationFrame(f)},v=requestAnimationFrame(f);return()=>cancelAnimationFrame(v)},[t,n,c,d,b]),e.jsxs("svg",{style:{position:"fixed",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:1},children:[g.staticPaths.map(h=>e.jsx("path",{d:h.d,stroke:"#cbd5e1",strokeWidth:"2",fill:"none",strokeLinecap:"round"},h.key)),g.activePaths.map(h=>e.jsx("path",{d:h.d,stroke:"#3b82f6",strokeWidth:"3",fill:"none",strokeLinecap:"round",style:{filter:"drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))",zIndex:40}},h.key))]})},et=({nodes:t,parentName:n,assignedColor:c,parentId:d})=>{const[b,g]=r.useState(!1),{focusedNodeId:m,hoveredNodeId:h}=r.useContext(ee),f=r.useMemo(()=>t.some(s=>s.distinguishedName===m||s.distinguishedName===h),[t,m,h]);r.useEffect(()=>{m&&t.some(S=>S.distinguishedName===m)&&g(!0)},[m,t]);const v=12,k=b?t:t.slice(0,v),i=t.length>v;return e.jsxs("div",{className:"aggregate-box-wrapper",id:`aggregate-${d}`,children:[e.jsx("div",{className:`connector-vertical-aggregate ${f?"active":""}`}),e.jsxs("div",{className:`aggregate-box ${f?"box-active":""}`,children:[e.jsx("div",{className:"aggregate-header",children:e.jsxs("h5",{children:["Pessoas que respondem a ",n," (",t.length,")"]})}),e.jsx("div",{className:"aggregate-grid",children:k.map(s=>e.jsx(ie,{node:s,isGridItem:!0,hasChildren:!1,isExpanded:!1,toggleNode:()=>{},isMatch:!1,parentId:null,assignedColor:c},s.distinguishedName))}),i&&e.jsx("div",{className:"aggregate-footer",children:e.jsx("button",{className:"btn-view-more",onClick:()=>g(!b),children:b?"Visualizar menos":"Visualizar mais"})})]})]})},ie=({node:t,isExpanded:n,toggleNode:c,hasChildren:d,isMatch:b,parentId:g,isGridItem:m,assignedColor:h})=>{const{hoveredNodeId:f,setHoveredNodeId:v,focusedNodeId:k,setFocusedNodeId:i,ancestorIds:s,setTooltipData:S}=r.useContext(ee),u=h||"#64748b",C=t.distinguishedName,y=f===C,T=k===C,I=f===g&&f!==null,D=s.has(C),$=(f!==null||k!==null)&&!(y||T||I||D),N=t.title&&(t.title.toLowerCase().includes("presidente")||t.title.toLowerCase().includes("ceo")||t.title.toLowerCase().includes("diretor")),x=r.useRef(null),L=z=>{z.stopPropagation(),v(C),x.current&&clearTimeout(x.current),x.current=setTimeout(()=>{S({node:t,x:z.clientX,y:z.clientY})},800)},M=()=>{v(null),x.current&&clearTimeout(x.current),S(null)},P=z=>{(z.key==="Enter"||z.key===" ")&&(z.preventDefault(),i(C),d&&c())};return e.jsxs("div",{id:C,className:`
                 org-card
-                ${u?"card-grid":""}
-                ${m?"highlight":""}
-                ${A?"executive":""}
-                ${g?"state-active":""}
-                ${z?"state-focused":""}
-                ${j?"state-subordinate":""}
-                ${$?"state-ancestor":""}
-                ${H?"state-dimmed":""}
-            `,onClick:E=>{E.stopPropagation(),s(v),d&&l()},onKeyDown:F,onMouseEnter:_,onMouseLeave:T,style:{"--dept-color":x},role:"button","aria-expanded":n,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:A?"#0f172a":`${x}10`,color:A?"#fff":x},children:Qe(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${x}08`,color:x,borderColor:`${x}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${n?"expanded":""}`,children:e.jsx(be,{size:14,className:"icon-chevron"})})]})},tt=()=>{const[t,n]=r.useState([]),[l,d]=r.useState(!0),[m,h]=r.useState(null),[u,p]=r.useState(1),[f,b]=r.useState(new Set),[y,s]=r.useState(null),[i,C]=r.useState(null),[x,v]=r.useState(new Set),[g,z]=r.useState(null),j=r.useRef(null),[$,S]=r.useState(!1),[k,H]=r.useState({x:0,y:0}),[A,M]=r.useState({left:0,top:0});r.useEffect(()=>{fetch("/api/public/organogram_data").then(o=>{if(!o.ok)throw new Error("Falha ao carregar dados");return o.json()}).then(o=>{const a=Array.isArray(o)?o:[];n(a);const c=new Set;a.forEach((N,L)=>{const R=N.distinguishedName||L;c.add(R)}),b(c),d(!1)}).catch(o=>{h(o.message),d(!1)})},[]);const _=(o,a,c=[])=>{for(const N of o){const L=N.distinguishedName;if(L===a)return[...c,L];if(N.children){const R=_(N.children,a,[...c,L]);if(R)return R}}return null};r.useEffect(()=>{const o=y||i;if(o){const a=_(t,o);v(a?new Set(a):new Set)}else v(new Set)},[y,i,t]),r.useEffect(()=>{const o=j.current;if(!o)return;const a=c=>{c.ctrlKey||c.metaKey;{c.preventDefault();const N=-c.deltaY*.001;p(L=>Math.min(Math.max(L+N,.4),2))}};return o.addEventListener("wheel",a,{passive:!1}),()=>o.removeEventListener("wheel",a)},[]),r.useEffect(()=>{if(i){setTimeout(()=>{const a=document.getElementById(i);a&&a.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const o=setTimeout(()=>{C(null)},3e3);return()=>clearTimeout(o)}},[i]);const T=o=>{j.current&&(S(!0),H({x:o.pageX,y:o.pageY}),M({left:j.current.scrollLeft,top:j.current.scrollTop}))},F=o=>{if(!$||!j.current)return;o.preventDefault();const a=o.pageX-k.x,c=o.pageY-k.y;j.current.scrollLeft=A.left-a,j.current.scrollTop=A.top-c},E=()=>{S(!1)},ee=o=>{b(a=>{const c=new Set(a);return c.has(o)?c.delete(o):c.add(o),c})},te=()=>{const o=new Set,a=c=>{c&&c.forEach(N=>{o.add(N.distinguishedName),N.children&&a(N.children)})};a(t),b(o)},oe=()=>{const o=new Set;t.forEach(a=>o.add(a.distinguishedName)),b(o)},re=o=>{const a=_(t,o);a&&b(c=>new Set([...c,...a])),C(o)},ae=()=>p(o=>Math.min(o+.1,2)),ne=()=>p(o=>Math.max(o-.1,.4)),ie=()=>p(1),se=()=>{if(i){const o=document.getElementById(i);o&&o.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},Y=(o,a=null,c=null,N=0)=>{if(!o||!Array.isArray(o)||o.length===0)return null;const L=3,R=[],O=[];o.forEach(I=>{I.children&&I.children.length>0?R.push(I):O.push(I)});const le=o.length>L&&O.length>0;let P=[];return le?(R.sort((I,D)=>I.name.localeCompare(D.name)),P=[...R],O.length>0&&P.push({isAggregate:!0,nodes:O,distinguishedName:`aggregate-${a?a.distinguishedName:"root"}`})):P=o,e.jsx("ul",{className:"org-tree",style:{display:"flex",justifyContent:"center"},children:P.map((I,D)=>{if(I.isAggregate){const ce=I.distinguishedName,de=c||U(D+N);return e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(et,{nodes:I.nodes,parentName:a?a.name:"Unknown",assignedColor:de,parentId:a?a.distinguishedName:"root"})]},ce)}const B=I,G=B.distinguishedName||D,V=B.children&&B.children.length>0,q=f.has(G),Z=V?U(D+N):c||U(D+N);return e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(J,{node:B,isExpanded:q,toggleNode:()=>ee(G),hasChildren:V,isMatch:!1,parentId:a?a.distinguishedName:null,assignedColor:Z}),V&&q&&Y(B.children,B,Z,N+1)]},G)})})};return l?e.jsxs("div",{className:"loading-container",children:[e.jsx(ze,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):m?e.jsxs("div",{className:"error-container",children:[e.jsx(Pe,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",m]})]}):e.jsx(X.Provider,{value:{hoveredNodeId:y,setHoveredNodeId:s,focusedNodeId:i,setFocusedNodeId:C,ancestorIds:x,setTooltipData:z},children:e.jsxs("div",{className:"organogram-page",children:[e.jsx(Je,{data:t,hoveredNodeId:y,focusedNodeId:i,ancestorIds:x,zoom:u}),e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(_e,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(Ke,{data:t,onSelect:re}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:te,title:"Expandir Tudo",children:e.jsx(ke,{size:16})}),e.jsx("button",{onClick:oe,title:"Recolher Tudo",children:e.jsx(je,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:se,disabled:!i,title:"Centralizar Seleção",style:{opacity:i?1:.4},children:e.jsx(Ee,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ne,title:"Reduzir Zoom",children:e.jsx(We,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(u*100),"%"]}),e.jsx("button",{onClick:ae,title:"Aumentar Zoom",children:e.jsx(qe,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:ie,title:"Resetar",children:e.jsx(He,{size:14})})]})]})]}),e.jsx("main",{className:`canvas ${$?"grabbing":""}`,ref:j,onMouseDown:T,onMouseMove:F,onMouseUp:E,onMouseLeave:E,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${u})`},children:Y(t,null)})}),g&&e.jsxs("div",{className:"node-tooltip",style:{left:g.x+20,top:g.y+20},children:[e.jsxs("div",{className:"tooltip-header",children:["Contato ",e.jsx(we,{size:14})]}),g.node.mail&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx($e,{size:16,className:"icon-tooltip"}),e.jsx("a",{href:`mailto:${g.node.mail}`,className:"tooltip-link",children:g.node.mail})]}),g.node.telephoneNumber&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx(De,{size:16,className:"icon-tooltip"}),e.jsx("a",{href:`tel:${g.node.telephoneNumber}`,className:"tooltip-link",children:g.node.telephoneNumber})]}),g.node.office&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx(Me,{size:16,className:"icon-tooltip"}),e.jsx("span",{className:"tooltip-text",children:g.node.office})]})]}),e.jsx("style",{children:`
+                ${m?"card-grid":""}
+                ${b?"highlight":""}
+                ${N?"executive":""}
+                ${y?"state-active":""}
+                ${T?"state-focused":""}
+                ${I?"state-subordinate":""}
+                ${D?"state-ancestor":""}
+                ${$?"state-dimmed":""}
+            `,onClick:z=>{z.stopPropagation(),i(C),d&&c()},onKeyDown:P,onMouseEnter:L,onMouseLeave:M,style:{"--dept-color":u},role:"button","aria-expanded":n,"aria-label":`${t.name}, ${t.title}`,tabIndex:0,children:[e.jsx("div",{className:"card-accent"}),e.jsxs("div",{className:"card-body",children:[e.jsxs("div",{className:"card-header",children:[e.jsx("div",{className:"avatar",style:{backgroundColor:N?"#0f172a":`${u}10`,color:N?"#fff":u},children:Qe(t.name)}),e.jsxs("div",{className:"info",children:[e.jsx("h6",{className:"name",title:t.name,children:t.name}),e.jsx("p",{className:"role",title:t.title,children:t.title||"Cargo não definido"})]})]}),t.department&&e.jsx("div",{className:"card-footer",children:e.jsx("span",{className:"dept-badge",style:{backgroundColor:`${u}08`,color:u,borderColor:`${u}20`},children:t.department})})]}),d&&e.jsx("div",{className:`toggle-btn ${n?"expanded":""}`,children:e.jsx(be,{size:14,className:"icon-chevron"})})]})},tt=()=>{const[t,n]=r.useState([]),[c,d]=r.useState(!0),[b,g]=r.useState(null),[m,h]=r.useState(1),[f,v]=r.useState(new Set),[k,i]=r.useState(null),[s,S]=r.useState(null),[u,C]=r.useState(new Set),[y,T]=r.useState(null),I=r.useRef(null),[D,p]=r.useState(!1),[E,$]=r.useState({x:0,y:0}),[N,x]=r.useState({left:0,top:0});r.useEffect(()=>{fetch("/api/public/organogram_data").then(o=>{if(!o.ok)throw new Error("Falha ao carregar dados");return o.json()}).then(o=>{const a=Array.isArray(o)?o:[];n(a);const l=new Set;a.forEach((j,_)=>{const R=j.distinguishedName||_;l.add(R)}),v(l),d(!1)}).catch(o=>{g(o.message),d(!1)})},[]);const L=(o,a,l=[])=>{for(const j of o){const _=j.distinguishedName;if(_===a)return[...l,_];if(j.children){const R=L(j.children,a,[...l,_]);if(R)return R}}return null};r.useEffect(()=>{const o=k||s;if(o){const a=L(t,o);C(a?new Set(a):new Set)}else C(new Set)},[k,s,t]),r.useEffect(()=>{const o=I.current;if(!o)return;const a=l=>{l.ctrlKey||l.metaKey;{l.preventDefault();const j=-l.deltaY*.001;h(_=>Math.min(Math.max(_+j,.4),2))}};return o.addEventListener("wheel",a,{passive:!1}),()=>o.removeEventListener("wheel",a)},[]),r.useEffect(()=>{if(s){setTimeout(()=>{const a=document.getElementById(s);a&&a.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})},100);const o=setTimeout(()=>{S(null)},3e3);return()=>clearTimeout(o)}},[s]);const M=o=>{I.current&&(p(!0),$({x:o.pageX,y:o.pageY}),x({left:I.current.scrollLeft,top:I.current.scrollTop}))},P=o=>{if(!D||!I.current)return;o.preventDefault();const a=o.pageX-E.x,l=o.pageY-E.y;I.current.scrollLeft=N.left-a,I.current.scrollTop=N.top-l},z=()=>{p(!1)},O=o=>{v(a=>{const l=new Set(a);return l.has(o)?l.delete(o):l.add(o),l})},Y=()=>{const o=new Set,a=l=>{l&&l.forEach(j=>{o.add(j.distinguishedName),j.children&&a(j.children)})};a(t),v(o)},H=()=>{const o=new Set;t.forEach(a=>o.add(a.distinguishedName)),v(o)},Z=o=>{const a=L(t,o);a&&v(l=>new Set([...l,...a])),S(o)},X=()=>h(o=>Math.min(o+.1,2)),B=()=>h(o=>Math.max(o-.1,.4)),W=()=>h(1),q=()=>{if(s){const o=document.getElementById(s);o&&o.scrollIntoView({behavior:"smooth",block:"center",inline:"center"})}},te=(o,a=null,l=null,j=0)=>{if(!o||!Array.isArray(o)||o.length===0)return null;const _=3,R=[],U=[];o.forEach(A=>{A.children&&A.children.length>0?R.push(A):U.push(A)});const ce=o.length>_&&U.length>0;let V=[];return ce?(R.sort((A,G)=>A.name.localeCompare(G.name)),V=[...R],U.length>0&&V.push({isAggregate:!0,nodes:U,distinguishedName:`aggregate-${a?a.distinguishedName:"root"}`})):V=o,e.jsx("ul",{className:"org-tree",style:{display:"flex",justifyContent:"center"},children:V.map((A,G)=>{if(A.isAggregate){const le=A.distinguishedName,de=l||J(G+j);return e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(et,{nodes:A.nodes,parentName:a?a.name:"Unknown",assignedColor:de,parentId:a?a.distinguishedName:"root"})]},le)}const F=A,K=F.distinguishedName||G,Q=F.children&&F.children.length>0,oe=f.has(K),re=Q?J(G+j):l||J(G+j);return e.jsxs("li",{className:"org-leaf",children:[e.jsx("div",{className:"connector-vertical"}),e.jsx(ie,{node:F,isExpanded:oe,toggleNode:()=>O(K),hasChildren:Q,isMatch:!1,parentId:a?a.distinguishedName:null,assignedColor:re}),Q&&oe&&te(F.children,F,re,j+1)]},K)})})};return c?e.jsxs("div",{className:"loading-container",children:[e.jsx(Ce,{className:"spinner",size:40}),e.jsx("p",{children:"Carregando estrutura..."})]}):b?e.jsxs("div",{className:"error-container",children:[e.jsx(Oe,{size:48,className:"text-red-500"}),e.jsxs("p",{children:["Erro ao carregar: ",b]})]}):e.jsx(ee.Provider,{value:{hoveredNodeId:k,setHoveredNodeId:i,focusedNodeId:s,setFocusedNodeId:S,ancestorIds:u,setTooltipData:T},children:e.jsxs("div",{className:"organogram-page",children:[e.jsx(Je,{data:t,expandedNodes:f,hoveredNodeId:k,focusedNodeId:s,zoom:m}),e.jsxs("header",{className:"page-header",children:[e.jsxs("div",{className:"brand",children:[e.jsx("div",{className:"brand-icon",children:e.jsx(Le,{size:20})}),e.jsxs("div",{className:"brand-text",children:[e.jsx("h2",{children:"Organograma"}),e.jsx("span",{children:"Corporativo"})]})]}),e.jsxs("div",{className:"actions",children:[e.jsx(Ke,{data:t,onSelect:Z}),e.jsxs("div",{className:"zoom-controls",children:[e.jsx("button",{onClick:Y,title:"Expandir Tudo",children:e.jsx(ke,{size:16})}),e.jsx("button",{onClick:H,title:"Recolher Tudo",children:e.jsx(je,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:q,disabled:!s,title:"Centralizar Seleção",style:{opacity:s?1:.4},children:e.jsx(Ie,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:B,title:"Reduzir Zoom",children:e.jsx(We,{size:16})}),e.jsxs("span",{className:"zoom-level",children:[Math.round(m*100),"%"]}),e.jsx("button",{onClick:X,title:"Aumentar Zoom",children:e.jsx(Ze,{size:16})}),e.jsx("div",{className:"separator"}),e.jsx("button",{onClick:W,title:"Resetar",children:e.jsx(Pe,{size:14})})]})]})]}),e.jsx("main",{className:`canvas ${D?"grabbing":""}`,ref:I,onMouseDown:M,onMouseMove:P,onMouseUp:z,onMouseLeave:z,children:e.jsx("div",{className:"tree-wrapper",style:{transform:`scale(${m})`},children:te(t,null)})}),y&&e.jsxs("div",{className:"node-tooltip",style:{left:y.x+20,top:y.y+20},children:[e.jsxs("div",{className:"tooltip-header",children:["Contato ",e.jsx(ye,{size:14})]}),y.node.mail&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx($e,{size:16,className:"icon-tooltip"}),e.jsx("a",{href:`mailto:${y.node.mail}`,className:"tooltip-link",children:y.node.mail})]}),y.node.telephoneNumber&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx(Te,{size:16,className:"icon-tooltip"}),e.jsx("a",{href:`tel:${y.node.telephoneNumber}`,className:"tooltip-link",children:y.node.telephoneNumber})]}),y.node.office&&e.jsxs("div",{className:"tooltip-row",children:[e.jsx(Me,{size:16,className:"icon-tooltip"}),e.jsx("span",{className:"tooltip-text",children:y.node.office})]})]}),e.jsx("style",{children:`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -596,130 +596,27 @@ import{a as r,j as e,c as pe}from"./index-Q695sD3D.js";/**
                         max-width: 320px;
                     }
 
-                    /* --- Connectors --- */
-                    /* Vertical line from parent (ul::before) */
-                    .org-tree::before {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: all 0.2s var(--ease-out);
-                    }
+                    /* --- Connectors (Legacy CSS Removed - Now SVG) --- */
+                    /* We keep spacing/padding, but remove visual borders */
 
-                    /* Horizontal Arms */
-                    .org-leaf::before, .org-leaf::after {
-                        content: '';
-                        position: absolute;
-                        top: 0;
-                        right: 50%;
-                        border-top: 2px solid var(--line-color);
-                        width: 50%;
-                        height: 30px;
-                        transition: all 0.2s var(--ease-out);
-                    }
-                    .org-leaf::after {
-                        right: auto;
-                        left: 50%;
-                        border-left: none; /* REMOVED vertical line part */
-                    }
+                    .org-tree::before { display: none; }
+                    .org-leaf::before, .org-leaf::after { display: none; }
+                    .connector-vertical { display: none; } /* Removed, handled by SVG */
+                    .org-leaf > ul::before { display: none; }
 
-                    /* New Separate Vertical Connector */
-                    .connector-vertical {
-                        position: absolute;
-                        top: 0;
-                        left: 50%;
-                        width: 2px;
-                        height: 60px; /* Covers the full padding-top */
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        z-index: 0;
-                        transition: all 0.2s var(--ease-out);
-                    }
+                    /* Aggregate Box Connector - also removed, handled by SVG */
+                    .connector-vertical-aggregate { display: none; }
 
-                    /* Exceptions */
-                    .tree-wrapper > .org-tree::before { display: none; }
-                    .tree-wrapper > .org-tree > .org-leaf { padding-top: 0; }
-                    .tree-wrapper > .org-tree > .org-leaf > .connector-vertical { display: none; } /* Root has no parent line */
-
-                    /* Only Child: Hide horizontal arms, keep vertical */
-                    .org-leaf:only-child::after { display: none; }
-                    .org-leaf:only-child::before { display: none; }
-                    /* Vertical connector handles the link for only-child naturally now */
-
-                    .org-leaf:first-child::before, .org-leaf:last-child::after { border: 0 none; }
-
-                    /* Corners */
-                    .org-leaf:last-child::before {
-                        border-right: 2px solid var(--line-color);
-                        border-radius: 0 16px 0 0;
-                    }
-                    .org-leaf:first-child::after {
-                        border-left: 2px solid var(--line-color); /* Add border-left back for the corner curve? No. */
-                        border-radius: 16px 0 0 0;
-                    }
-
-                    .org-leaf:last-child::before { border-right: none; border-radius: 0; }
-                    .org-leaf:first-child::after { border-left: none; border-radius: 0; }
-
-                    /* Connector DOWN to children (ul::before) */
-                    .org-leaf > ul::before {
-                        content: '';
-                        position: absolute;
-                        top: -30px;
-                        left: 50%;
-                        width: 2px;
-                        height: 30px;
-                        background-color: var(--line-color);
-                        transform: translateX(-50%);
-                        transition: all 0.2s var(--ease-out);
-                    }
-
-                    /* --- Active Connection States --- */
-
-                    @keyframes pulse-line {
-                        0% { opacity: 0.6; }
-                        50% { opacity: 1; }
-                        100% { opacity: 0.6; }
-                    }
-
-                    /* Left Path Highlight */
-                    .org-leaf.conn-l::before {
-                        border-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Right Path Highlight */
-                    .org-leaf.conn-r::after {
-                        border-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Vertical Stem Highlight */
-                    .org-leaf.conn-v > .connector-vertical {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Descendant (Downward from ancestor) Highlight - LEGACY (Backup) */
-                    .org-leaf.conn-descendant > ul::before {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
-
-                    /* Group Active Highlight (New Logic - Up to Parent) */
-                    .org-tree.group-active::before {
-                        background-color: var(--line-active);
-                        animation: pulse-line 2s infinite ease-in-out;
-                        z-index: 1;
-                    }
+                    /* Grid wrapper parent connectors also removed?
+                       Wait, Grid layout inside Aggregate box is local.
+                       The SVG handles Parent -> Box.
+                       The lines INSIDE the box (Grid) are probably fine to keep CSS?
+                       Or did we want those SVG too?
+                       User asked for "The line passing through the gray line".
+                       The user image showed the line OUTSIDE the box.
+                       So we only need to replace the Tree Structure lines.
+                       The Aggregate Grid lines are internal.
+                    */
 
                     /* --- Card Styles --- */
                     .org-card {
