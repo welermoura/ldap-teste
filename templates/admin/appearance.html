@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Aparência Organograma - Gestão AD{% endblock %}
+
+{% block page_title %}
+<div class="page-header">
+    <h1><i class="fas fa-paint-brush me-2"></i>Aparência Organograma</h1>
+    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Voltar
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card glass-card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+
+                    <h5 class="mb-4">Personalização Visual</h5>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Cor de Fundo (Página)</label>
+                        <div class="input-group">
+                            {{ form.bg_color(class="form-control form-control-color", type="color", style="width: 100px;") }}
+                            <input type="text" class="form-control" id="bg_color_text" value="{{ form.bg_color.data }}" readonly>
+                            <button type="submit" name="clear_bg_color" value="1" class="btn btn-outline-danger">Limpar</button>
+                        </div>
+                        <div class="form-text">Selecione a cor de fundo da página do organograma.</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Imagem de Fundo</label>
+                        {{ form.bg_image(class="form-control") }}
+                        {% if config.ORGANOGRAM_BG_IMAGE %}
+                            <div class="mt-2">
+                                <small class="text-muted">Imagem atual: {{ config.ORGANOGRAM_BG_IMAGE }}</small>
+                                <br>
+                                <img src="{{ url_for('static', filename='uploads/' + config.ORGANOGRAM_BG_IMAGE) }}" style="max-height: 100px; max-width: 100%; border: 1px solid #ddd; padding: 4px; border-radius: 4px;" class="mt-1">
+                                <br>
+                                <button type="submit" name="clear_bg_image" value="1" class="btn btn-sm btn-outline-danger mt-1">Remover Imagem</button>
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Substitui a cor de fundo se definida. Formatos: JPG, PNG, WebP.</div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <h5 class="mb-4">Identidade Visual</h5>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Logo (Topo Esquerdo)</label>
+                        {{ form.logo(class="form-control") }}
+                        {% if config.ORGANOGRAM_LOGO %}
+                            <div class="mt-2">
+                                <small class="text-muted">Logo atual: {{ config.ORGANOGRAM_LOGO }}</small>
+                                <br>
+                                <img src="{{ url_for('static', filename='uploads/' + config.ORGANOGRAM_LOGO) }}" style="max-height: 50px; background: #eee; padding: 4px; border-radius: 4px;" class="mt-1">
+                                <br>
+                                <button type="submit" name="clear_logo" value="1" class="btn btn-sm btn-outline-danger mt-1">Remover Logo</button>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Favicon (Ícone da Aba)</label>
+                        {{ form.favicon(class="form-control") }}
+                        {% if config.ORGANOGRAM_FAVICON %}
+                            <div class="mt-2">
+                                <small class="text-muted">Favicon atual: {{ config.ORGANOGRAM_FAVICON }}</small>
+                                <br>
+                                <img src="{{ url_for('static', filename='uploads/' + config.ORGANOGRAM_FAVICON) }}" style="width: 32px; height: 32px; border: 1px solid #ddd;" class="mt-1">
+                                <br>
+                                <button type="submit" name="clear_favicon" value="1" class="btn btn-sm btn-outline-danger mt-1">Remover Favicon</button>
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Formato recomendado: .ico ou .png (32x32).</div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Sync color input with text input
+    document.getElementById('bg_color').addEventListener('input', function() {
+        document.getElementById('bg_color_text').value = this.value;
+    });
+</script>
+{% endblock %}
