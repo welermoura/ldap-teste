@@ -59,7 +59,151 @@ const getInitials = (name) => {
 
 // --- Components ---
 
-const AggregateGroup = ({ nodes, parentName, assignedColor }) => {
+const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom }) => {
+    const [path, setPath] = useState('');
+    const containerRef = useRef(null);
+
+    useEffect(() => {
+        const updatePath = () => {
+            const activeId = hoveredNodeId || focusedNodeId;
+            if (!activeId) {
+                setPath('');
+                return;
+            }
+
+            // Map of DN -> Parent DN
+            const parentMap = new Map();
+            const traverse = (nodes, parentId = null) => {
+                nodes.forEach(node => {
+                    if (parentId) parentMap.set(node.distinguishedName, parentId);
+                    if (node.children) traverse(node.children, node.distinguishedName);
+                });
+            };
+            traverse(data);
+
+            // Construct chain: Active -> Parent -> Grandparent ...
+            // But we must stop at the highest visible ancestor or root.
+            // Also, we need to handle Aggregate Groups.
+            // The ancestorIds set contains the chain.
+
+            // We'll iterate the DOM elements for ancestorIds.
+            // Since ancestorIds includes the active node and all ancestors.
+            // We find the child DOM, find the parent DOM, draw line.
+
+            const paths = [];
+            const processedPairs = new Set();
+
+            // Convert Set to Array and sort by depth?
+            // Actually, we can just look up parents using parentMap.
+
+            let currentId = activeId;
+            let parentId = parentMap.get(currentId);
+
+            const getElement = (id) => {
+                let el = document.getElementById(id);
+                if (el) return el;
+                // Check if inside an aggregate group (heuristic: check aggregate-id)
+                // If the node is hidden inside an aggregate, we should use the aggregate box
+                // But the aggregate box ID is `aggregate-PARENT_DN`.
+                // If `currentId` is inside aggregate, its parent is `parentId`.
+                // So the aggregate box ID is `aggregate-${parentId}`.
+
+                const aggId = `aggregate-${parentId}`;
+                el = document.getElementById(aggId);
+                return el;
+            };
+
+            while (parentId) {
+                const childEl = getElement(currentId);
+                const parentEl = document.getElementById(parentId); // Parents are always Branch Nodes (visible)
+
+                if (childEl && parentEl) {
+                    const childRect = childEl.getBoundingClientRect();
+                    const parentRect = parentEl.getBoundingClientRect();
+
+                    // Coordinates relative to the viewport are fine for SVG if SVG is fixed?
+                    // No, SVG is inside the scaled container.
+                    // We need coordinates relative to the .tree-wrapper.
+                    // But .tree-wrapper is transformed (scale).
+                    // getBoundingClientRect returns viewport coordinates (after scale).
+                    // If we put the SVG *outside* the scale transform (e.g. fixed overlay),
+                    // we can use viewport coordinates directly!
+                    // Let's try that. It's simpler.
+
+                    const startX = childRect.left + childRect.width / 2;
+                    const startY = childRect.top; // Top of Child
+                    const endX = parentRect.left + parentRect.width / 2;
+                    const endY = parentRect.bottom; // Bottom of Parent
+
+                    const midY = (startY + endY) / 2;
+
+                    // Inverted L logic (or S curve)
+                    // M startX startY V midY H endX V endY
+
+                    const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
+                    paths.push(d);
+                }
+
+                currentId = parentId;
+                parentId = parentMap.get(currentId);
+            }
+
+            setPath(paths.join(' '));
+        };
+
+        // Update on mount, hover change, and window resize/scroll
+        updatePath();
+        window.addEventListener('resize', updatePath);
+        window.addEventListener('scroll', updatePath, true); // Capture scroll
+
+        // Also need to update when expansion changes (layout shift)
+        // We can use a MutationObserver or just polling/timeout?
+        // Since React handles expansion, a useEffect dependency is enough.
+        // But the animation takes time.
+
+        let animationFrame;
+        const loop = () => {
+            updatePath();
+            animationFrame = requestAnimationFrame(loop);
+        };
+        loop();
+
+        return () => {
+            window.removeEventListener('resize', updatePath);
+            window.removeEventListener('scroll', updatePath, true);
+            cancelAnimationFrame(animationFrame);
+        };
+
+    }, [hoveredNodeId, focusedNodeId, data, zoom, ancestorIds]);
+
+    // Render as a fixed overlay on top of everything
+    return (
+        <svg
+            style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none',
+                zIndex: 40, // Below Tooltip (100) but above cards (2/50)
+            }}
+        >
+            <path
+                d={path}
+                stroke="#3b82f6"
+                strokeWidth="3"
+                fill="none"
+                strokeLinecap="round"
+                style={{
+                    filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.5))'
+                }}
+            />
+        </svg>
+    );
+};
+
+const AggregateGroup = ({ nodes, parentName, assignedColor, parentId }) => {
     const [showAll, setShowAll] = useState(false);
     const { focusedNodeId, hoveredNodeId } = useContext(OrganogramContext);
 
@@ -86,7 +230,10 @@ const AggregateGroup = ({ nodes, parentName, assignedColor }) => {
     const hasMore = nodes.length > initialLimit;
 
     return (
-        <div className="aggregate-box-wrapper">
+        <div
+            className="aggregate-box-wrapper"
+            id={`aggregate-${parentId}`}
+        >
             {/* Single vertical connector from parent */}
             <div className={`connector-vertical-aggregate ${isActive ? 'active' : ''}`}></div>
 
@@ -435,9 +582,6 @@ const OrganogramPage = () => {
         const GRID_THRESHOLD = 3;
 
         // --- Split Children Logic ---
-        // Used when > GRID_THRESHOLD nodes
-        // We separate nodes into two groups: Branch Nodes (have children) and Leaf Nodes (no children)
-        // If we have MANY nodes (> GRID_THRESHOLD), we might want to aggregate the leaves.
 
         const branchNodes = [];
         const leafNodes = [];
@@ -453,160 +597,56 @@ const OrganogramPage = () => {
         const totalNodes = nodes.length;
         const shouldUseAggregation = totalNodes > GRID_THRESHOLD && leafNodes.length > 0;
 
-        // If aggregating, we render branch nodes normally, and put all leaves into one AggregateGroup
-        // The displayNodes array will contain: [...branchNodes, { isAggregate: true, nodes: leafNodes }]
-
         let displayNodes = [];
 
         if (shouldUseAggregation) {
-            // Sort branch nodes by name
             branchNodes.sort((a, b) => a.name.localeCompare(b.name));
-
-            // Add branch nodes first
             displayNodes = [...branchNodes];
-
-            // Add aggregate group if there are leaves
             if (leafNodes.length > 0) {
                 displayNodes.push({
                     isAggregate: true,
                     nodes: leafNodes,
-                    // Use a deterministic ID for the aggregate group to handle keys
                     distinguishedName: `aggregate-${parentNode ? parentNode.distinguishedName : 'root'}`
                 });
             }
         } else {
-            // Standard behavior: just render all nodes
             displayNodes = nodes;
         }
 
-        const useGrid = false; // Grid is replaced by the hybrid Aggregate logic
-
-        // Determine target for path logic
-        const targetId = hoveredNodeId || focusedNodeId;
-
-        // --- Path Calculation Logic ---
-        // Determine which child is part of the active path
-        // For Aggregate nodes, check if any of the contained leaf nodes are active
-        let activeChildIndex = -1;
-        if (targetId || ancestorIds.size > 0) {
-            activeChildIndex = displayNodes.findIndex(item => {
-                if (item.isAggregate) {
-                    return item.nodes.some(n => n.distinguishedName === targetId || ancestorIds.has(n.distinguishedName));
-                }
-                const nid = item.distinguishedName;
-                return (nid === targetId) || (ancestorIds.has(nid));
-            });
-        }
-
-        const isGroupActive = activeChildIndex !== -1;
-
-        // 2. Determine Pivot (Center of the group)
-        const pivot = (displayNodes.length - 1) / 2;
-
         return (
             <ul
-                className={`org-tree ${isGroupActive ? 'group-active' : ''}`}
+                className="org-tree"
                 style={{
                     display: 'flex',
                     justifyContent: 'center',
                 }}
             >
                 {displayNodes.map((item, index) => {
-                    // Special rendering for Aggregate Group
                     if (item.isAggregate) {
                         const key = item.distinguishedName;
-
-                        // Connector Logic for Aggregate Group
-                        let isVerticalActive = false;
-                        let isLeftActive = false;
-                        let isRightActive = false;
-
-                        if (activeChildIndex !== -1) {
-                            const A = activeChildIndex;
-                            const P = pivot;
-                            if (index === A) isVerticalActive = true;
-                            if (A < P) {
-                                if (index > A && index <= Math.floor(P)) isLeftActive = true;
-                                if (index >= A && index < Math.ceil(P)) isRightActive = true;
-                            } else if (A > P) {
-                                if (index > Math.floor(P) && index <= A) isLeftActive = true;
-                                if (index >= Math.ceil(P) && index < A) isRightActive = true;
-                            }
-                        }
-
-                        // Aggregate group inherits parent color
                         const aggColor = parentColor || getNodeColor(index + depth);
 
                         return (
-                            <li key={key} className={`
-                                org-leaf
-                                ${isLeftActive ? 'conn-l' : ''}
-                                ${isRightActive ? 'conn-r' : ''}
-                                ${isVerticalActive ? 'conn-v' : ''}
-                            `}>
+                            <li key={key} className="org-leaf">
                                 <div className="connector-vertical"></div>
                                 <AggregateGroup
                                     nodes={item.nodes}
                                     parentName={parentNode ? parentNode.name : 'Unknown'}
                                     assignedColor={aggColor}
+                                    parentId={parentNode ? parentNode.distinguishedName : 'root'}
                                 />
                             </li>
                         );
                     }
 
-                    // Standard Rendering for Node
                     const node = item;
                     const key = node.distinguishedName || index;
                     const hasChildren = node.children && node.children.length > 0;
                     const isExpanded = expandedNodes.has(key);
-
-                    // Logic: If has children, get new color (rotated by depth). If leaf, inherit parent color.
                     const myColor = hasChildren ? getNodeColor(index + depth) : (parentColor || getNodeColor(index + depth));
 
-                    // --- Connector Logic ---
-                    let isVerticalActive = false;
-                    let isLeftActive = false;
-                    let isRightActive = false;
-
-                    if (activeChildIndex !== -1) {
-                        const A = activeChildIndex;
-                        const P = pivot;
-
-                        // Vertical stem is active if this is the specific active child
-                        if (index === A) {
-                            isVerticalActive = true;
-                        }
-
-                        // Determine horizontal segments based on direction to center
-                        if (A < P) {
-                            // Path goes RIGHT from A to Center
-                            // Left Arm Active?
-                            if (index > A && index <= Math.floor(P)) isLeftActive = true;
-                            // Right Arm Active?
-                            if (index >= A && index < Math.ceil(P)) isRightActive = true;
-                        } else if (A > P) {
-                            // Path goes LEFT from A to Center
-                            // Left Arm Active?
-                            if (index > Math.floor(P) && index <= A) isLeftActive = true;
-                            // Right Arm Active?
-                            if (index >= Math.ceil(P) && index < A) isRightActive = true;
-                        } else {
-                            // A === P. We are at center. No horizontal movement needed.
-                        }
-                    }
-
-                    // Downward Connection (Pass-through ancestor)
-                    const isPassThrough = ancestorIds.has(key) && key !== targetId;
-
                     return (
-                        <li key={key} className={`
-                            org-leaf
-                            ${isLeftActive ? 'conn-l' : ''}
-                            ${isRightActive ? 'conn-r' : ''}
-                            ${isVerticalActive ? 'conn-v' : ''}
-                            ${isPassThrough ? 'conn-descendant' : ''}
-                        `}>
-                            {/* Dedicated Vertical Connector */}
+                        <li key={key} className="org-leaf">
                             <div className="connector-vertical"></div>
 
                             <NodeCard
@@ -643,6 +683,13 @@ const OrganogramPage = () => {
     return (
         <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData }}>
             <div className="organogram-page">
+                <ActiveConnector
+                    data={data}
+                    hoveredNodeId={hoveredNodeId}
+                    focusedNodeId={focusedNodeId}
+                    ancestorIds={ancestorIds}
+                    zoom={zoom}
+                />
                 <header className="page-header">
                     <div className="brand">
                         <div className="brand-icon">
