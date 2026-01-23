@@ -51,6 +51,12 @@
                     <h5 class="mb-4">Identidade Visual</h5>
 
                     <div class="mb-4">
+                        <label class="form-label fw-bold">Subtítulo do Cabeçalho</label>
+                        {{ form.subtitle(class="form-control", placeholder="Ex: Corporativo") }}
+                        <div class="form-text">Texto exibido abaixo do título "Organograma". Deixe em branco para usar o padrão.</div>
+                    </div>
+
+                    <div class="mb-4">
                         <label class="form-label fw-bold">Logo (Topo Esquerdo)</label>
                         {{ form.logo(class="form-control") }}
                         {% if config.ORGANOGRAM_LOGO %}

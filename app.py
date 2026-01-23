@@ -326,6 +326,7 @@ class AppearanceForm(FlaskForm):
     bg_image = FileField('Imagem de Fundo', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif', 'webp'], 'Apenas imagens são permitidas.')])
     logo = FileField('Logo', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'svg'], 'Apenas imagens são permitidas.')])
     favicon = FileField('Favicon', validators=[FileAllowed(['ico', 'png'], 'Apenas .ico ou .png permitidos.')])
+    subtitle = StringField('Subtítulo do Cabeçalho')
     submit = SubmitField('Salvar Aparência')
 
 class UserSearchForm(FlaskForm):
@@ -647,7 +648,8 @@ def organograma():
             'bg_color': config.get('ORGANOGRAM_BG_COLOR'),
             'bg_image': config.get('ORGANOGRAM_BG_IMAGE'),
             'logo': config.get('ORGANOGRAM_LOGO'),
-            'favicon': config.get('ORGANOGRAM_FAVICON')
+            'favicon': config.get('ORGANOGRAM_FAVICON'),
+            'subtitle': config.get('ORGANOGRAM_SUBTITLE')
         }
 
         return render_template('organograma_react.html', js_file=js_file, css_file=css_file, appearance=appearance)
@@ -2918,6 +2920,11 @@ def appearance():
         elif request.form.get('clear_bg_color'):
             new_config.pop('ORGANOGRAM_BG_COLOR', None)
 
+        if form.subtitle.data:
+            new_config['ORGANOGRAM_SUBTITLE'] = form.subtitle.data
+        else:
+            new_config.pop('ORGANOGRAM_SUBTITLE', None)
+
         # Handle File Uploads
         upload_dir = os.path.join(basedir, 'static', 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
@@ -2952,6 +2959,7 @@ def appearance():
 
     # Pre-populate form
     form.bg_color.data = config.get('ORGANOGRAM_BG_COLOR', '')
+    form.subtitle.data = config.get('ORGANOGRAM_SUBTITLE', '')
 
     return render_template('admin/appearance.html', form=form, config=config)
 
