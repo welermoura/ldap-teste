@@ -59,6 +59,12 @@ const getInitials = (name) => {
 
 // --- Components ---
 
+const isAggregatedGroup = (nodes) => {
+    const GRID_THRESHOLD = 3;
+    const leafNodes = nodes.filter(n => !n.children || n.children.length === 0);
+    return nodes.length > GRID_THRESHOLD && leafNodes.length > 0;
+};
+
 const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoom }) => {
     const [paths, setPaths] = useState({ staticPaths: [], activePaths: [] });
 
@@ -74,34 +80,40 @@ const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoo
             const aggregatedNodeSet = new Set();
 
             const traverse = (nodes, parentId = null) => {
-                const GRID_THRESHOLD = 3;
-                const leafNodes = [];
                 nodes.forEach(node => {
                     if (parentId) parentMap.set(node.distinguishedName, parentId);
 
-                    if (!node.children || node.children.length === 0) {
-                        leafNodes.push(node);
-                    } else {
-                         if (node.children) traverse(node.children, node.distinguishedName);
+                    if (node.children && node.children.length > 0) {
+                         traverse(node.children, node.distinguishedName);
                     }
                 });
 
-                // Mimic aggregation logic
+                // Mimic aggregation logic from renderTree
+                const leafNodes = nodes.filter(n => !n.children || n.children.length === 0);
+                // The aggregation logic applies to the *group of children* of a parent.
+                // The `nodes` array passed here is exactly that group (children of parentId).
+                const GRID_THRESHOLD = 3;
                 if (nodes.length > GRID_THRESHOLD && leafNodes.length > 0) {
                      leafNodes.forEach(n => aggregatedNodeSet.add(n.distinguishedName));
                 }
             };
-            traverse(data);
+
+            // Traverse from Root's children?
+            // Root is usually single.
+            // But we need to handle the whole tree structure.
+            // Data is [Root].
+            if (data.length > 0) {
+                // Initialize map for Root
+                parentMap.set(data[0].distinguishedName, null);
+                if (data[0].children) {
+                    traverse(data[0].children, data[0].distinguishedName);
+                }
+            }
 
             // 2. Build Set of "Active" Connections (Ancestor Chain)
-            // If activeId is present, we trace back to root.
-            // Any connection on this path is "active".
-            const activePairs = new Set(); // Set of "ChildDN"
+            const activePairs = new Set();
             if (activeId) {
                 let curr = activeId;
-                // If the active node is inside an aggregate, the "link" is technically Parent -> AggregateBox
-                // But we identify links by the Child ID usually.
-                // Let's just track the node DNs.
                 while(curr) {
                     activePairs.add(curr);
                     curr = parentMap.get(curr);
@@ -109,8 +121,7 @@ const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoo
             }
 
             // 3. Generate Paths for ALL visible nodes
-            // We need to traverse visible nodes again.
-            // Visible means: Root is visible. Children are visible if Parent is expanded.
+            const processedGroups = new Set(); // Track processed aggregate groups to avoid drawing multiple lines
 
             const processNode = (node, parentId) => {
                 if (!node) return;
@@ -121,59 +132,56 @@ const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoo
                     const isAggregated = aggregatedNodeSet.has(currentId);
 
                     let childEl;
-                    // If aggregated, we only draw ONE line for the whole group (Parent -> Box).
-                    // We shouldn't draw lines for *every* aggregated child, just once for the group.
-                    // So if isAggregated is true, we check if we already processed this group?
-                    // Or we can just check if the element exists.
+                    let shouldProcess = true;
 
                     if (isAggregated) {
-                        // The group box ID
                         const aggId = `aggregate-${parentId}`;
-                        childEl = document.getElementById(aggId);
-                        // We only want to add this path ONCE per group.
-                        // But traverse visits every child.
-                        // We can deduplicate by using the aggId as key.
+                        // If we already processed this aggregate group for this parent, skip
+                        if (processedGroups.has(aggId)) {
+                            shouldProcess = false;
+                        } else {
+                            // Target the BOX itself
+                            childEl = document.getElementById(aggId);
+                            processedGroups.add(aggId);
+                        }
                     } else {
                         childEl = document.getElementById(currentId);
                     }
 
                     const parentEl = document.getElementById(parentId);
 
-                    if (childEl && parentEl) {
+                    if (shouldProcess && childEl && parentEl) {
                         const childRect = childEl.getBoundingClientRect();
                         const parentRect = parentEl.getBoundingClientRect();
 
                         const startX = childRect.left + childRect.width / 2;
-                        const startY = childRect.top;
+                        let startY = childRect.top;
+
+                        // If targeting an aggregate box, we want to hit the very top edge, or slightly inside?
+                        // Visual tweak: if isAggregated, startY is the top of the box.
+
                         const endX = parentRect.left + parentRect.width / 2;
                         const endY = parentRect.bottom;
 
                         const midY = (startY + endY) / 2;
-                        const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
 
-                        // Determine if this specific connection is "active"
-                        // It is active if the CHILD is in the activePairs set.
-                        // OR if the child is an aggregate box, it is active if any node INSIDE it is active?
-                        // Yes.
+                        // Ensure the line touches the box exactly
+                        const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
 
                         let isActive = false;
                         if (isAggregated) {
-                            // Check if ANY aggregated child of this parent is in activePairs
-                            // We need to know which nodes are in this group.
-                            // We can check if activeId is one of the siblings?
-                            // Simpler: if activeId is in aggregatedNodeSet AND its parent is parentId.
-                            if (activeId && aggregatedNodeSet.has(activeId) && parentMap.get(activeId) === parentId) {
+                            // Active if ANY aggregated child of this parent is in activePairs
+                            // Check if activeId is a child of this parent AND is aggregated
+                            if (activeId && parentMap.get(activeId) === parentId && aggregatedNodeSet.has(activeId)) {
                                 isActive = true;
                             }
                         } else {
                             isActive = activePairs.has(currentId);
                         }
 
-                        // Push to list
-                        // We need a unique key to prevent duplicates for aggregate boxes
                         const key = isAggregated ? `agg-${parentId}` : currentId;
-
                         const pathObj = { d, key, isActive };
+
                         if (isActive) {
                             activePathsList.push(pathObj);
                         } else {
@@ -183,19 +191,19 @@ const TreeConnectors = ({ data, expandedNodes, hoveredNodeId, focusedNodeId, zoo
                 }
 
                 // Recurse if expanded
+                // Note: If aggregated, `renderTree` might treat them as hidden/inside box?
+                // But `expandedNodes` usually tracks the PARENT being expanded.
+                // The nodes inside the aggregate box are logically leaves.
+                // We should only recurse if node has children. Leaves don't.
                 if (expandedNodes.has(currentId) && node.children) {
                     node.children.forEach(child => processNode(child, currentId));
                 }
             };
 
-            // Start processing from roots
             data.forEach(root => processNode(root, null));
 
-            // Deduplicate lists based on key (needed for aggregate boxes)
-            const uniqueStatic = Array.from(new Map(staticPathsList.map(item => [item.key, item])).values());
-            const uniqueActive = Array.from(new Map(activePathsList.map(item => [item.key, item])).values());
-
-            setPaths({ staticPaths: uniqueStatic, activePaths: uniqueActive });
+            // We handled deduplication via `processedGroups` but let's be safe
+            setPaths({ staticPaths: staticPathsList, activePaths: activePathsList });
         };
 
         const loop = () => {
@@ -626,8 +634,6 @@ const OrganogramPage = () => {
     const renderTree = (nodes, parentNode = null, parentColor = null, depth = 0) => {
         if (!nodes || !Array.isArray(nodes) || nodes.length === 0) return null;
 
-        const GRID_THRESHOLD = 3;
-
         // --- Split Children Logic ---
 
         const branchNodes = [];
@@ -641,8 +647,11 @@ const OrganogramPage = () => {
             }
         });
 
-        const totalNodes = nodes.length;
-        const shouldUseAggregation = totalNodes > GRID_THRESHOLD && leafNodes.length > 0;
+        // Use shared logic for aggregation check
+        // We can re-use the isAggregatedGroup function or logic here.
+        // Logic: if total nodes > threshold AND we have leaves.
+        const GRID_THRESHOLD = 3;
+        const shouldUseAggregation = nodes.length > GRID_THRESHOLD && leafNodes.length > 0;
 
         let displayNodes = [];
 
