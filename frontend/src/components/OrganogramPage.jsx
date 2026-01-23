@@ -61,7 +61,15 @@ const getInitials = (name) => {
 
 const AggregateGroup = ({ nodes, parentName, assignedColor }) => {
     const [showAll, setShowAll] = useState(false);
-    const { focusedNodeId } = useContext(OrganogramContext);
+    const { focusedNodeId, hoveredNodeId } = useContext(OrganogramContext);
+
+    // Check if the group is active (contains focused or hovered node)
+    const isActive = useMemo(() => {
+        return nodes.some(n =>
+            n.distinguishedName === focusedNodeId ||
+            n.distinguishedName === hoveredNodeId
+        );
+    }, [nodes, focusedNodeId, hoveredNodeId]);
 
     // Automatically expand if the focused node is inside this group
     useEffect(() => {
@@ -80,9 +88,9 @@ const AggregateGroup = ({ nodes, parentName, assignedColor }) => {
     return (
         <div className="aggregate-box-wrapper">
             {/* Single vertical connector from parent */}
-            <div className="connector-vertical-aggregate"></div>
+            <div className={`connector-vertical-aggregate ${isActive ? 'active' : ''}`}></div>
 
-            <div className="aggregate-box">
+            <div className={`aggregate-box ${isActive ? 'box-active' : ''}`}>
                 <div className="aggregate-header">
                     <h5>Pessoas que respondem a {parentName} ({nodes.length})</h5>
                 </div>
@@ -922,6 +930,11 @@ const OrganogramPage = () => {
                         height: 60px;
                         background-color: var(--line-color);
                         transform: translateX(-50%);
+                        transition: background-color 0.2s;
+                    }
+                    .connector-vertical-aggregate.active {
+                        background-color: var(--line-active);
+                        animation: pulse-line 2s infinite ease-in-out;
                     }
 
                     .aggregate-box {
@@ -932,6 +945,11 @@ const OrganogramPage = () => {
                         width: 100%;
                         max-width: 900px;
                         padding: 20px;
+                        transition: border-color 0.2s, box-shadow 0.2s;
+                    }
+                    .aggregate-box.box-active {
+                        border-color: var(--line-active);
+                        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2), var(--shadow-md);
                     }
 
                     .aggregate-header h5 {
