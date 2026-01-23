@@ -767,7 +767,7 @@ const OrganogramPage = () => {
                         </div>
                         <div className="brand-text">
                             <h2>Organograma</h2>
-                            <span>Corporativo</span>
+                            <span>{window.ORGANOGRAM_CONFIG?.subtitle || 'Corporativo'}</span>
                         </div>
                     </div>
 
