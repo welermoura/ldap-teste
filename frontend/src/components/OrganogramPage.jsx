@@ -287,12 +287,14 @@ const AggregateGroup = ({ nodes, parentName, assignedColor, parentId }) => {
     return (
         <div
             className="aggregate-box-wrapper"
-            id={`aggregate-${parentId}`}
         >
             {/* Single vertical connector from parent */}
             <div className={`connector-vertical-aggregate ${isActive ? 'active' : ''}`}></div>
 
-            <div className={`aggregate-box ${isActive ? 'box-active' : ''}`}>
+            <div
+                className={`aggregate-box ${isActive ? 'box-active' : ''}`}
+                id={`aggregate-${parentId}`}
+            >
                 <div className="aggregate-header">
                     <h5>Pessoas que respondem a {parentName} ({nodes.length})</h5>
                 </div>
