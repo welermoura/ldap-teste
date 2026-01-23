@@ -477,16 +477,6 @@ const OrganogramPage = () => {
         const targetId = hoveredNodeId || focusedNodeId;
 
         // --- Path Calculation Logic ---
-        // 1. Identify which child is part of the active path (ancestor or target)
-        let activeChildIndex = -1;
-        if (targetId || ancestorIds.size > 0) {
-            activeChildIndex = nodes.findIndex(node => {
-                const nid = node.distinguishedName;
-                return (nid === targetId) || (ancestorIds.has(nid));
-            });
-        }
-
-        // --- Path Calculation Logic ---
         // Determine which child is part of the active path
         // For Aggregate nodes, check if any of the contained leaf nodes are active
         let activeChildIndex = -1;
