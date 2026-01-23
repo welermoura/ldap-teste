@@ -3,6 +3,7 @@ import os
 import logging
 from flask import Flask, render_template, request, flash, redirect, url_for, session, jsonify, Response, send_from_directory
 from flask_wtf import FlaskForm
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, ValidationError, Length, EqualTo, Regexp
 import ldap3
@@ -11,6 +12,7 @@ from ldap3.utils.conv import escape_filter_chars
 from datetime import datetime, timedelta, date, timezone
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from functools import wraps
 import re
 import secrets
@@ -318,6 +320,13 @@ class ConfigForm(FlaskForm):
     service_account_user = StringField('Usuário de Serviço (para tarefas automáticas)')
     service_account_password = PasswordField('Senha do Usuário de Serviço (deixe em branco para não alterar)')
     submit = SubmitField('Salvar Configuração')
+
+class AppearanceForm(FlaskForm):
+    bg_color = StringField('Cor de Fundo (Hex)', validators=[Regexp(r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$', message="Formato inválido. Use #RRGGBB.")])
+    bg_image = FileField('Imagem de Fundo', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'gif', 'webp'], 'Apenas imagens são permitidas.')])
+    logo = FileField('Logo', validators=[FileAllowed(['jpg', 'png', 'jpeg', 'svg'], 'Apenas imagens são permitidas.')])
+    favicon = FileField('Favicon', validators=[FileAllowed(['ico', 'png'], 'Apenas .ico ou .png permitidos.')])
+    submit = SubmitField('Salvar Aparência')
 
 class UserSearchForm(FlaskForm):
     search_query = StringField('Buscar Usuário (Nome ou Login)', validators=[DataRequired()])
@@ -633,7 +642,15 @@ def organograma():
         css_files = entry_point.get('css', [])
         css_file = css_files[0] if css_files else None
 
-        return render_template('organograma_react.html', js_file=js_file, css_file=css_file)
+        config = load_config()
+        appearance = {
+            'bg_color': config.get('ORGANOGRAM_BG_COLOR'),
+            'bg_image': config.get('ORGANOGRAM_BG_IMAGE'),
+            'logo': config.get('ORGANOGRAM_LOGO'),
+            'favicon': config.get('ORGANOGRAM_FAVICON')
+        }
+
+        return render_template('organograma_react.html', js_file=js_file, css_file=css_file, appearance=appearance)
     except Exception as e:
         logging.error(f"Erro ao carregar o manifesto do Vite para Organograma: {e}", exc_info=True)
         # Fallback para desenvolvimento (se o build não existir, pode ser que esteja rodando dev server,
@@ -2883,6 +2900,60 @@ def config():
     form.service_account_user.data = current_config.get('SERVICE_ACCOUNT_USER')
 
     return render_template('admin/config.html', form=form)
+
+@app.route('/admin/appearance', methods=['GET', 'POST'])
+def appearance():
+    if 'master_admin' not in session:
+        return redirect(url_for('admin_login'))
+
+    form = AppearanceForm()
+    config = load_config()
+
+    if form.validate_on_submit():
+        new_config = config.copy()
+
+        # Background Color
+        if form.bg_color.data:
+            new_config['ORGANOGRAM_BG_COLOR'] = form.bg_color.data
+        elif request.form.get('clear_bg_color'):
+            new_config.pop('ORGANOGRAM_BG_COLOR', None)
+
+        # Handle File Uploads
+        upload_dir = os.path.join(basedir, 'static', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+
+        if form.bg_image.data:
+            f = form.bg_image.data
+            filename = secure_filename('bg_image_' + f.filename)
+            f.save(os.path.join(upload_dir, filename))
+            new_config['ORGANOGRAM_BG_IMAGE'] = filename
+        elif request.form.get('clear_bg_image'):
+            new_config.pop('ORGANOGRAM_BG_IMAGE', None)
+
+        if form.logo.data:
+            f = form.logo.data
+            filename = secure_filename('logo_' + f.filename)
+            f.save(os.path.join(upload_dir, filename))
+            new_config['ORGANOGRAM_LOGO'] = filename
+        elif request.form.get('clear_logo'):
+            new_config.pop('ORGANOGRAM_LOGO', None)
+
+        if form.favicon.data:
+            f = form.favicon.data
+            filename = secure_filename('favicon_' + f.filename)
+            f.save(os.path.join(upload_dir, filename))
+            new_config['ORGANOGRAM_FAVICON'] = filename
+        elif request.form.get('clear_favicon'):
+             new_config.pop('ORGANOGRAM_FAVICON', None)
+
+        save_config(new_config)
+        flash('Aparência atualizada com sucesso!', 'success')
+        return redirect(url_for('appearance'))
+
+    # Pre-populate form
+    form.bg_color.data = config.get('ORGANOGRAM_BG_COLOR', '')
+
+    return render_template('admin/appearance.html', form=form, config=config)
 
 @app.route('/admin/logs', methods=['GET', 'POST'])
 def admin_logs():

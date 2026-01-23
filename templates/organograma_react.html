@@ -4,9 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Organograma - Gestão AD</title>
+
+    {% if appearance and appearance.favicon %}
+    <link rel="icon" href="{{ url_for('static', filename='uploads/' + appearance.favicon) }}">
+    {% endif %}
+
     {% if css_file %}
     <link rel="stylesheet" href="{{ url_for('ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
     {% endif %}
+
+    <script>
+      window.ORGANOGRAM_CONFIG = {{ appearance | tojson | safe if appearance else '{}' }};
+    </script>
+    <style>
+        {% if appearance %}
+            {% if appearance.bg_color %}
+            body, .organogram-page { background-color: {{ appearance.bg_color }} !important; }
+            {% endif %}
+
+            {% if appearance.bg_image %}
+            body, .organogram-page {
+                background-image: url("{{ url_for('static', filename='uploads/' + appearance.bg_image) }}") !important;
+                background-size: cover;
+                background-position: center;
+                background-repeat: no-repeat;
+                background-attachment: fixed;
+            }
+            /* Add overlay for readability if needed, or rely on card styles */
+            {% endif %}
+        {% endif %}
+    </style>
   </head>
   <body>
     <div id="root"></div>

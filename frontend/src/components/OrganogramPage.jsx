@@ -750,8 +750,20 @@ const OrganogramPage = () => {
                 />
                 <header className="page-header">
                     <div className="brand">
-                        <div className="brand-icon">
-                            <Network size={20} />
+                        <div className="brand-icon" style={{
+                            background: window.ORGANOGRAM_CONFIG?.logo ? 'transparent' : null,
+                            padding: window.ORGANOGRAM_CONFIG?.logo ? 0 : null,
+                            overflow: 'hidden'
+                        }}>
+                            {window.ORGANOGRAM_CONFIG?.logo ? (
+                                <img
+                                    src={`/static/uploads/${window.ORGANOGRAM_CONFIG.logo}`}
+                                    alt="Logo"
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                />
+                            ) : (
+                                <Network size={20} />
+                            )}
                         </div>
                         <div className="brand-text">
                             <h2>Organograma</h2>
