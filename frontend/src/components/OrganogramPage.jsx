@@ -73,76 +73,75 @@ const ActiveConnector = ({ data, hoveredNodeId, focusedNodeId, ancestorIds, zoom
 
             // Map of DN -> Parent DN
             const parentMap = new Map();
+            // Set of IDs that are inside an aggregate group
+            const aggregatedNodeSet = new Set();
+
             const traverse = (nodes, parentId = null) => {
+                const GRID_THRESHOLD = 3;
+                const leafNodes = [];
                 nodes.forEach(node => {
                     if (parentId) parentMap.set(node.distinguishedName, parentId);
-                    if (node.children) traverse(node.children, node.distinguishedName);
+
+                    if (!node.children || node.children.length === 0) {
+                        leafNodes.push(node);
+                    } else {
+                         traverse(node.children, node.distinguishedName);
+                    }
                 });
+
+                // Mimic aggregation logic
+                if (nodes.length > GRID_THRESHOLD && leafNodes.length > 0) {
+                     leafNodes.forEach(n => aggregatedNodeSet.add(n.distinguishedName));
+                }
             };
             traverse(data);
 
-            // Construct chain: Active -> Parent -> Grandparent ...
-            // But we must stop at the highest visible ancestor or root.
-            // Also, we need to handle Aggregate Groups.
-            // The ancestorIds set contains the chain.
-
-            // We'll iterate the DOM elements for ancestorIds.
-            // Since ancestorIds includes the active node and all ancestors.
-            // We find the child DOM, find the parent DOM, draw line.
-
             const paths = [];
-            const processedPairs = new Set();
-
-            // Convert Set to Array and sort by depth?
-            // Actually, we can just look up parents using parentMap.
 
             let currentId = activeId;
             let parentId = parentMap.get(currentId);
 
-            const getElement = (id) => {
-                let el = document.getElementById(id);
-                if (el) return el;
-                // Check if inside an aggregate group (heuristic: check aggregate-id)
-                // If the node is hidden inside an aggregate, we should use the aggregate box
-                // But the aggregate box ID is `aggregate-PARENT_DN`.
-                // If `currentId` is inside aggregate, its parent is `parentId`.
-                // So the aggregate box ID is `aggregate-${parentId}`.
-
-                const aggId = `aggregate-${parentId}`;
-                el = document.getElementById(aggId);
-                return el;
-            };
+            // Special handling: if the ACTIVE node itself is aggregated, start drawing from the Box, not the node.
+            // This prevents the line from penetrating the box to find the specific card.
+            // We do this by swapping currentId to the aggregate box ID effectively.
+            // But we need to handle this in the loop.
 
             while (parentId) {
-                const childEl = getElement(currentId);
-                const parentEl = document.getElementById(parentId); // Parents are always Branch Nodes (visible)
+                let childEl;
+                let isAggregated = aggregatedNodeSet.has(currentId);
+
+                if (isAggregated) {
+                     // If aggregated, the connector should come from the Aggregate Box Top
+                     childEl = document.getElementById(`aggregate-${parentId}`);
+                } else {
+                     childEl = document.getElementById(currentId);
+                     // If not found (e.g. collapsed branch?), try finding aggregate box just in case logic mismatch
+                     if (!childEl) {
+                         const aggId = `aggregate-${parentId}`;
+                         childEl = document.getElementById(aggId);
+                     }
+                }
+
+                const parentEl = document.getElementById(parentId);
 
                 if (childEl && parentEl) {
                     const childRect = childEl.getBoundingClientRect();
                     const parentRect = parentEl.getBoundingClientRect();
 
-                    // Coordinates relative to the viewport are fine for SVG if SVG is fixed?
-                    // No, SVG is inside the scaled container.
-                    // We need coordinates relative to the .tree-wrapper.
-                    // But .tree-wrapper is transformed (scale).
-                    // getBoundingClientRect returns viewport coordinates (after scale).
-                    // If we put the SVG *outside* the scale transform (e.g. fixed overlay),
-                    // we can use viewport coordinates directly!
-                    // Let's try that. It's simpler.
-
                     const startX = childRect.left + childRect.width / 2;
-                    const startY = childRect.top; // Top of Child
+                    const startY = childRect.top; // Top of Child (or Box)
                     const endX = parentRect.left + parentRect.width / 2;
                     const endY = parentRect.bottom; // Bottom of Parent
 
                     const midY = (startY + endY) / 2;
 
-                    // Inverted L logic (or S curve)
-                    // M startX startY V midY H endX V endY
-
                     const d = `M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`;
                     paths.push(d);
                 }
+
+                // If we were aggregated, we just drew line Parent -> Box.
+                // We do NOT draw a line inside the box.
+                // The loop continues upwards.
 
                 currentId = parentId;
                 parentId = parentMap.get(currentId);
