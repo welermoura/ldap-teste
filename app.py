@@ -670,8 +670,8 @@ def api_public_organogram_data():
         if not search_base:
             return jsonify({'error': 'AD_SEARCH_BASE não configurado.'}), 500
 
-        # Buscar todos os usuários ativos com seus gerentes
-        search_filter = "(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+        # Buscar todos os usuários (ativos e bloqueados) com seus gerentes
+        search_filter = "(&(objectClass=user)(objectCategory=person))"
         attributes = ['displayName', 'title', 'manager', 'distinguishedName', 'department', 'physicalDeliveryOfficeName', 'mail', 'telephoneNumber']
 
         # Paged search para garantir que pegamos todos
