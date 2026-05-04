@@ -8,6 +8,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./static/uploads:/app/static/uploads
     restart: unless-stopped
     container_name: ad_manager_web
 
