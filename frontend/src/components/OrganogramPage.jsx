@@ -414,8 +414,9 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             <div className="card-body">
                 <div className="card-header">
                     <div className="avatar" style={{
-                        backgroundColor: isExecutive ? '#0f172a' : `${nodeColor}10`,
-                        color: isExecutive ? '#fff' : nodeColor
+                        background: isExecutive ? 'linear-gradient(135deg, #1e293b, #0f172a)' : `linear-gradient(135deg, ${nodeColor}25, ${nodeColor}05)`,
+                        color: isExecutive ? '#fff' : nodeColor,
+                        border: `1px solid ${isExecutive ? '#334155' : `${nodeColor}30`}`
                     }}>
                         {getInitials(node.name)}
                     </div>
@@ -1256,9 +1257,9 @@ const OrganogramPage = () => {
                         background: var(--bg-card);
                         width: 280px;
                         position: relative;
-                        border-radius: 12px;
-                        box-shadow: var(--shadow-md);
-                        transition: all 0.2s var(--ease-out);
+                        border-radius: 16px;
+                        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -4px rgba(0,0,0,0.05);
+                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                         cursor: pointer;
                         z-index: 2;
                         border: 1px solid transparent;
@@ -1281,21 +1282,21 @@ const OrganogramPage = () => {
                         display: flex;
                         flex-direction: column;
                         gap: 10px;
-                        border-radius: 0 12px 12px 0;
+                        border-radius: 0 16px 16px 0;
                     }
 
                     /* Hover State */
                     .org-card.state-active {
-                        transform: scale(1.03);
-                        box-shadow: var(--shadow-hover);
+                        transform: translateY(-4px) scale(1.02);
+                        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
                         z-index: 50;
                         border-color: var(--line-active);
                     }
 
                     /* Focused State */
                     .org-card.state-focused {
-                        transform: scale(1.03);
-                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), var(--shadow-hover);
+                        transform: translateY(-4px) scale(1.02);
+                        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3), 0 20px 25px -5px rgba(0,0,0,0.1);
                         border-color: var(--line-active);
                         z-index: 50;
                     }
