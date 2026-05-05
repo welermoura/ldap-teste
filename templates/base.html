@@ -4,261 +4,184 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Gestão AD{% endblock %}</title>
-    <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     {% block head %}{% endblock %}
 </head>
 <body>
 
-    {% block body_content %}
+{% block body_content %}
+<div class="app-wrapper">
 
     {% if session.ad_user %}
-    {# ── Sidebar layout for authenticated users ── #}
-    <div class="app-wrapper">
-
-        <aside class="sidebar" id="app-sidebar">
-            <!-- Header / Brand -->
-            <div class="sidebar-header">
-                <div class="sidebar-logo-icon">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <div class="sidebar-brand-text">
-                    Gestão AD
-                    <span class="sidebar-brand-sub">Portal de Administração</span>
-                </div>
-                <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Recolher menu">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-            </div>
-
-            <!-- Navigation -->
-            <nav class="sidebar-nav">
-                <div class="sidebar-section-label">Principal</div>
-
-                <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-                    <i class="fas fa-chart-line nav-icon"></i>
-                    <span class="nav-label">Dashboard</span>
-                </a>
-
-                {% if check_permission(action='can_edit') or check_permission(action='can_disable') %}
-                <a href="{{ url_for('manage_users') }}" class="sidebar-link {% if request.endpoint == 'manage_users' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
-                    <i class="fas fa-users-cog nav-icon"></i>
-                    <span class="nav-label">Gerenciar Usuários</span>
-                </a>
-                {% endif %}
-
-                {% if check_permission(action='can_create') %}
-                <a href="{{ url_for('create_user_form') }}" class="sidebar-link {% if request.endpoint == 'create_user_form' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
-                    <i class="fas fa-user-plus nav-icon"></i>
-                    <span class="nav-label">Criar Usuário</span>
-                </a>
-                {% endif %}
-
-                {% if check_permission(action='can_manage_groups') %}
-                <a href="{{ url_for('group_management') }}" class="sidebar-link {% if request.endpoint == 'group_management' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
-                    <i class="fas fa-layer-group nav-icon"></i>
-                    <span class="nav-label">Gerenciar Grupos</span>
-                </a>
-                {% endif %}
-
-                <div class="sidebar-section-label">Ferramentas</div>
-
-                <a href="{{ url_for('organograma') }}" class="sidebar-link {% if request.endpoint == 'organograma' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
-                    <i class="fas fa-sitemap nav-icon"></i>
-                    <span class="nav-label">Organograma</span>
-                </a>
-
-                <a href="{{ url_for('ad_tree') }}" class="sidebar-link {% if request.endpoint == 'ad_tree' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
-                    <i class="fas fa-network-wired nav-icon"></i>
-                    <span class="nav-label">Active Directory</span>
-                </a>
-
-                {% if check_permission(view='can_export_data') %}
-                <a href="{{ url_for('export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'export_ad_data' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
-                    <i class="fas fa-file-csv nav-icon"></i>
-                    <span class="nav-label">Exportar Base AD</span>
-                </a>
-                {% endif %}
-
-                {% if check_permission(action='can_manage_schedules') or check_permission(view='can_view_schedules') %}
-                <a href="{{ url_for('manage_schedules') }}" class="sidebar-link {% if request.endpoint == 'manage_schedules' %}active-page{% endif %}"
-                   data-bs-toggle="tooltip" data-bs-placement="right" title="Agendamentos">
-                    <i class="fas fa-calendar-alt nav-icon"></i>
-                    <span class="nav-label">Agendamentos</span>
-                </a>
-                {% endif %}
-            </nav>
-
-            <!-- Footer: user info + actions -->
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="sidebar-avatar">
-                        {{ (session.user_display_name or 'U')[0] | upper }}
-                    </div>
-                    <span class="sidebar-user-name">{{ session.user_display_name or 'Usuário' }}</span>
-                </div>
-                <div class="sidebar-footer-actions">
-                    <button id="theme-toggle" class="sidebar-icon-btn btn" title="Alternar tema">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <a href="{{ url_for('logout') }}" class="sidebar-icon-btn btn" title="Sair">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </a>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Main content -->
-        <div class="main-content-wrapper">
-            <main class="container-fluid">
-                {% block page_title %}{% endblock %}
-
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                                <i class="fas fa-info-circle me-2"></i>{{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-
-                {% block content %}{% endblock %}
-            </main>
-
-            <footer>
-                <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
-            </footer>
+    <aside class="sidebar" id="app-sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo-icon"><i class="fas fa-shield-alt"></i></div>
+            <div class="sidebar-brand-text">Gestão AD<span class="sidebar-brand-sub">Portal de Administração</span></div>
+            <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Recolher menu"><i class="fas fa-chevron-left"></i></button>
         </div>
-
-    </div>{# fecha app-wrapper #}
-    {% endif %}{# fecha if session.ad_user #}
-
-    {% endblock %}
-
-
-    <!-- Toast Container -->
-    <div aria-live="polite" aria-atomic="true" class="position-relative">
-        <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;">
-            <!-- Toasts will be appended here -->
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Principal</div>
+            <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+                <i class="fas fa-chart-line nav-icon"></i><span class="nav-label">Dashboard</span>
+            </a>
+            {% if check_permission(action='can_edit') or check_permission(action='can_disable') %}
+            <a href="{{ url_for('manage_users') }}" class="sidebar-link {% if request.endpoint == 'manage_users' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
+                <i class="fas fa-users-cog nav-icon"></i><span class="nav-label">Gerenciar Usuários</span>
+            </a>
+            {% endif %}
+            {% if check_permission(action='can_create') %}
+            <a href="{{ url_for('create_user_form') }}" class="sidebar-link {% if request.endpoint == 'create_user_form' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
+                <i class="fas fa-user-plus nav-icon"></i><span class="nav-label">Criar Usuário</span>
+            </a>
+            {% endif %}
+            {% if check_permission(action='can_manage_groups') %}
+            <a href="{{ url_for('group_management') }}" class="sidebar-link {% if request.endpoint == 'group_management' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
+                <i class="fas fa-layer-group nav-icon"></i><span class="nav-label">Gerenciar Grupos</span>
+            </a>
+            {% endif %}
+            <div class="sidebar-section-label">Ferramentas</div>
+            <a href="{{ url_for('organograma') }}" class="sidebar-link {% if request.endpoint == 'organograma' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
+                <i class="fas fa-sitemap nav-icon"></i><span class="nav-label">Organograma</span>
+            </a>
+            <a href="{{ url_for('ad_tree') }}" class="sidebar-link {% if request.endpoint == 'ad_tree' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
+                <i class="fas fa-network-wired nav-icon"></i><span class="nav-label">Active Directory</span>
+            </a>
+            {% if check_permission(view='can_export_data') %}
+            <a href="{{ url_for('export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'export_ad_data' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
+                <i class="fas fa-file-csv nav-icon"></i><span class="nav-label">Exportar Base AD</span>
+            </a>
+            {% endif %}
+            {% if check_permission(action='can_manage_schedules') or check_permission(view='can_view_schedules') %}
+            <a href="{{ url_for('manage_schedules') }}" class="sidebar-link {% if request.endpoint == 'manage_schedules' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Agendamentos">
+                <i class="fas fa-calendar-alt nav-icon"></i><span class="nav-label">Agendamentos</span>
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="sidebar-avatar">{{ (session.user_display_name or 'U')[0] | upper }}</div>
+                <span class="sidebar-user-name">{{ session.user_display_name or 'Usuário' }}</span>
+            </div>
+            <div class="sidebar-footer-actions">
+                <button id="theme-toggle" class="sidebar-icon-btn btn" title="Alternar tema"><i class="fas fa-moon"></i></button>
+                <a href="{{ url_for('logout') }}" class="sidebar-icon-btn btn" title="Sair"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
         </div>
+    </aside>
+    {% endif %}
+
+    <div class="main-content-wrapper">
+        <main class="container-fluid">
+
+            {% block page_title %}{% endblock %}
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-info-circle me-2"></i>{{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+
+        </main>
+        <footer>
+            <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
+        </footer>
     </div>
 
-    <!-- Modal de Confirmação Genérico -->
-    <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body" id="confirmationModalBody">
-            ...
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
-          </div>
-        </div>
+</div>
+{% endblock %}
+
+<!-- Toast Container -->
+<div aria-live="polite" aria-atomic="true" class="position-relative">
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
+</div>
+
+<!-- Modal de Confirmação Genérico -->
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="confirmationModalBody">...</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Bootstrap JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+<script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 
-    <!-- Common JS -->
-    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
-
-    <!-- Theme Toggler Script -->
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Phone mask
-        const phoneFields = ['telephone', 'home_phone', 'pager', 'mobile', 'fax'];
-        phoneFields.forEach(fieldName => {
-            const input = document.querySelector(`[name="${fieldName}"]`);
-            if (input) input.addEventListener('input', handlePhoneInput);
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Phone mask
+    ['telephone','home_phone','pager','mobile','fax'].forEach(function(name) {
+        var el = document.querySelector('[name="' + name + '"]');
+        if (el) el.addEventListener('input', function(e) {
+            var v = e.target.value.replace(/\D/g,'').substring(0,10);
+            if (v.length > 2) v = v.substring(0,2)+' '+v.substring(2,6)+(v.length>6?'-'+v.substring(6,10):'');
+            e.target.value = v;
         });
-        function handlePhoneInput(e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 10) value = value.substring(0, 10);
-            let formattedValue = value;
-            if (value.length > 2) {
-                formattedValue = `${value.substring(0, 2)} ${value.substring(2, 6)}`;
-                if (value.length > 6) formattedValue += `-${value.substring(6, 10)}`;
-            }
-            e.target.value = formattedValue;
-        }
-
-        // Theme
-        const docElement = document.documentElement;
-        const themeToggle = document.getElementById('theme-toggle');
-        const applyTheme = (theme) => {
-            docElement.setAttribute('data-bs-theme', theme);
-            localStorage.setItem('theme', theme);
-            if (themeToggle) {
-                const icon = themeToggle.querySelector('i');
-                if (icon) {
-                    icon.className = theme === 'dark' ? 'fa-regular fa-sun' : 'fas fa-moon';
-                }
-                themeToggle.classList.toggle('theme-icon-sun', theme === 'dark');
-            }
-        };
-        const savedTheme = localStorage.getItem('theme');
-        applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-        if (themeToggle) themeToggle.addEventListener('click', () => {
-            applyTheme(docElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
-        });
-
-        // Sidebar collapse/expand
-        const sidebar = document.getElementById('app-sidebar');
-        const toggleBtn = document.getElementById('sidebar-toggle');
-        if (sidebar && toggleBtn) {
-            const collapsed = localStorage.getItem('sidebar-collapsed') === 'true';
-            if (collapsed) sidebar.classList.add('collapsed');
-
-            toggleBtn.addEventListener('click', () => {
-                sidebar.classList.toggle('collapsed');
-                localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
-            });
-
-            // Bootstrap tooltips on sidebar links (only when collapsed)
-            const tooltipEls = sidebar.querySelectorAll('[data-bs-toggle="tooltip"]');
-            tooltipEls.forEach(el => {
-                const tip = new bootstrap.Tooltip(el, { trigger: 'hover' });
-                // Only show tooltip when sidebar is collapsed
-                el.addEventListener('mouseenter', () => {
-                    if (!sidebar.classList.contains('collapsed')) tip.disable();
-                    else tip.enable();
-                });
-            });
-        }
     });
-    </script>
 
-    {% block scripts %}
-    <script>
-        window.addEventListener('pageshow', function(event) {
-            if (event.persisted) window.location.reload();
+    // Theme
+    var docEl = document.documentElement;
+    var themeBtn = document.getElementById('theme-toggle');
+    function applyTheme(t) {
+        docEl.setAttribute('data-bs-theme', t);
+        localStorage.setItem('theme', t);
+        if (themeBtn) {
+            var icon = themeBtn.querySelector('i');
+            if (icon) icon.className = t === 'dark' ? 'fa-regular fa-sun' : 'fas fa-moon';
+            themeBtn.classList.toggle('theme-icon-sun', t === 'dark');
+        }
+    }
+    var saved = localStorage.getItem('theme');
+    applyTheme(saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    if (themeBtn) themeBtn.addEventListener('click', function() {
+        applyTheme(docEl.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
+    });
+
+    // Sidebar
+    var sidebar = document.getElementById('app-sidebar');
+    var toggleBtn = document.getElementById('sidebar-toggle');
+    if (sidebar && toggleBtn) {
+        if (localStorage.getItem('sidebar-collapsed') === 'true') sidebar.classList.add('collapsed');
+        toggleBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
         });
-    </script>
-    {% endblock %}
+        sidebar.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el) {
+            var tip = new bootstrap.Tooltip(el, {trigger:'hover'});
+            el.addEventListener('mouseenter', function() {
+                sidebar.classList.contains('collapsed') ? tip.enable() : tip.disable();
+            });
+        });
+    }
+});
+</script>
+
+{% block scripts %}
+<script>
+    window.addEventListener('pageshow', function(e) { if (e.persisted) window.location.reload(); });
+</script>
+{% endblock %}
+
 </body>
-</html>
+</html>
