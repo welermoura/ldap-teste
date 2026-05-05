@@ -473,7 +473,7 @@ const ProfileOffcanvas = () => {
             {/* Offcanvas Panel */}
             <div className="profile-offcanvas" style={{
                 position: 'fixed', top: 0, right: 0, width: '400px', maxWidth: '90vw', height: '100vh',
-                background: 'var(--background-color)', backdropFilter: 'none',
+                background: 'var(--bg-card)', backdropFilter: 'none',
                 boxShadow: '-10px 0 25px rgba(0,0,0,0.5)', zIndex: 1000,
                 display: 'flex', flexDirection: 'column',
                 transform: selectedProfile ? 'translateX(0)' : 'translateX(100%)',
