@@ -120,7 +120,10 @@
             </div>
             <div class="card-body p-0" style="min-height: 250px;">
                 <div id="expiring-list-container" class="list-group list-group-flush">
-                    <!-- O conteúdo será preenchido por JavaScript -->
+                    <!-- Skeleton loading -->
+                    <div class="skeleton-row"><div class="skeleton-line full"></div><div class="skeleton-line medium"></div></div>
+                    <div class="skeleton-row"><div class="skeleton-line full"></div><div class="skeleton-line short"></div></div>
+                    <div class="skeleton-row"><div class="skeleton-line full"></div><div class="skeleton-line medium"></div></div>
                 </div>
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -360,8 +363,12 @@ document.addEventListener('DOMContentLoaded', function() {
             name.textContent = user.cn || 'Nome não disponível';
 
             const expiryBadge = document.createElement('span');
-            expiryBadge.className = 'badge bg-warning text-dark';
-            expiryBadge.textContent = `Expira em ${user.expires_in_days} dia(s)`;
+            const days = user.expires_in_days;
+            let urgencyClass = 'badge-urgency-medium';
+            if (days <= 1) urgencyClass = 'badge-urgency-critical';
+            else if (days <= 3) urgencyClass = 'badge-urgency-high';
+            expiryBadge.className = `badge ${urgencyClass}`;
+            expiryBadge.textContent = days === 0 ? 'Expira hoje!' : `Expira em ${days} dia(s)`;
 
             mainInfo.appendChild(name);
             mainInfo.appendChild(expiryBadge);
@@ -436,13 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <style>
     .glass-list-item {
-        background-color: rgba(255, 255, 255, 0.05);
-        border: none;
-        color: var(--text-color);
-    }
-    .glass-list-item:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: var(--text-color);
+        /* overridden by global style.css — class kept for JS reference */
     }
     .page-indicator {
         background-color: rgba(0, 0, 0, 0.2);
@@ -451,22 +452,4 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 </style>
 
-<!-- Modal de Confirmação Genérico para o Dashboard -->
-<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="confirmationModalLabel">Confirmar Ação</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="confirmationModalBody">
-        ...
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" id="confirmActionBtn" class="btn btn-primary">Confirmar</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}

@@ -19,10 +19,142 @@
 <body>
 
     {% block body_content %}
+
+    {% if session.ad_user %}
+    {# ── Sidebar layout for authenticated users ── #}
+    <div class="app-wrapper">
+
+        <aside class="sidebar" id="app-sidebar">
+            <!-- Header / Brand -->
+            <div class="sidebar-header">
+                <div class="sidebar-logo-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="sidebar-brand-text">
+                    Gestão AD
+                    <span class="sidebar-brand-sub">Portal de Administração</span>
+                </div>
+                <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Recolher menu">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="sidebar-nav">
+                <div class="sidebar-section-label">Principal</div>
+
+                <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+                    <i class="fas fa-chart-line nav-icon"></i>
+                    <span class="nav-label">Dashboard</span>
+                </a>
+
+                {% if check_permission(action='can_edit') or check_permission(action='can_disable') %}
+                <a href="{{ url_for('manage_users') }}" class="sidebar-link {% if request.endpoint == 'manage_users' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
+                    <i class="fas fa-users-cog nav-icon"></i>
+                    <span class="nav-label">Gerenciar Usuários</span>
+                </a>
+                {% endif %}
+
+                {% if check_permission(action='can_create') %}
+                <a href="{{ url_for('create_user_form') }}" class="sidebar-link {% if request.endpoint == 'create_user_form' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
+                    <i class="fas fa-user-plus nav-icon"></i>
+                    <span class="nav-label">Criar Usuário</span>
+                </a>
+                {% endif %}
+
+                {% if check_permission(action='can_manage_groups') %}
+                <a href="{{ url_for('group_management') }}" class="sidebar-link {% if request.endpoint == 'group_management' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
+                    <i class="fas fa-layer-group nav-icon"></i>
+                    <span class="nav-label">Gerenciar Grupos</span>
+                </a>
+                {% endif %}
+
+                <div class="sidebar-section-label">Ferramentas</div>
+
+                <a href="{{ url_for('organograma') }}" class="sidebar-link {% if request.endpoint == 'organograma' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
+                    <i class="fas fa-sitemap nav-icon"></i>
+                    <span class="nav-label">Organograma</span>
+                </a>
+
+                <a href="{{ url_for('ad_tree') }}" class="sidebar-link {% if request.endpoint == 'ad_tree' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
+                    <i class="fas fa-network-wired nav-icon"></i>
+                    <span class="nav-label">Active Directory</span>
+                </a>
+
+                {% if check_permission(view='can_export_data') %}
+                <a href="{{ url_for('export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'export_ad_data' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
+                    <i class="fas fa-file-csv nav-icon"></i>
+                    <span class="nav-label">Exportar Base AD</span>
+                </a>
+                {% endif %}
+
+                {% if check_permission(action='can_manage_schedules') or check_permission(view='can_view_schedules') %}
+                <a href="{{ url_for('manage_schedules') }}" class="sidebar-link {% if request.endpoint == 'manage_schedules' %}active-page{% endif %}"
+                   data-bs-toggle="tooltip" data-bs-placement="right" title="Agendamentos">
+                    <i class="fas fa-calendar-alt nav-icon"></i>
+                    <span class="nav-label">Agendamentos</span>
+                </a>
+                {% endif %}
+            </nav>
+
+            <!-- Footer: user info + actions -->
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar">
+                        {{ (session.user_display_name or 'U')[0] | upper }}
+                    </div>
+                    <span class="sidebar-user-name">{{ session.user_display_name or 'Usuário' }}</span>
+                </div>
+                <div class="sidebar-footer-actions">
+                    <button id="theme-toggle" class="sidebar-icon-btn btn" title="Alternar tema">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <a href="{{ url_for('logout') }}" class="sidebar-icon-btn btn" title="Sair">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <div class="main-content-wrapper">
+            <main class="container-fluid">
+                {% block page_title %}{% endblock %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-info-circle me-2"></i>{{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </main>
+
+            <footer>
+                <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
+            </footer>
+        </div>
+
+    </div>
+    {# ── End sidebar layout ── #}
+
+    {% else %}
+    {# ── No sidebar for unauthenticated pages ── #}
         <main class="container-fluid">
             {% block page_title %}{% endblock %}
 
-            {# Flashed messages will now appear here with the correct styling #}
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -36,6 +168,8 @@
 
             {% block content %}{% endblock %}
         </main>
+    {% endif %}
+
     {% endblock %}
 
     <!-- Toast Container -->
@@ -64,10 +198,6 @@
       </div>
     </div>
 
-    <footer>
-        <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
-    </footer>
-
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 
@@ -79,99 +209,75 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Phone mask
         const phoneFields = ['telephone', 'home_phone', 'pager', 'mobile', 'fax'];
-
         phoneFields.forEach(fieldName => {
             const input = document.querySelector(`[name="${fieldName}"]`);
-            if (input) {
-                input.addEventListener('input', handlePhoneInput);
-            }
+            if (input) input.addEventListener('input', handlePhoneInput);
         });
-
         function handlePhoneInput(e) {
             let value = e.target.value.replace(/\D/g, '');
-
-            if (value.length > 10) {
-                value = value.substring(0, 10);
-            }
-
+            if (value.length > 10) value = value.substring(0, 10);
             let formattedValue = value;
             if (value.length > 2) {
                 formattedValue = `${value.substring(0, 2)} ${value.substring(2, 6)}`;
-                if (value.length > 6) {
-                    formattedValue += `-${value.substring(6, 10)}`;
-                }
+                if (value.length > 6) formattedValue += `-${value.substring(6, 10)}`;
             }
             e.target.value = formattedValue;
         }
-    });
-    </script>
 
-    <script>
-    // Lógica para o seletor de tema
-    document.addEventListener('DOMContentLoaded', function() {
+        // Theme
         const docElement = document.documentElement;
         const themeToggle = document.getElementById('theme-toggle');
-        if (!themeToggle) {
-            console.warn('Theme toggle button not found.');
-            return;
-        }
-
-        const themeToggleIcon = themeToggle.querySelector('i');
-
         const applyTheme = (theme) => {
-            docElement.setAttribute('data-bs-theme', theme); // Alterado para data-bs-theme
+            docElement.setAttribute('data-bs-theme', theme);
             localStorage.setItem('theme', theme);
-            if (theme === 'light') {
-                themeToggleIcon.className = 'fas fa-moon';
-                themeToggle.classList.remove('theme-icon-sun');
-            } else {
-                themeToggleIcon.className = 'fa-regular fa-sun';
-                themeToggle.classList.add('theme-icon-sun');
-            }
-            // Define 'dark' como padrão se nenhuma preferência for encontrada
-            return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        };
-
-        const setTheme = theme => {
-            document.documentElement.setAttribute('data-bs-theme', theme);
-        };
-
-        const updateToggleButton = (theme) => {
-            const themeToggle = document.getElementById('theme-toggle');
-            if (!themeToggle) return;
-
-            const themeToggleIcon = themeToggle.querySelector('i');
-            if (theme === 'dark') {
-                themeToggleIcon.className = 'fa-regular fa-sun';
-                themeToggle.classList.add('theme-icon-sun');
-            } else {
-                themeToggleIcon.className = 'fas fa-moon';
-                themeToggle.classList.remove('theme-icon-sun');
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                if (icon) {
+                    icon.className = theme === 'dark' ? 'fa-regular fa-sun' : 'fas fa-moon';
+                }
+                themeToggle.classList.toggle('theme-icon-sun', theme === 'dark');
             }
         };
-
         const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+        if (themeToggle) themeToggle.addEventListener('click', () => {
+            applyTheme(docElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
+        });
 
-        if (savedTheme) {
-            applyTheme(savedTheme);
-        } else {
-            applyTheme(prefersDark ? 'dark' : 'light');
+        // Sidebar collapse/expand
+        const sidebar = document.getElementById('app-sidebar');
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        if (sidebar && toggleBtn) {
+            const collapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+            if (collapsed) sidebar.classList.add('collapsed');
+
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
+            });
+
+            // Bootstrap tooltips on sidebar links (only when collapsed)
+            const tooltipEls = sidebar.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipEls.forEach(el => {
+                const tip = new bootstrap.Tooltip(el, { trigger: 'hover' });
+                // Only show tooltip when sidebar is collapsed
+                el.addEventListener('mouseenter', () => {
+                    if (!sidebar.classList.contains('collapsed')) tip.disable();
+                    else tip.enable();
+                });
+            });
         }
     });
     </script>
 
     {% block scripts %}
     <script>
-        // Força o recarregamento da página ao navegar de volta usando o cache (bfcache)
-        // Isso previne o erro ERR_CACHE_MISS em alguns navegadores
         window.addEventListener('pageshow', function(event) {
-            if (event.persisted) {
-                window.location.reload();
-            }
+            if (event.persisted) window.location.reload();
         });
     </script>
     {% endblock %}
 </body>
-</html>
+</html>

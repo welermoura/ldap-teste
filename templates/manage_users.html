@@ -48,7 +48,7 @@
                             <td>{{ get_attr_value(user, 'mail') or 'N/A' }}</td>
                             <td>
                                 {% set status = get_user_status(user) %}
-                                <span class="badge rounded-pill bg-{{ 'success' if status == 'Ativo' else 'danger' }}">{{ status }}</span>
+                                <span class="badge rounded-pill bg-{{ 'success' if status == 'Ativo' else 'danger' }} {% if status == 'Ativo' %}badge-pulse{% endif %}">{{ status }}</span>
                             </td>
                             <td class="text-end">
                                 <a href="{{ url_for('view_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-sm btn-info">
