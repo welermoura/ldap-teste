@@ -17,7 +17,11 @@ import {
     MapPin,
     ChevronRight,
     ChevronsDown,
-    ChevronsUp
+    ChevronsUp,
+    Building2,
+    Users,
+    X,
+    MessageSquare
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -29,6 +33,8 @@ const OrganogramContext = createContext({
     setFocusedNodeId: () => {},
     ancestorIds: new Set(),
     setTooltipData: () => {},
+    selectedProfile: null,
+    setSelectedProfile: () => {},
 });
 
 // --- Utility Functions ---
@@ -325,8 +331,8 @@ const AggregateGroup = ({ nodes, parentName, assignedColor, parentId }) => {
     );
 };
 
-const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem, assignedColor }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData } = useContext(OrganogramContext);
+const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem, assignedColor, parentName }) => {
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData, setSelectedProfile } = useContext(OrganogramContext);
 
     // Use the assigned color from parent, or default to Slate-500 if root/undefined
     const nodeColor = assignedColor || '#64748b';
@@ -375,6 +381,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setFocusedNodeId(nodeId);
+            setSelectedProfile({ ...node, assignedColor: nodeColor, parentName });
             if (hasChildren) toggleNode();
         }
     };
@@ -396,6 +403,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             onClick={(e) => {
                 e.stopPropagation();
                 setFocusedNodeId(nodeId);
+                setSelectedProfile({ ...node, assignedColor: nodeColor, parentName });
                 if (hasChildren) toggleNode();
             }}
             onKeyDown={handleKeyDown}
@@ -448,6 +456,175 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
     );
 };
 
+const ProfileOffcanvas = () => {
+    const { selectedProfile, setSelectedProfile } = useContext(OrganogramContext);
+
+    if (!selectedProfile) return null;
+
+    const node = selectedProfile;
+    const isExecutive = node.title && (node.title.toLowerCase().includes('presidente') || node.title.toLowerCase().includes('diretor'));
+    const nodeColor = selectedProfile.assignedColor || '#64748b';
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div 
+                style={{
+                    position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                    backgroundColor: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)',
+                    zIndex: 999, transition: 'opacity 0.3s'
+                }}
+                onClick={() => setSelectedProfile(null)}
+            />
+            {/* Offcanvas Panel */}
+            <div className="profile-offcanvas" style={{
+                position: 'fixed', top: 0, right: 0, width: '400px', maxWidth: '90vw', height: '100vh',
+                background: 'var(--glass-background)', backdropFilter: 'blur(20px)',
+                boxShadow: '-10px 0 25px rgba(0,0,0,0.1)', zIndex: 1000,
+                display: 'flex', flexDirection: 'column',
+                transform: selectedProfile ? 'translateX(0)' : 'translateX(100%)',
+                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                borderLeft: '1px solid var(--glass-border-color)',
+                color: 'var(--text-color)',
+                overflowY: 'auto'
+            }}>
+                <button 
+                    onClick={() => setSelectedProfile(null)}
+                    style={{
+                        position: 'absolute', top: '16px', right: '16px',
+                        background: 'transparent', border: 'none', color: 'var(--text-muted-color)',
+                        cursor: 'pointer', padding: '4px', borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                >
+                    <X size={24} />
+                </button>
+
+                <div style={{ padding: '32px 24px', textAlign: 'center', borderBottom: '1px solid var(--glass-border-color)' }}>
+                    <div style={{
+                        width: '96px', height: '96px', borderRadius: '50%', margin: '0 auto 16px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 'bold',
+                        background: isExecutive ? 'linear-gradient(135deg, #1e293b, #0f172a)' : `linear-gradient(135deg, ${nodeColor}30, ${nodeColor}10)`,
+                        color: isExecutive ? '#fff' : nodeColor,
+                        border: `2px solid ${isExecutive ? '#334155' : `${nodeColor}40`}`,
+                        boxShadow: `0 8px 16px ${isExecutive ? 'rgba(0,0,0,0.2)' : `${nodeColor}20`}`
+                    }}>
+                        {getInitials(node.name)}
+                    </div>
+                    <h3 style={{ margin: '0 0 8px 0', fontSize: '1.25rem', fontWeight: '600' }}>{node.name}</h3>
+                    <p style={{ margin: 0, color: 'var(--text-muted-color)', fontSize: '0.95rem' }}>{node.title || 'Cargo não definido'}</p>
+                    {node.department && (
+                        <span style={{ 
+                            display: 'inline-block', marginTop: '12px', padding: '4px 12px', borderRadius: '20px', 
+                            fontSize: '0.8rem', fontWeight: '500', 
+                            backgroundColor: `${nodeColor}15`, color: nodeColor, border: `1px solid ${nodeColor}30`
+                        }}>
+                            {node.department}
+                        </span>
+                    )}
+                </div>
+
+                <div style={{ padding: '24px', flex: 1 }}>
+                    <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted-color)', marginBottom: '16px' }}>Contato</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {node.mail && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Mail size={18} />
+                                </div>
+                                <div style={{ flex: 1, overflow: 'hidden' }}>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)' }}>Email</div>
+                                    <a href={`mailto:${node.mail}`} style={{ color: 'var(--text-color)', textDecoration: 'none', fontSize: '0.95rem', display: 'block', textOverflow: 'ellipsis', overflow: 'hidden' }}>{node.mail}</a>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {node.telephoneNumber && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Phone size={18} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)' }}>Ramal / Telefone</div>
+                                    <a href={`tel:${node.telephoneNumber}`} style={{ color: 'var(--text-color)', textDecoration: 'none', fontSize: '0.95rem' }}>{node.telephoneNumber}</a>
+                                </div>
+                            </div>
+                        )}
+
+                        {node.office && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <MapPin size={18} />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)' }}>Escritório</div>
+                                    <div style={{ color: 'var(--text-color)', fontSize: '0.95rem' }}>{node.office}</div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {node.mail && (
+                        <a 
+                            href={`msteams:/l/chat/0/0?users=${node.mail}`}
+                            style={{ 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
+                                marginTop: '20px', padding: '10px', borderRadius: '8px', 
+                                background: '#5b5fc7', color: '#fff', textDecoration: 'none', 
+                                fontWeight: '500', fontSize: '0.95rem', transition: 'background 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#4a4e9e'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = '#5b5fc7'}
+                        >
+                            <MessageSquare size={18} />
+                            Chamar no Teams
+                        </a>
+                    )}
+
+                    <hr style={{ borderColor: 'var(--glass-border-color)', margin: '24px 0', opacity: 0.5 }} />
+
+                    <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted-color)', marginBottom: '16px' }}>Hierarquia</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        {node.parentName && (
+                            <div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Building2 size={14} /> Responde a
+                                </div>
+                                <div style={{ background: 'var(--input-background)', border: '1px solid var(--input-border-color)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.95rem' }}>
+                                    {node.parentName}
+                                </div>
+                            </div>
+                        )}
+
+                        {node.children && node.children.length > 0 && (
+                            <div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Users size={14} /> Equipe Direta ({node.children.length})
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {node.children.map(child => (
+                                        <div key={child.distinguishedName} style={{ background: 'var(--input-background)', border: '1px solid var(--input-border-color)', padding: '10px 14px', borderRadius: '8px' }}>
+                                            <div style={{ fontWeight: '500', fontSize: '0.9rem', color: 'var(--text-color)' }}>{child.name}</div>
+                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted-color)' }}>{child.title || 'Cargo não definido'}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {(!node.children || node.children.length === 0) && (
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-muted-color)', fontStyle: 'italic' }}>
+                                Nenhum subordinado direto.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+};
+
 const OrganogramPage = () => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -457,6 +634,7 @@ const OrganogramPage = () => {
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
     const [focusedNodeId, setFocusedNodeId] = useState(null);
     const [ancestorIds, setAncestorIds] = useState(new Set());
+    const [selectedProfile, setSelectedProfile] = useState(null);
 
     // Tooltip State
     const [tooltipData, setTooltipData] = useState(null);
@@ -716,6 +894,7 @@ const OrganogramPage = () => {
                                 isMatch={false}
                                 parentId={parentNode ? parentNode.distinguishedName : null}
                                 assignedColor={myColor}
+                                parentName={parentNode ? parentNode.name : null}
                             />
                             {hasChildren && isExpanded && renderTree(node.children, node, myColor, depth + 1)}
                         </li>
@@ -740,7 +919,13 @@ const OrganogramPage = () => {
     );
 
     return (
-        <OrganogramContext.Provider value={{ hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData }}>
+        <OrganogramContext.Provider value={{ 
+            hoveredNodeId, setHoveredNodeId, 
+            focusedNodeId, setFocusedNodeId, 
+            ancestorIds, 
+            setTooltipData,
+            selectedProfile, setSelectedProfile
+        }}>
             <div className="organogram-page">
                 <TreeConnectors
                     data={data}
@@ -810,11 +995,11 @@ const OrganogramPage = () => {
                     </div>
                 </main>
 
-                {tooltipData && (
-                    <div className="node-tooltip" style={{
-                        left: tooltipData.x + 20,
-                        top: tooltipData.y + 20
-                    }}>
+            {tooltipData && !selectedProfile && (
+                <div 
+                    className="node-tooltip" 
+                    style={{ left: tooltipData.x + 20, top: tooltipData.y + 20 }}
+                >
                         <div className="tooltip-header">
                             Contato <ChevronRight size={14} />
                         </div>
@@ -845,10 +1030,12 @@ const OrganogramPage = () => {
                                 </span>
                             </div>
                         )}
-                    </div>
-                )}
+                </div>
+            )}
 
-                <style>{`
+            <ProfileOffcanvas />
+
+            <style>{`
                     /* --- Fonts & Vars --- */
                     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
