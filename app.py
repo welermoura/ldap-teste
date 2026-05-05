@@ -20,6 +20,7 @@ import io
 import csv
 import base64
 import uuid
+from PIL import Image
 from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
 
 # ==============================================================================
@@ -2444,12 +2445,70 @@ def remove_member_temp(group_name, user_sam):
 
     return redirect(url_for('view_group', group_name=group_name))
 
+@app.route('/api/user_photo/<username>')
+@require_auth
+def api_user_photo(username):
+    """Serve a foto de perfil de um usuário diretamente do atributo thumbnailPhoto do AD."""
+    try:
+        conn = get_read_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['thumbnailPhoto'])
+        if not user or 'thumbnailPhoto' not in user or not user.thumbnailPhoto.value:
+            return '', 404
+        photo_bytes = user.thumbnailPhoto.value
+        return Response(photo_bytes, mimetype='image/jpeg', headers={
+            'Cache-Control': 'public, max-age=300'
+        })
+    except Exception as e:
+        logging.error(f"Erro ao servir foto do usuário {username}: {e}")
+        return '', 404
+
+
+@app.route('/api/upload_photo/<username>', methods=['POST'])
+@require_auth
+@require_permission(action='can_edit')
+def api_upload_photo(username):
+    """Recebe uma imagem, redimensiona para no máximo 200x200px mantendo proporção, e salva no AD como thumbnailPhoto."""
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
+    photo_file = request.files['photo']
+    if not photo_file or photo_file.filename == '':
+        return jsonify({'error': 'Nenhum arquivo selecionado.'}), 400
+    allowed_extensions = {'jpg', 'jpeg', 'png'}
+    ext = photo_file.filename.rsplit('.', 1)[-1].lower() if '.' in photo_file.filename else ''
+    if ext not in allowed_extensions:
+        return jsonify({'error': 'Apenas arquivos JPG ou PNG são permitidos.'}), 400
+    try:
+        raw_bytes = photo_file.read()
+        if len(raw_bytes) > 10 * 1024 * 1024:  # 10 MB limit
+            return jsonify({'error': 'A imagem não pode ter mais de 10 MB.'}), 400
+        img = Image.open(io.BytesIO(raw_bytes))
+        img = img.convert('RGB')  # Converte RGBA/PNG para RGB (necessário para JPEG)
+        img.thumbnail((200, 200), Image.LANCZOS)  # Redimensiona mantendo proporção, nunca amplia
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=85, optimize=True)
+        jpeg_bytes = output.getvalue()
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+        conn.modify(user.distinguishedName.value, {
+            'thumbnailPhoto': [(ldap3.MODIFY_REPLACE, [jpeg_bytes])]
+        })
+        if conn.result['description'] != 'success':
+            raise Exception(conn.result.get('message', 'Erro desconhecido do LDAP'))
+        logging.info(f"[FOTO] Foto do usuário '{username}' atualizada por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Foto atualizada com sucesso!'})
+    except Exception as e:
+        logging.error(f"Erro ao fazer upload de foto para {username}: {e}", exc_info=True)
+        return jsonify({'error': f'Erro ao processar a imagem: {str(e)}'}), 500
+
+
 @app.route('/view_user/<username>')
 @require_auth
 def view_user(username):
     try:
         conn = get_read_connection()
-        attributes = ['*', 'msDS-UserPasswordExpiryTimeComputed']
+        attributes = ['*', 'msDS-UserPasswordExpiryTimeComputed', 'thumbnailPhoto']
         user = get_user_by_samaccountname(conn, username, attributes=attributes)
         if not user:
             flash("Usuário não encontrado ou você não tem permissão para ver os detalhes.", "error")
@@ -2521,10 +2580,13 @@ def view_user(username):
         except Exception as e:
             logging.error(f"Erro ao buscar info de hierarquia para {username}: {e}")
 
+        # Verifica se o usuário tem foto de perfil
+        has_photo = 'thumbnailPhoto' in user and user.thumbnailPhoto.value is not None
+
         # Passa ambos os formulários para o template
         form = EditUserForm() # Para os formulários existentes
         delete_form = DeleteUserForm() # Para o modal de exclusão
-        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info, manager_info=manager_info, direct_reports_info=direct_reports_info)
+        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info, manager_info=manager_info, direct_reports_info=direct_reports_info, has_photo=has_photo)
     except Exception as e:
         flash(f"Erro ao buscar detalhes do usuário: {e}", "error")
         logging.error(f"Erro ao buscar detalhes do usuário para {username}: {e}", exc_info=True)
