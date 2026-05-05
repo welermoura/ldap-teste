@@ -208,10 +208,10 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: var(--datepicker
 /* ==========================================================================
    Sidebar Layout
    ========================================================================== */
-body { display: block; } /* override flex-column for sidebar layout */
 
 .app-wrapper {
     display: flex;
+    flex: 1;
     min-height: 100vh;
 }
 
