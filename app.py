@@ -2503,6 +2503,27 @@ def api_upload_photo(username):
         return jsonify({'error': f'Erro ao processar a imagem: {str(e)}'}), 500
 
 
+@app.route('/api/remove_photo/<username>', methods=['DELETE'])
+@require_auth
+@require_permission(action='can_edit')
+def api_remove_photo(username):
+    """Remove o atributo thumbnailPhoto do usuário no AD."""
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+        conn.modify(user.distinguishedName.value, {
+            'thumbnailPhoto': [(ldap3.MODIFY_REPLACE, [])]
+        })
+        if conn.result['description'] != 'success':
+            raise Exception(conn.result.get('message', 'Erro desconhecido do LDAP'))
+        logging.info(f"[FOTO] Foto do usuário '{username}' removida por '{session.get('user_display_name')}'.")
+        return jsonify({'success': True, 'message': 'Foto removida com sucesso!'})
+    except Exception as e:
+        logging.error(f"Erro ao remover foto do usuário {username}: {e}", exc_info=True)
+        return jsonify({'error': f'Erro ao remover a foto: {str(e)}'}), 500
+
 @app.route('/view_user/<username>')
 @require_auth
 def view_user(username):
