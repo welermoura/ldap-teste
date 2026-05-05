@@ -32,7 +32,6 @@ const OrganogramContext = createContext({
     focusedNodeId: null,
     setFocusedNodeId: () => {},
     ancestorIds: new Set(),
-    setTooltipData: () => {},
     selectedProfile: null,
     setSelectedProfile: () => {},
 });
@@ -332,7 +331,7 @@ const AggregateGroup = ({ nodes, parentName, assignedColor, parentId }) => {
 };
 
 const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId, isGridItem, assignedColor, parentName }) => {
-    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setTooltipData, setSelectedProfile } = useContext(OrganogramContext);
+    const { hoveredNodeId, setHoveredNodeId, focusedNodeId, setFocusedNodeId, ancestorIds, setSelectedProfile } = useContext(OrganogramContext);
 
     // Use the assigned color from parent, or default to Slate-500 if root/undefined
     const nodeColor = assignedColor || '#64748b';
@@ -357,24 +356,13 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
         node.title.toLowerCase().includes('diretor')
     );
 
-    // Tooltip timer refs
-    const hoverTimer = useRef(null);
-
     const handleMouseEnter = (e) => {
         e.stopPropagation();
         setHoveredNodeId(nodeId);
-
-        // Start tooltip timer
-        if (hoverTimer.current) clearTimeout(hoverTimer.current);
-        hoverTimer.current = setTimeout(() => {
-            setTooltipData({ node, x: e.clientX, y: e.clientY });
-        }, 800); // 800ms delay
     };
 
     const handleMouseLeave = () => {
         setHoveredNodeId(null);
-        if (hoverTimer.current) clearTimeout(hoverTimer.current);
-        setTooltipData(null);
     };
 
     const handleKeyDown = (e) => {
@@ -448,7 +436,13 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
             </div>
 
             {hasChildren && (
-                <div className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}>
+                <div 
+                    className={`toggle-btn ${isExpanded ? 'expanded' : ''}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleNode();
+                    }}
+                >
                     <ChevronDown size={14} className="icon-chevron" />
                 </div>
             )}
@@ -479,8 +473,8 @@ const ProfileOffcanvas = () => {
             {/* Offcanvas Panel */}
             <div className="profile-offcanvas" style={{
                 position: 'fixed', top: 0, right: 0, width: '400px', maxWidth: '90vw', height: '100vh',
-                background: 'var(--glass-background)', backdropFilter: 'blur(20px)',
-                boxShadow: '-10px 0 25px rgba(0,0,0,0.1)', zIndex: 1000,
+                background: 'var(--card-bg)', backdropFilter: 'none',
+                boxShadow: '-10px 0 25px rgba(0,0,0,0.5)', zIndex: 1000,
                 display: 'flex', flexDirection: 'column',
                 transform: selectedProfile ? 'translateX(0)' : 'translateX(100%)',
                 transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -635,9 +629,6 @@ const OrganogramPage = () => {
     const [focusedNodeId, setFocusedNodeId] = useState(null);
     const [ancestorIds, setAncestorIds] = useState(new Set());
     const [selectedProfile, setSelectedProfile] = useState(null);
-
-    // Tooltip State
-    const [tooltipData, setTooltipData] = useState(null);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -923,7 +914,6 @@ const OrganogramPage = () => {
             hoveredNodeId, setHoveredNodeId, 
             focusedNodeId, setFocusedNodeId, 
             ancestorIds, 
-            setTooltipData,
             selectedProfile, setSelectedProfile
         }}>
             <div className="organogram-page">
@@ -994,44 +984,6 @@ const OrganogramPage = () => {
                         {renderTree(data, null)}
                     </div>
                 </main>
-
-            {tooltipData && !selectedProfile && (
-                <div 
-                    className="node-tooltip" 
-                    style={{ left: tooltipData.x + 20, top: tooltipData.y + 20 }}
-                >
-                        <div className="tooltip-header">
-                            Contato <ChevronRight size={14} />
-                        </div>
-
-                        {tooltipData.node.mail && (
-                            <div className="tooltip-row">
-                                <Mail size={16} className="icon-tooltip" />
-                                <a href={`mailto:${tooltipData.node.mail}`} className="tooltip-link">
-                                    {tooltipData.node.mail}
-                                </a>
-                            </div>
-                        )}
-
-                        {tooltipData.node.telephoneNumber && (
-                            <div className="tooltip-row">
-                                <Phone size={16} className="icon-tooltip" />
-                                <a href={`tel:${tooltipData.node.telephoneNumber}`} className="tooltip-link">
-                                    {tooltipData.node.telephoneNumber}
-                                </a>
-                            </div>
-                        )}
-
-                        {tooltipData.node.office && (
-                            <div className="tooltip-row">
-                                <MapPin size={16} className="icon-tooltip" />
-                                <span className="tooltip-text">
-                                    {tooltipData.node.office}
-                                </span>
-                            </div>
-                        )}
-                </div>
-            )}
 
             <ProfileOffcanvas />
 
