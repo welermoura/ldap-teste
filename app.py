@@ -880,8 +880,21 @@ def index():
 @app.route('/dashboard')
 @require_auth
 def dashboard():
-    form = FlaskForm()  # Cria uma instância de formulário vazia para o CSRF
+    form = FlaskForm()  # CSRF form
     context = {
+        'active_users': 0,
+        'disabled_users': 0,
+        'deactivated_last_week': 0,
+        'pending_reactivations': 0,
+        'pending_deactivations': 0,
+        'expiring_passwords': []
+    }
+    return render_template('dashboard.html', form=form, **context)
+
+@app.route('/api/dashboard/stats')
+@require_auth
+def api_dashboard_stats():
+    data = {
         'active_users': 0,
         'disabled_users': 0,
         'deactivated_last_week': 0,
@@ -891,28 +904,28 @@ def dashboard():
     }
     try:
         conn = get_read_connection()
-        # Permissões para cada card
         if check_permission(view='can_view_user_stats'):
             stats = get_dashboard_stats(conn)
-            context['active_users'] = stats.get('enabled_users', 0)
-            context['disabled_users'] = stats.get('disabled_users', 0)
+            data['active_users'] = stats.get('enabled_users', 0)
+            data['disabled_users'] = stats.get('disabled_users', 0)
 
         if check_permission(view='can_view_deactivated_last_week'):
-            context['deactivated_last_week'] = get_deactivated_last_week()
+            data['deactivated_last_week'] = get_deactivated_last_week()
 
         if check_permission(view='can_view_pending_reactivations'):
-            context['pending_reactivations'] = get_pending_reactivations(days=7)
+            data['pending_reactivations'] = get_pending_reactivations(days=7)
 
         if check_permission(view='can_view_pending_deactivations'):
-            context['pending_deactivations'] = get_pending_deactivations(days=7)
+            data['pending_deactivations'] = get_pending_deactivations(days=7)
 
         if check_permission(view='can_view_expiring_passwords'):
-            context['expiring_passwords'] = get_expiring_passwords(conn, days=5)
+            data['expiring_passwords'] = get_expiring_passwords(conn, days=5)
 
     except Exception as e:
-        flash(f"Erro ao carregar dados do dashboard: {e}", "error")
+        logging.error(f"Erro ao buscar dados da API do dashboard: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
-    return render_template('dashboard.html', form=form, **context)
+    return jsonify(data)
 
 @app.route('/create_user_form', methods=['GET', 'POST'])
 @require_auth

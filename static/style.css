@@ -512,6 +512,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: var(--datepicker
 .skeleton-line.short  { width: 40%; }
 .skeleton-line.medium { width: 65%; }
 .skeleton-line.full   { width: 100%; }
+.skeleton-line.inline { display: inline-block; margin-bottom: 0; vertical-align: middle; }
 .skeleton-row { padding: 0.9rem 1rem; border-bottom: 1px solid var(--glass-border-color); }
 
 /* ==========================================================================

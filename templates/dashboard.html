@@ -36,7 +36,6 @@
 </div>
 {% endif %}
 
-<!-- Linha dos Cards de Estatísticas -->
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 justify-content-center mb-4">
     {% if check_permission(view='can_view_user_stats') %}
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="active_users" data-title="Contas Ativas">
@@ -44,7 +43,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted text-uppercase fs-7">Contas Ativas</div>
-<div class="fs-3 fw-bold text-success">{{ active_users }}</div>
+                    <div class="fs-3 fw-bold text-success"><span id="stat-active_users" class="skeleton-line short inline"></span></div>
                 </div>
                 <div class="fs-3 text-success opacity-75"><i class="fas fa-user-check"></i></div>
             </div>
@@ -55,7 +54,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted text-uppercase fs-7">Contas Desativadas</div>
-                    <div class="fs-3 fw-bold text-warning">{{ disabled_users }}</div>
+                    <div class="fs-3 fw-bold text-warning"><span id="stat-disabled_users" class="skeleton-line short inline"></span></div>
                 </div>
                 <div class="fs-3 text-warning opacity-75"><i class="fas fa-user-slash"></i></div>
             </div>
@@ -69,7 +68,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted text-uppercase fs-7">Desativados (Última Semana)</div>
-                    <div class="fs-3 fw-bold text-danger">{{ deactivated_last_week }}</div>
+                    <div class="fs-3 fw-bold text-danger"><span id="stat-deactivated_last_week" class="skeleton-line short inline"></span></div>
                 </div>
                 <div class="fs-3 text-danger opacity-75"><i class="fas fa-user-times"></i></div>
             </div>
@@ -83,7 +82,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted text-uppercase fs-7">Reativações (Próx. 7 dias)</div>
-                    <div class="fs-3 fw-bold text-info">{{ pending_reactivations }}</div>
+                    <div class="fs-3 fw-bold text-info"><span id="stat-pending_reactivations" class="skeleton-line short inline"></span></div>
                 </div>
                 <div class="fs-3 text-info opacity-75"><i class="fas fa-calendar-check"></i></div>
             </div>
@@ -97,7 +96,7 @@
             <div class="card-body d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted text-uppercase fs-7">Desativações (Próx. 7 dias)</div>
-                    <div class="fs-3 fw-bold text-secondary">{{ pending_deactivations }}</div>
+                    <div class="fs-3 fw-bold text-secondary"><span id="stat-pending_deactivations" class="skeleton-line short inline"></span></div>
                 </div>
                 <div class="fs-3 text-secondary opacity-75"><i class="fas fa-calendar-times"></i></div>
             </div>
@@ -330,7 +329,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Lógica para a lista de senhas expirando
-    const expiringPasswordsData = {{ expiring_passwords|tojson }};
+    let expiringPasswordsData = [];
     const listContainer = document.getElementById('expiring-list-container');
     const paginationControls = document.getElementById('expiring-pagination-controls');
     const searchInput = document.getElementById('expiring-search-input');
@@ -338,7 +337,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let currentPage = 1;
     const itemsPerPage = 5;
-    let filteredData = [...expiringPasswordsData];
+    let filteredData = [];
+
+    // Carregamento Lazy do Dashboard
+    async function fetchDashboardStats() {
+        try {
+            const response = await fetch('/api/dashboard/stats');
+            if (!response.ok) throw new Error('Falha ao carregar estatísticas');
+            const data = await response.json();
+
+            // Atualiza os contadores
+            const statFields = ['active_users', 'disabled_users', 'deactivated_last_week', 'pending_reactivations', 'pending_deactivations'];
+            statFields.forEach(field => {
+                const el = document.getElementById(`stat-${field}`);
+                if (el) {
+                    el.textContent = data[field] || 0;
+                    el.classList.remove('skeleton-line', 'short', 'inline');
+                }
+            });
+
+            // Atualiza a lista de senhas
+            expiringPasswordsData = data.expiring_passwords || [];
+            filteredData = [...expiringPasswordsData];
+            totalBadge.textContent = `Total: ${filteredData.length}`;
+            renderList();
+
+        } catch (error) {
+            console.error('Erro dashboard stats:', error);
+            // Em caso de erro, remove o skeleton e coloca 0 ou erro
+            document.querySelectorAll('.skeleton-line.inline').forEach(el => {
+                el.textContent = '0';
+                el.classList.remove('skeleton-line', 'short', 'inline');
+            });
+            listContainer.innerHTML = '<div class="text-center text-danger p-4">Erro ao carregar dados.</div>';
+        }
+    }
+
+    fetchDashboardStats();
 
     function renderList() {
         listContainer.innerHTML = '';
