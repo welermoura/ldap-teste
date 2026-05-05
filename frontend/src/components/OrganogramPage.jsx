@@ -21,7 +21,9 @@ import {
     Building2,
     Users,
     X,
-    MessageSquare
+    MessageSquare,
+    Target,
+    FilterX
 } from 'lucide-react';
 import OrganogramSearch from './OrganogramSearch';
 
@@ -34,6 +36,8 @@ const OrganogramContext = createContext({
     ancestorIds: new Set(),
     selectedProfile: null,
     setSelectedProfile: () => {},
+    isolatedNodeId: null,
+    setIsolatedNodeId: () => {},
 });
 
 // --- Utility Functions ---
@@ -60,6 +64,29 @@ const getInitials = (name) => {
     const names = name.split(' ');
     if (names.length >= 2) return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
     return name[0].toUpperCase();
+};
+
+const filterTreeForIsolation = (nodes, targetId) => {
+    if (!nodes || !targetId) return nodes;
+    
+    const result = [];
+    for (const node of nodes) {
+        if (node.distinguishedName === targetId) {
+            // Se for o nó alvo, retorna ele com todos os filhos originais
+            result.push({ ...node });
+            continue;
+        }
+        
+        if (node.children && node.children.length > 0) {
+            const filteredChildren = filterTreeForIsolation(node.children, targetId);
+            if (filteredChildren.length > 0) {
+                // Se o alvo está em algum dos filhos, mantém este ancestral
+                // mas apenas com o caminho que leva ao alvo
+                result.push({ ...node, children: filteredChildren });
+            }
+        }
+    }
+    return result;
 };
 
 // --- Components ---
@@ -451,7 +478,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
 };
 
 const ProfileOffcanvas = () => {
-    const { selectedProfile, setSelectedProfile } = useContext(OrganogramContext);
+    const { selectedProfile, setSelectedProfile, isolatedNodeId, setIsolatedNodeId } = useContext(OrganogramContext);
 
     if (!selectedProfile) return null;
 
@@ -559,12 +586,12 @@ const ProfileOffcanvas = () => {
                         )}
                     </div>
 
-                    {node.mail && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
                         <a 
                             href={`msteams:/l/chat/0/0?users=${node.mail}`}
                             style={{ 
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
-                                marginTop: '20px', padding: '10px', borderRadius: '8px', 
+                                padding: '10px', borderRadius: '8px', 
                                 background: '#5b5fc7', color: '#fff', textDecoration: 'none', 
                                 fontWeight: '500', fontSize: '0.95rem', transition: 'background 0.2s'
                             }}
@@ -574,7 +601,25 @@ const ProfileOffcanvas = () => {
                             <MessageSquare size={18} />
                             Chamar no Teams
                         </a>
-                    )}
+
+                        <button 
+                            onClick={() => {
+                                setIsolatedNodeId(node.distinguishedName);
+                                setSelectedProfile(null);
+                            }}
+                            style={{ 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', 
+                                padding: '10px', borderRadius: '8px', 
+                                background: 'var(--text-primary)', color: '#fff', border: 'none',
+                                fontWeight: '500', fontSize: '0.95rem', cursor: 'pointer', transition: 'opacity 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                        >
+                            <Target size={18} />
+                            Focar nesta Estrutura
+                        </button>
+                    </div>
 
                     <hr style={{ borderColor: 'var(--glass-border-color)', margin: '24px 0', opacity: 0.5 }} />
 
@@ -629,6 +674,13 @@ const OrganogramPage = () => {
     const [focusedNodeId, setFocusedNodeId] = useState(null);
     const [ancestorIds, setAncestorIds] = useState(new Set());
     const [selectedProfile, setSelectedProfile] = useState(null);
+    const [isolatedNodeId, setIsolatedNodeId] = useState(null);
+
+    // Filtered Data for Isolation Mode
+    const filteredData = useMemo(() => {
+        if (!isolatedNodeId) return data;
+        return filterTreeForIsolation(data, isolatedNodeId);
+    }, [data, isolatedNodeId]);
 
     // Drag-to-pan state
     const canvasRef = useRef(null);
@@ -681,7 +733,7 @@ const OrganogramPage = () => {
     useEffect(() => {
         const targetId = hoveredNodeId || focusedNodeId;
         if (targetId) {
-            const path = findPathToNode(data, targetId);
+            const path = findPathToNode(filteredData, targetId);
             if (path) {
                 setAncestorIds(new Set(path));
             } else {
@@ -914,11 +966,12 @@ const OrganogramPage = () => {
             hoveredNodeId, setHoveredNodeId, 
             focusedNodeId, setFocusedNodeId, 
             ancestorIds, 
-            selectedProfile, setSelectedProfile
+            selectedProfile, setSelectedProfile,
+            isolatedNodeId, setIsolatedNodeId
         }}>
             <div className="organogram-page">
                 <TreeConnectors
-                    data={data}
+                    data={filteredData}
                     expandedNodes={expandedNodes}
                     hoveredNodeId={hoveredNodeId}
                     focusedNodeId={focusedNodeId}
@@ -948,6 +1001,23 @@ const OrganogramPage = () => {
                     </div>
 
                     <div className="actions">
+                        {isolatedNodeId && (
+                            <button 
+                                onClick={() => setIsolatedNodeId(null)}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '8px',
+                                    padding: '8px 16px', borderRadius: '8px',
+                                    background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca',
+                                    fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer',
+                                    transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#fecaca'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#fee2e2'}
+                            >
+                                <FilterX size={16} />
+                                Sair do Modo Foco
+                            </button>
+                        )}
                         <OrganogramSearch data={data} onSelect={handleSelectNode} />
 
                         <div className="zoom-controls">
@@ -981,7 +1051,7 @@ const OrganogramPage = () => {
                             transform: `scale(${zoom})`,
                         }}
                     >
-                        {renderTree(data, null)}
+                        {renderTree(filteredData, null)}
                     </div>
                 </main>
 
