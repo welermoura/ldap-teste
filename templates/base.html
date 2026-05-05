@@ -147,30 +147,11 @@
             </footer>
         </div>
 
-    </div>
-    {# ── End sidebar layout ── #}
-
-    {% else %}
-    {# ── No sidebar for unauthenticated pages ── #}
-        <main class="container-fluid">
-            {% block page_title %}{% endblock %}
-
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                            <i class="fas fa-info-circle me-2"></i>{{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-
-            {% block content %}{% endblock %}
-        </main>
-    {% endif %}
+    {% if session.ad_user %}</div>{% endif %}
+    {# ── End app-wrapper ── #}
 
     {% endblock %}
+
 
     <!-- Toast Container -->
     <div aria-live="polite" aria-atomic="true" class="position-relative">
