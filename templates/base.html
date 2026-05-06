@@ -9,6 +9,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    {% if appearance.favicon %}
+    <link rel="icon" href="{{ url_for('static', filename='uploads/' + appearance.favicon) }}">
+    {% endif %}
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     {# Aplica o tema ANTES do render para evitar flash #}
     <script>
@@ -28,40 +33,47 @@
     {% if session.ad_user %}
     <aside class="sidebar" id="app-sidebar">
         <div class="sidebar-header">
-            <div class="sidebar-logo-icon"><i class="fas fa-shield-alt"></i></div>
-            <div class="sidebar-brand-text">Gestão AD<span class="sidebar-brand-sub">Portal de Administração</span></div>
-            <button class="sidebar-toggle-btn" id="sidebar-toggle" title="Recolher menu"><i class="fas fa-chevron-left"></i></button>
+            <div class="sidebar-logo-wrapper">
+                {% if appearance.logo %}
+                <img src="{{ url_for('static', filename='uploads/' + appearance.logo) }}" alt="Logo" class="sidebar-custom-logo">
+                {% else %}
+                <div class="sidebar-logo-icon"><i class="fas fa-shield-alt"></i></div>
+                {% endif %}
+            </div>
+            <div class="sidebar-brand-text">Gestão AD<span class="sidebar-brand-sub">{{ appearance.subtitle }}</span></div>
+            <button class="sidebar-toggle-btn d-none d-md-block" id="sidebar-toggle" title="Recolher menu"><i class="fas fa-chevron-left"></i></button>
         </div>
         <nav class="sidebar-nav">
             <div class="sidebar-section-label">Principal</div>
             <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-                <i class="fas fa-chart-line nav-icon"></i><span class="nav-label">Dashboard</span>
+                <i class="fas fa-chart-line"></i><span class="nav-label">Dashboard</span>
             </a>
             {% if check_permission(action='can_edit') or check_permission(action='can_disable') %}
             <a href="{{ url_for('manage_users') }}" class="sidebar-link {% if request.endpoint == 'manage_users' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
-                <i class="fas fa-users-cog nav-icon"></i><span class="nav-label">Gerenciar Usuários</span>
+                <i class="fas fa-users-cog"></i><span class="nav-label">Gerenciar Usuários</span>
             </a>
             {% endif %}
             {% if check_permission(action='can_create') %}
             <a href="{{ url_for('create_user_form') }}" class="sidebar-link {% if request.endpoint == 'create_user_form' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
-                <i class="fas fa-user-plus nav-icon"></i><span class="nav-label">Criar Usuário</span>
+                <i class="fas fa-user-plus"></i><span class="nav-label">Criar Usuário</span>
             </a>
             {% endif %}
             {% if check_permission(action='can_manage_groups') %}
             <a href="{{ url_for('group_management') }}" class="sidebar-link {% if request.endpoint == 'group_management' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
-                <i class="fas fa-layer-group nav-icon"></i><span class="nav-label">Gerenciar Grupos</span>
+                <i class="fas fa-layer-group"></i><span class="nav-label">Gerenciar Grupos</span>
             </a>
             {% endif %}
+            
             <div class="sidebar-section-label">Ferramentas</div>
             <a href="{{ url_for('organograma') }}" class="sidebar-link {% if request.endpoint == 'organograma' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
-                <i class="fas fa-sitemap nav-icon"></i><span class="nav-label">Organograma</span>
+                <i class="fas fa-sitemap"></i><span class="nav-label">Organograma</span>
             </a>
             <a href="{{ url_for('ad_tree') }}" class="sidebar-link {% if request.endpoint == 'ad_tree' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
-                <i class="fas fa-network-wired nav-icon"></i><span class="nav-label">Active Directory</span>
+                <i class="fas fa-network-wired"></i><span class="nav-label">Active Directory</span>
             </a>
             {% if check_permission(view='can_export_data') %}
             <a href="{{ url_for('export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'export_ad_data' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
-                <i class="fas fa-file-csv nav-icon"></i><span class="nav-label">Exportar Base AD</span>
+                <i class="fas fa-file-csv"></i><span class="nav-label">Exportar Base AD</span>
             </a>
             {% endif %}
         </nav>
@@ -85,12 +97,13 @@
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                            <i class="fas fa-info-circle me-2"></i>{{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            {% for category, message in messages %}
+                                showToast("{{ message }}", "{{ 'error' if category == 'danger' or category == 'error' else 'success' if category == 'success' else 'info' }}", "{{ 'Erro' if category == 'error' else 'Sucesso' if category == 'success' else 'Informação' }}");
+                            {% endfor %}
+                        });
+                    </script>
                 {% endif %}
             {% endwith %}
 

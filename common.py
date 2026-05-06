@@ -24,6 +24,7 @@ KEY_FILE = os.path.join(data_dir, 'secret.key')
 SCHEDULE_FILE = os.path.join(data_dir, 'schedules.json')
 DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
 GROUP_SCHEDULE_FILE = os.path.join(data_dir, 'group_schedules.json')
+HISTORY_FILE = os.path.join(data_dir, 'history.json')
 
 # ==============================================================================
 # Funções de Criptografia e Configuração
@@ -213,3 +214,28 @@ def get_group_by_name(conn, group_name, attributes=None):
     if conn.entries:
         return conn.entries[0]
     return None
+
+def save_to_history(action, user_sam, details=""):
+    """Salva uma ação executada no arquivo de histórico."""
+    try:
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': action,
+            'user_sam': user_sam,
+            'details': details
+        }
+        history.append(entry)
+        
+        # Mantém apenas os últimos 1000 registros
+        if len(history) > 1000:
+            history = history[-1000:]
+            
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=4)
+    except Exception as e:
+        logging.error(f"Erro ao salvar histórico: {e}")

@@ -8,32 +8,102 @@
     {{ render_page_header('<i class="fas fa-users-cog me-2"></i>Gerenciamento de Colaboradores', show_nav_buttons=False) }}
 {% endblock %}
 
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
 {% block content %}
 <form method="POST" action="">
     {{ form.hidden_tag() }}
 </form>
 
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 justify-content-center mb-4">
+<!-- Dashboard Analytics Section -->
+<div class="row g-4 mb-4 animate-in" style="animation-delay: 0.1s;">
+    <div class="col-lg-8">
+        <div class="card glass-card h-100 collapsible-widget" id="widget-contas">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center py-3">
+                <h5 class="card-title mb-0"><i class="fas fa-chart-area me-2 text-primary"></i>Visão Geral de Contas</h5>
+                <div class="d-flex align-items-center gap-2">
+                    <div class="btn-group btn-group-sm d-none d-sm-flex">
+                        <button class="btn btn-outline-secondary active">AD Principal</button>
+                    </div>
+                    <button class="btn btn-sm btn-link text-muted widget-toggle-btn" title="Recolher/Expandir"><i class="fas fa-chevron-up"></i></button>
+                </div>
+            </div>
+            <div class="widget-content">
+                <div class="card-body pt-0">
+                    <div class="chart-container">
+                        <canvas id="mainStatsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card glass-card h-100 collapsible-widget" id="widget-status">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center py-3">
+                <h5 class="card-title mb-0"><i class="fas fa-pie-chart me-2 text-primary"></i>Status Global</h5>
+                <button class="btn btn-sm btn-link text-muted widget-toggle-btn" title="Recolher/Expandir"><i class="fas fa-chevron-up"></i></button>
+            </div>
+            <div class="widget-content">
+                <div class="card-body pt-0">
+                    <div class="chart-container d-flex align-items-center justify-content-center">
+                        <canvas id="statusDoughnutChart"></canvas>
+                    </div>
+                    <div id="chart-legend" class="mt-3 small text-muted text-center"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trend Chart Row -->
+<div class="row mb-4 animate-in" style="animation-delay: 0.15s;">
+    <div class="col-12">
+        <div class="card glass-card collapsible-widget" id="widget-tendencia">
+            <div class="card-header border-0 bg-transparent d-flex justify-content-between align-items-center py-3">
+                <h5 class="card-title mb-0"><i class="fas fa-chart-line me-2 text-primary"></i>Tendência de Desativações (Últimos 30 dias)</h5>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="text-muted small d-none d-sm-block">Baseado no histórico do sistema</div>
+                    <button class="btn btn-sm btn-link text-muted widget-toggle-btn" title="Recolher/Expandir"><i class="fas fa-chevron-up"></i></button>
+                </div>
+            </div>
+            <div class="widget-content">
+                <div class="card-body pt-0">
+                    <div class="chart-container" style="position: relative; height:300px;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 justify-content-center mb-4 animate-in" style="animation-delay: 0.2s;">
     {% if check_permission(view='can_view_user_stats') %}
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="active_users" data-title="Contas Ativas">
         <div class="card glass-card h-100">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted text-uppercase fs-7">Contas Ativas</div>
-                    <div class="fs-3 fw-bold text-success"><span id="stat-active_users" class="skeleton-line short inline"></span></div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-card-icon bg-success bg-opacity-10 text-success me-3">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="text-muted text-uppercase fs-7 fw-semibold">Ativas</div>
                 </div>
-                <div class="fs-3 text-success opacity-75"><i class="fas fa-user-check"></i></div>
+                <div class="fs-2 fw-bold text-success"><span id="stat-active_users" class="skeleton-line short inline"></span></div>
             </div>
         </div>
     </div>
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="disabled_users" data-title="Contas Desativadas">
         <div class="card glass-card h-100">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted text-uppercase fs-7">Contas Desativadas</div>
-                    <div class="fs-3 fw-bold text-warning"><span id="stat-disabled_users" class="skeleton-line short inline"></span></div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-card-icon bg-warning bg-opacity-10 text-warning me-3">
+                        <i class="fas fa-user-slash"></i>
+                    </div>
+                    <div class="text-muted text-uppercase fs-7 fw-semibold">Desativadas</div>
                 </div>
-                <div class="fs-3 text-warning opacity-75"><i class="fas fa-user-slash"></i></div>
+                <div class="fs-2 fw-bold text-warning"><span id="stat-disabled_users" class="skeleton-line short inline"></span></div>
             </div>
         </div>
     </div>
@@ -42,12 +112,14 @@
     {% if check_permission(view='can_view_deactivated_last_week') %}
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="deactivated_last_week" data-title="Desativados (Última Semana)">
         <div class="card glass-card h-100">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted text-uppercase fs-7">Desativados (Última Semana)</div>
-                    <div class="fs-3 fw-bold text-danger"><span id="stat-deactivated_last_week" class="skeleton-line short inline"></span></div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-card-icon bg-danger bg-opacity-10 text-danger me-3">
+                        <i class="fas fa-user-times"></i>
+                    </div>
+                    <div class="text-muted text-uppercase fs-7 fw-semibold">Semana</div>
                 </div>
-                <div class="fs-3 text-danger opacity-75"><i class="fas fa-user-times"></i></div>
+                <div class="fs-2 fw-bold text-danger"><span id="stat-deactivated_last_week" class="skeleton-line short inline"></span></div>
             </div>
         </div>
     </div>
@@ -56,12 +128,14 @@
     {% if check_permission(view='can_view_pending_reactivations') %}
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="pending_reactivations" data-title="Reativações Pendentes (Próx. 7 dias)">
         <div class="card glass-card h-100">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted text-uppercase fs-7">Reativações (Próx. 7 dias)</div>
-                    <div class="fs-3 fw-bold text-info"><span id="stat-pending_reactivations" class="skeleton-line short inline"></span></div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-card-icon bg-info bg-opacity-10 text-info me-3">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div class="text-muted text-uppercase fs-7 fw-semibold">Reativar</div>
                 </div>
-                <div class="fs-3 text-info opacity-75"><i class="fas fa-calendar-check"></i></div>
+                <div class="fs-2 fw-bold text-info"><span id="stat-pending_reactivations" class="skeleton-line short inline"></span></div>
             </div>
         </div>
     </div>
@@ -70,12 +144,14 @@
     {% if check_permission(view='can_view_pending_deactivations') %}
     <div class="col dashboard-stat-card" data-bs-toggle="modal" data-bs-target="#dataModal" data-category="pending_deactivations" data-title="Desativações Agendadas (Próx. 7 dias)">
         <div class="card glass-card h-100">
-            <div class="card-body d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted text-uppercase fs-7">Desativações (Próx. 7 dias)</div>
-                    <div class="fs-3 fw-bold text-secondary"><span id="stat-pending_deactivations" class="skeleton-line short inline"></span></div>
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-card-icon bg-secondary bg-opacity-10 text-secondary me-3">
+                        <i class="fas fa-calendar-times"></i>
+                    </div>
+                    <div class="text-muted text-uppercase fs-7 fw-semibold">Desativar</div>
                 </div>
-                <div class="fs-3 text-secondary opacity-75"><i class="fas fa-calendar-times"></i></div>
+                <div class="fs-2 fw-bold text-secondary"><span id="stat-pending_deactivations" class="skeleton-line short inline"></span></div>
             </div>
         </div>
     </div>
@@ -305,7 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Lógica para a lista de senhas expirando
+    // Inicialização de Gráficos e Senhas
+    let mainChart, doughnutChart;
     let expiringPasswordsData = [];
     const listContainer = document.getElementById('expiring-list-container');
     const paginationControls = document.getElementById('expiring-pagination-controls');
@@ -315,6 +392,152 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 1;
     const itemsPerPage = 5;
     let filteredData = [];
+
+    function initCharts(data) {
+        const ctxMain = document.getElementById('mainStatsChart').getContext('2d');
+        const ctxDoughnut = document.getElementById('statusDoughnutChart').getContext('2d');
+        
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+        // Gráfico de Barras Principal
+        mainChart = new Chart(ctxMain, {
+            type: 'bar',
+            data: {
+                labels: ['Ativas', 'Desativadas', 'Desat. Semana', 'Reat. Pendentes', 'Desat. Pendentes'],
+                datasets: [{
+                    label: 'Quantidade de Contas',
+                    data: [
+                        data.active_users, 
+                        data.disabled_users, 
+                        data.deactivated_last_week, 
+                        data.pending_reactivations, 
+                        data.pending_deactivations
+                    ],
+                    backgroundColor: [
+                        '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#64748b'
+                    ],
+                    borderRadius: 8,
+                    barThickness: 40
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        padding: 12,
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        titleColor: isDark ? '#ffffff' : '#0f172a',
+                        bodyColor: isDark ? '#94a3b8' : '#64748b',
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor }
+                    }
+                }
+            }
+        });
+
+        // Gráfico de Rosca (Status Global)
+        doughnutChart = new Chart(ctxDoughnut, {
+            type: 'doughnut',
+            data: {
+                labels: ['Ativas', 'Desativadas'],
+                datasets: [{
+                    data: [data.active_users, data.disabled_users],
+                    backgroundColor: ['#10b981', '#f59e0b'],
+                    borderWidth: 0,
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '75%',
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Legenda customizada
+        const legendContainer = document.getElementById('chart-legend');
+        const total = data.active_users + data.disabled_users;
+        const activePercent = total > 0 ? Math.round((data.active_users / total) * 100) : 0;
+        if (legendContainer) {
+            legendContainer.innerHTML = `
+                <div class="d-flex justify-content-center gap-3">
+                    <span><i class="fas fa-circle text-success me-1"></i> Ativas (${activePercent}%)</span>
+                    <span><i class="fas fa-circle text-warning me-1"></i> Desat. (${100-activePercent}%)</span>
+                </div>
+            `;
+        }
+
+        // Gráfico de Tendência (Novo)
+        if (data.trends && data.trends.length > 0) {
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            const trendChart = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: data.trends.map(t => {
+                        const d = new Date(t.date + 'T00:00:00');
+                        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                    }),
+                    datasets: [{
+                        label: 'Desativações',
+                        data: data.trends.map(t => t.count),
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#6366f1',
+                        pointBorderColor: isDark ? '#1e293b' : '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            padding: 12,
+                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                            titleColor: isDark ? '#ffffff' : '#0f172a',
+                            bodyColor: isDark ? '#94a3b8' : '#64748b',
+                            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    }
 
     // Carregamento Lazy do Dashboard
     async function fetchDashboardStats() {
@@ -333,15 +556,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
+            // Inicializa gráficos
+            initCharts(data);
+
             // Atualiza a lista de senhas
             expiringPasswordsData = data.expiring_passwords || [];
             filteredData = [...expiringPasswordsData];
-            totalBadge.textContent = `Total: ${filteredData.length}`;
+            if (totalBadge) totalBadge.textContent = `Total: ${filteredData.length}`;
             renderList();
 
         } catch (error) {
             console.error('Erro dashboard stats:', error);
-            // Em caso de erro, remove o skeleton e coloca 0 ou erro
             document.querySelectorAll('.skeleton-line.inline').forEach(el => {
                 el.textContent = '0';
                 el.classList.remove('skeleton-line', 'short', 'inline');
@@ -353,6 +578,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetchDashboardStats();
 
     function renderList() {
+        if (!listContainer) return;
         listContainer.innerHTML = '';
         if (filteredData.length === 0) {
             listContainer.innerHTML = '<div class="text-center text-muted p-4">Nenhum usuário encontrado.</div>';
@@ -365,39 +591,57 @@ document.addEventListener('DOMContentLoaded', function() {
         pageData.forEach(user => {
             const listItem = document.createElement('a');
             listItem.href = `/view_user/${user.sam}`;
-            listItem.className = 'list-group-item list-group-item-action flex-column align-items-start glass-list-item';
+            listItem.className = 'list-group-item list-group-item-action flex-column align-items-start border-0 px-3 mb-2 rounded-4 glass-list-item';
 
             const mainInfo = document.createElement('div');
-            mainInfo.className = 'd-flex w-100 justify-content-between';
+            mainInfo.className = 'd-flex w-100 justify-content-between align-items-center mb-2';
 
             const name = document.createElement('h6');
-            name.className = 'mb-1';
+            name.className = 'mb-0 fw-bold';
             name.textContent = user.cn || 'Nome não disponível';
 
-            const expiryBadge = document.createElement('span');
             const days = user.expires_in_days;
-            let urgencyClass = 'badge-urgency-medium';
-            if (days <= 1) urgencyClass = 'badge-urgency-critical';
-            else if (days <= 3) urgencyClass = 'badge-urgency-high';
-            expiryBadge.className = `badge ${urgencyClass}`;
-            expiryBadge.textContent = days === 0 ? 'Expira hoje!' : `Expira em ${days} dia(s)`;
+            let urgencyClass = 'text-warning';
+            let barColor = 'var(--warning-color)';
+            if (days <= 1) { urgencyClass = 'text-danger'; barColor = 'var(--danger-color)'; }
+            else if (days <= 3) { urgencyClass = 'text-warning'; barColor = 'var(--warning-color)'; }
+            else { urgencyClass = 'text-success'; barColor = 'var(--success-color)'; }
+
+            const expiryInfo = document.createElement('span');
+            expiryInfo.className = `small fw-bold ${urgencyClass}`;
+            expiryInfo.textContent = days === 0 ? 'Expira hoje!' : `${days} d`;
 
             mainInfo.appendChild(name);
-            mainInfo.appendChild(expiryBadge);
+            mainInfo.appendChild(expiryInfo);
+
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar-thin mb-2';
+            const progressFill = document.createElement('div');
+            progressFill.className = 'progress-fill';
+            progressFill.style.backgroundColor = barColor;
+            // Calcula progresso: assumindo 15 dias como base
+            const percent = Math.max(0, Math.min(100, (days / 15) * 100));
+            progressFill.style.width = '0%';
+            progressBar.appendChild(progressFill);
 
             const subInfo = document.createElement('p');
-            subInfo.className = 'mb-1 text-muted small';
-            const details = [`Login: ${user.sam}`, user.title, user.department, user.location].filter(Boolean).join(' • ');
-            subInfo.textContent = details || 'Sem detalhes adicionais';
+            subInfo.className = 'mb-0 text-muted small';
+            const details = [user.sam, user.title, user.department].filter(Boolean).join(' • ');
+            subInfo.textContent = details;
 
             listItem.appendChild(mainInfo);
+            listItem.appendChild(progressBar);
             listItem.appendChild(subInfo);
             listContainer.appendChild(listItem);
+            
+            // Trigger animation
+            setTimeout(() => { progressFill.style.width = `${percent}%`; }, 100);
         });
         renderPagination();
     }
 
     function renderPagination() {
+        if (!paginationControls) return;
         paginationControls.innerHTML = '';
         const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
@@ -435,19 +679,47 @@ document.addEventListener('DOMContentLoaded', function() {
         return button;
     }
 
-    searchInput.addEventListener('input', () => {
-        const query = searchInput.value.toLowerCase();
-        filteredData = expiringPasswordsData.filter(user =>
-            user.cn.toLowerCase().includes(query) ||
-            user.sam.toLowerCase().includes(query)
-        );
-        currentPage = 1;
-        totalBadge.textContent = `Total: ${filteredData.length}`;
-        renderList();
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase();
+            filteredData = expiringPasswordsData.filter(user =>
+                user.cn.toLowerCase().includes(query) ||
+                user.sam.toLowerCase().includes(query)
+            );
+            currentPage = 1;
+            if (totalBadge) totalBadge.textContent = `Total: ${filteredData.length}`;
+            renderList();
+        });
+    }
 
     // Renderização inicial
     renderList();
+
+    // Lógica de Recolher/Expandir Widgets
+    document.querySelectorAll('.widget-toggle-btn').forEach(btn => {
+        const widget = btn.closest('.collapsible-widget');
+        const widgetId = widget.id;
+        const icon = btn.querySelector('i');
+        
+        // Carrega estado inicial
+        const isCollapsed = localStorage.getItem(`widget-collapsed-${widgetId}`) === 'true';
+        if (isCollapsed) {
+            widget.classList.add('collapsed');
+            icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+        }
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const nowCollapsed = widget.classList.toggle('collapsed');
+            localStorage.setItem(`widget-collapsed-${widgetId}`, nowCollapsed);
+            
+            if (nowCollapsed) {
+                icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
+            } else {
+                icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
+            }
+        });
+    });
 
     // A lógica do botão de confirmação do modal genérico já está em base.html
 });

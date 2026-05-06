@@ -7,11 +7,18 @@
 {% block body_content %}
 <div class="login-wrapper">
     <div class="glass-card login-card">
-        <div class="login-icon">
-            <i class="fas fa-user-shield"></i>
+        <div class="login-logo-wrapper">
+            {% if appearance.logo %}
+            <img src="{{ url_for('static', filename='uploads/' + appearance.logo) }}" alt="Logo" class="login-custom-logo">
+            {% else %}
+            <div class="login-icon animate-float">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            {% endif %}
         </div>
 
-        <h2 class="mb-4">Portal de Gestão</h2>
+        <h2 class="mb-1">Gestão AD</h2>
+        <p class="text-muted-white small mb-4">Portal de Administração de Identidades</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -26,20 +33,26 @@
         <form method="POST" action="{{ url_for('login') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
-                {{ render_field(form.username, class='form-control-lg text-center', placeholder='Usuário', label_visible=false) }}
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-user text-muted"></i></span>
+                    {{ render_field(form.username, class='form-control border-start-0 ps-0', placeholder='Usuário', label_visible=false) }}
+                </div>
             </div>
             <div class="mb-3">
-                {{ render_field(form.password, class='form-control-lg text-center', placeholder='Senha', label_visible=false) }}
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                    {{ render_field(form.password, class='form-control border-start-0 ps-0', placeholder='Senha', label_visible=false) }}
+                </div>
             </div>
             <div class="d-grid mt-4">
-                 {{ form.submit(class="btn btn-primary btn-lg") }}
+                 {{ form.submit(class="btn btn-primary btn-lg", value="Acessar Portal") }}
             </div>
         </form>
 
-        <div class="login-help mt-3">
-            <p><i class="fas fa-info-circle me-1"></i>Utilize seu login e senha de rede.</p>
+        <div class="login-help mt-4">
+            <p><i class="fas fa-info-circle me-2"></i>Utilize suas credenciais de rede padrão para acessar o portal.</p>
         </div>
-        <a href="{{ url_for('admin_login') }}" class="admin-link">Acesso do Administrador</a>
+        <a href="{{ url_for('admin_login') }}" class="admin-link">Acesso Master (Administrador)</a>
     </div>
 </div>
 {% endblock %}

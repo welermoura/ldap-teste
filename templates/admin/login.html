@@ -7,12 +7,18 @@
 {% block body_content %}
 <div class="login-wrapper">
     <div class="glass-card login-card">
-        <div class="login-icon">
-            <i class="fas fa-user-cog"></i>
+        <div class="login-logo-wrapper">
+            {% if appearance.logo %}
+            <img src="{{ url_for('static', filename='uploads/' + appearance.logo) }}" alt="Logo" class="login-custom-logo">
+            {% else %}
+            <div class="login-icon">
+                <i class="fas fa-user-cog"></i>
+            </div>
+            {% endif %}
         </div>
 
-        <h2 class="mb-4">Acesso Restrito</h2>
-        <p class="text-muted mb-3">Painel de Administração</p>
+        <h2 class="mb-1">Acesso Restrito</h2>
+        <p class="text-muted-white small mb-4">Painel de Controle do Administrador</p>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -27,13 +33,13 @@
         <form method="POST" action="{{ url_for('admin_login') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
-                {{ render_field(form.username, class='form-control-lg text-center', placeholder='Usuário Admin', label_visible=false) }}
+                {{ render_field(form.username, class='form-control text-center', placeholder='Usuário Admin', label_visible=false) }}
             </div>
             <div class="mb-3">
-                {{ render_field(form.password, class='form-control-lg text-center', placeholder='Senha', label_visible=false) }}
+                {{ render_field(form.password, class='form-control text-center', placeholder='Senha', label_visible=false) }}
             </div>
             <div class="d-grid mt-4">
-                 {{ form.submit(class="btn btn-primary btn-lg") }}
+                 {{ form.submit(class="btn btn-primary btn-lg", value="Autenticar Admin") }}
             </div>
         </form>
 

@@ -48,7 +48,7 @@ RUN chmod +x ./install.sh
 
 # Run the installation script
 # This will create the venv, install Python & Node deps, and build the frontend
-RUN ./install.sh
+RUN sed -i 's/\r$//' ./install.sh && bash ./install.sh
 
 # Expose the port the app runs on
 EXPOSE 5000

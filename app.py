@@ -21,7 +21,7 @@ import csv
 import base64
 import uuid
 from PIL import Image
-from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition
+from common import load_config, save_config, get_ldap_connection, filetime_to_datetime, is_recycle_bin_enabled, get_user_by_samaccountname, get_group_by_name, search_groups_for_user_addition, save_to_history
 
 # ==============================================================================
 # Configuração Base
@@ -57,10 +57,24 @@ DISABLE_SCHEDULE_FILE = os.path.join(data_dir, 'disable_schedules.json')
 PERMISSIONS_FILE = os.path.join(data_dir, 'permissions.json')
 KEY_FILE = os.path.join(data_dir, 'secret.key')
 CONFIG_FILE = os.path.join(data_dir, 'config.json')
+HISTORY_FILE = os.path.join(data_dir, 'history.json')
 
 # ==============================================================================
-# Funções Auxiliares de User/Schedule/Permissions (sem alteração)
+# Processador de Contexto (Branding Global)
 # ==============================================================================
+@app.context_processor
+def inject_appearance():
+    config = load_config()
+    return {
+        'appearance': {
+            'bg_color': config.get('ORGANOGRAM_BG_COLOR'),
+            'bg_image': config.get('ORGANOGRAM_BG_IMAGE'),
+            'logo': config.get('ORGANOGRAM_LOGO'),
+            'favicon': config.get('ORGANOGRAM_FAVICON'),
+            'subtitle': config.get('ORGANOGRAM_SUBTITLE', 'Portal de Administração')
+        },
+        'year': datetime.now().year
+    }
 def load_user():
     user_path = os.path.join(data_dir, 'user.json')
     try:
@@ -605,6 +619,7 @@ def create_ad_user(conn, form_data, model_attrs):
         conn.modify(user_dn, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [512])], 'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
         if 'memberOf' in model_attrs and model_attrs.memberOf: conn.extend.microsoft.add_members_to_groups(user_dn, [str(g) for g in model_attrs.memberOf])
         logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado por '{session.get('user_display_name')}'.")
+        save_to_history('creation', sam, f"Criado por {session.get('user_display_name')}")
         return {'success': True, 'message': f"Usuário '{display_name}' criado com sucesso!", 'email': email, 'initials': initials, 'display_name': display_name, 'sam_account': sam, 'password': default_password, 'ou_path': get_ou_path(model_attrs.entry_dn)}
     except Exception as e:
         logging.error(f"Erro ao criar o usuário '{display_name}': {e}")
@@ -910,7 +925,8 @@ def api_dashboard_stats():
             data['disabled_users'] = stats.get('disabled_users', 0)
 
         if check_permission(view='can_view_deactivated_last_week'):
-            data['deactivated_last_week'] = get_deactivated_last_week()
+            data['deactivated_last_week'] = get_deactivated_last_week(conn)
+            data['trends'] = get_dashboard_trends(days=30)
 
         if check_permission(view='can_view_pending_reactivations'):
             data['pending_reactivations'] = get_pending_reactivations(days=7)
@@ -1176,6 +1192,8 @@ def get_paginated_user_details(conn, search_base, sam_account_names, page, per_p
 
     return items, total_pages
 
+# Auditoria unificada no painel administrativo
+
 @app.route('/api/dashboard_list/<category>')
 @require_auth
 def api_dashboard_list(category):
@@ -1207,15 +1225,29 @@ def api_dashboard_list(category):
         if category == 'deactivated_last_week':
             seven_days_ago = datetime.now() - timedelta(days=7)
             usernames = set()
+            
+            # 1. Tenta buscar no AD primeiro (Fonte da verdade para alterações externas)
             try:
-                with open(log_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - Conta '(.+?)' foi desativada por", line)
-                        if match:
-                            log_time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S,%f')
-                            if log_time >= seven_days_ago:
-                                usernames.add(match.group(2))
-            except (FileNotFoundError, Exception) as e:
+                seven_days_ago_dt = datetime.now(timezone.utc) - timedelta(days=7)
+                ad_date_str = seven_days_ago_dt.strftime('%Y%m%d%H%M%S.0Z')
+                search_filter = f"(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=2)(whenChanged>={ad_date_str}))"
+                conn.search(search_base, search_filter, attributes=['sAMAccountName'])
+                for entry in conn.entries:
+                    usernames.add(entry.sAMAccountName.value)
+            except Exception as e:
+                logging.error(f"Erro ao buscar desativados via AD para lista: {e}")
+
+            # 2. Tenta buscar no Log (Fallback para histórico)
+            try:
+                if os.path.exists(log_path):
+                    with open(log_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - .*Conta .*'(.+?)'.*desativada", line)
+                            if match:
+                                log_time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S,%f')
+                                if log_time >= seven_days_ago:
+                                    usernames.add(match.group(2))
+            except Exception as e:
                 logging.error(f"Erro ao processar log para API de desativados: {e}")
 
             sorted_usernames = sorted(list(usernames))
@@ -1804,6 +1836,9 @@ def api_delete_object():
             raise Exception(f"Erro do LDAP: {conn.result['message']}")
 
         logging.info(f"[EXCLUSÃO] Objeto '{name or dn}' foi EXCLUÍDO por '{session.get('user_display_name')}'.")
+        # Registra no histórico se parecer um usuário (contém CN)
+        if 'CN=' in dn:
+            save_to_history('exclusion', name or dn, f"Objeto excluído por {session.get('user_display_name')}")
         return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
 
     except Exception as e:
@@ -1880,6 +1915,7 @@ def api_schedule_absence(username):
                 if conn.result['description'] != 'success':
                     raise Exception(f"Erro do LDAP ao desativar: {conn.result['message']}")
                 logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada IMEDIATAMENTE (agendamento de ausência) por '{session.get('user_display_name')}'.")
+                save_to_history('deactivation', username, f"Desativado imediatamente via agendamento de ausência por {session.get('user_display_name')}")
                 message = "Usuário desativado imediatamente. "
             else:
                 message = "Usuário já estava desativado. "
@@ -2648,6 +2684,8 @@ def toggle_status(username):
                 save_schedules(schedules)
 
         logging.info(f"[ALTERAÇÃO] Conta '{username}' foi {action_message} por '{session.get('user_display_name', session.get('ad_user'))}'.")
+        # Registra no histórico para as métricas
+        save_to_history('deactivation' if action_message == 'desativada' else 'activation', username, f"Ação manual: {action_message} por {session.get('user_display_name')}")
         flash(f"Conta do usuário foi {action_message} com sucesso.", "success")
     except Exception as e:
         flash(f"Erro ao alterar status da conta: {e}", "error")
@@ -2750,6 +2788,7 @@ def delete_user(username):
                 if conn.result['description'] == 'success':
                     flash(f"Usuário '{username}' foi excluído permanentemente com sucesso.", "success")
                     logging.info(f"[EXCLUSÃO] Usuário '{username}' foi EXCLUÍDO por '{session.get('user_display_name', session.get('ad_user'))}'.")
+                    save_to_history('exclusion', username, f"Usuário excluído por {session.get('user_display_name')}")
                     return redirect(url_for('manage_users'))
                 else:
                     flash(f"Falha ao excluir usuário no Active Directory: {conn.result['message']}", "error")
@@ -3361,23 +3400,87 @@ def get_dashboard_stats(conn):
         logging.error(f"Erro ao buscar estatísticas do dashboard: {e}", exc_info=True)
     return stats
 
-def get_deactivated_last_week():
-    """Conta usuários desativados na última semana a partir do log."""
+def get_deactivated_last_week(conn=None):
+    """Conta usuários desativados na última semana (via AD whenChanged ou log)."""
     count = 0
-    seven_days_ago = datetime.now() - timedelta(days=7)
+    seven_days_ago_dt = datetime.now(timezone.utc) - timedelta(days=7)
+    
+    # Tentativa 1: Via AD (Mais confiável para alterações externas)
+    if conn:
+        try:
+            config = load_config()
+            search_base = config.get('AD_SEARCH_BASE')
+            if search_base:
+                # Filtro: Usuário, Pessoa, Desativado (UAC bit 2), Modificado nos últimos 7 dias
+                ad_date_str = seven_days_ago_dt.strftime('%Y%m%d%H%M%S.0Z')
+                search_filter = f"(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=2)(whenChanged>={ad_date_str}))"
+                conn.search(search_base, search_filter, attributes=['cn'])
+                count = len(conn.entries)
+                if count > 0:
+                    return count
+        except Exception as e:
+            logging.error(f"Erro ao buscar desativações da semana via AD: {e}")
+
+    # Tentativa 2: Via Histórico (Mais confiável para ações do sistema)
     try:
-        with open(log_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - Conta '(.+?)' foi desativada por", line)
-                if match:
-                    log_time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S,%f')
-                    if log_time >= seven_days_ago:
-                        count += 1
-    except FileNotFoundError:
-        logging.warning("Arquivo de log não encontrado ao verificar desativações da última semana.")
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+                history_count = 0
+                for entry in history:
+                    if entry.get('action') == 'deactivation':
+                        # Formato ISO: 2026-05-06T10:00:00
+                        ts = entry['timestamp']
+                        try:
+                            log_time = datetime.fromisoformat(ts).replace(tzinfo=None)
+                            if log_time >= (datetime.now() - timedelta(days=7)):
+                                history_count += 1
+                        except: continue
+                count = max(count, history_count)
     except Exception as e:
-        logging.error(f"Erro ao ler log para desativações da última semana: {e}", exc_info=True)
+        logging.error(f"Erro ao ler histórico para desativações da semana: {e}")
+
+    # Tentativa 3: Via Log (Fallback legado)
+    try:
+        if os.path.exists(log_path):
+            with open(log_path, 'r', encoding='utf-8') as f:
+                log_count = 0
+                for line in f:
+                    match = re.search(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - INFO - .*Conta .*'(.+?)'.*desativada", line)
+                    if match:
+                        log_time = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S,%f')
+                        if log_time >= (datetime.now() - timedelta(days=7)):
+                            log_count += 1
+                return max(count, log_count)
+    except Exception as e:
+        logging.error(f"Erro ao ler log para desativações da última semana: {e}")
+    
     return count
+
+def get_dashboard_trends(days=30):
+    """Gera dados de tendência de desativação a partir do histórico para os últimos X dias."""
+    trends = {}
+    today = datetime.now().date()
+    
+    # Inicializa os dias com zero
+    for i in range(days):
+        day = (today - timedelta(days=i)).isoformat()
+        trends[day] = 0
+
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+                for entry in history:
+                    if entry.get('action') == 'deactivation':
+                        log_day = entry['timestamp'][:10]
+                        if log_day in trends:
+                            trends[log_day] += 1
+    except Exception as e:
+        logging.error(f"Erro ao gerar tendências do dashboard a partir do histórico: {e}")
+    
+    # Retorna lista ordenada por data
+    return [{'date': d, 'count': c} for d, c in sorted(trends.items())]
 
 def get_pending_reactivations(days=7):
     schedules = load_schedules()
@@ -3444,31 +3547,65 @@ def get_expiring_passwords(conn, days=15):
 # ==============================================================================
 # Rota de Exportação de Dados
 # ==============================================================================
-@app.route('/export_ad_data')
+@app.route('/export_ad_data', methods=['GET', 'POST'])
 @require_auth
 @require_permission(view='can_export_data')
 def export_ad_data():
+    available_attributes = {
+        'description': 'Descrição',
+        'mail': 'Email',
+        'givenName': 'Nome',
+        'sn': 'Sobrenome',
+        'title': 'Cargo',
+        'company': 'Empresa',
+        'physicalDeliveryOfficeName': 'Escritório',
+        'department': 'Departamento',
+        'sAMAccountName': 'Login (Pre-2k)',
+        'userPrincipalName': 'Login (UPN)',
+        'displayName': 'Nome para Exibição',
+        'whenCreated': 'Data de Criação',
+        'whenChanged': 'Última Alteração'
+    }
+
+    if request.method == 'GET':
+        try:
+            conn = get_read_connection()
+            config = load_config()
+            default_search_base = config.get('AD_SEARCH_BASE')
+            
+            # Busca OUs principais para o seletor (limita a 100 por performance)
+            conn.search(default_search_base, '(objectClass=organizationalUnit)', search_scope=SUBTREE, attributes=['name'])
+            ous = [{'name': entry.name.value, 'dn': entry.entry_dn} for entry in conn.entries[:100]]
+            
+            return render_template('export_setup.html', 
+                                 available_attributes=available_attributes,
+                                 default_search_base=default_search_base,
+                                 ous=ous)
+        except Exception as e:
+            logging.error(f"Erro ao carregar setup de exportação: {e}")
+            flash("Erro ao carregar configurações de exportação.", "error")
+            return redirect(url_for('dashboard'))
+
+    # Processamento do POST (Download)
     try:
         conn = get_service_account_connection()
         config = load_config()
-        search_base = config.get('AD_SEARCH_BASE')
-        if not search_base:
-            flash("Base de busca do AD não configurada.", "error")
-            return redirect(url_for('dashboard'))
+        
+        selected_search_base = request.form.get('search_base', config.get('AD_SEARCH_BASE'))
+        selected_attrs = request.form.getlist('attributes')
+        only_active = request.form.get('only_active') == 'on'
 
-        # Filtro para exportar apenas usuários reais com sAMAccountName definido
+        if not selected_attrs:
+            flash("Selecione pelo menos um campo para exportar.", "error")
+            return redirect(url_for('export_ad_data'))
+
+        # Filtro base
         search_filter = "(&(objectClass=user)(objectCategory=person)(sAMAccountName=*))"
+        if only_active:
+            search_filter = "(&(objectClass=user)(objectCategory=person)(sAMAccountName=*)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
 
-        # Cabeçalhos e atributos conforme solicitado pelo usuário
-        header = [
-            'Descrição', 'Email', 'Nome', 'Cargo', 'Sobrenome', 'Empresa', 'Escritório',
-            'Departamento', 'Nome de Logon Anterior ao Windows 2000', 'Nome de Logon do Usuário',
-            'Nome para Exibição'
-        ]
-        attributes = [
-            'description', 'mail', 'givenName', 'title', 'sn', 'company', 'physicalDeliveryOfficeName',
-            'department', 'sAMAccountName', 'userPrincipalName', 'displayName'
-        ]
+        # Cabeçalhos baseados na seleção
+        header = [available_attributes[attr] for attr in selected_attrs]
 
         output = io.StringIO()
         output.write('\ufeff')  # BOM para Excel UTF-8
@@ -3476,52 +3613,35 @@ def export_ad_data():
         writer.writerow(header)
 
         entry_generator = conn.extend.standard.paged_search(
-            search_base=search_base,
+            search_base=selected_search_base,
             search_filter=search_filter,
-            attributes=attributes,
+            attributes=selected_attrs,
             paged_size=500,
             generator=True
         )
 
         for entry in entry_generator:
             attrs = entry.get('attributes', {})
-            # Pula entradas que não são de usuários (sem sAMAccountName)
-            if not attrs.get('sAMAccountName'):
-                continue
+            if not attrs.get('sAMAccountName'): continue
 
-            # Função auxiliar para obter valor com fallback seguro
-            def safe_get(attr_name, default=''):
-                val = attrs.get(attr_name)
-                return str(val) if val is not None else default
-
-            # Construção da linha na ordem correta
-            row = [
-                safe_get('description'),
-                safe_get('mail'),
-                safe_get('givenName'),
-                safe_get('title'),
-                safe_get('sn'),
-                safe_get('company'),
-                safe_get('physicalDeliveryOfficeName'),
-                safe_get('department'),
-                safe_get('sAMAccountName'),
-                safe_get('userPrincipalName'),
-                safe_get('displayName')
-            ]
-
+            row = []
+            for attr in selected_attrs:
+                val = attrs.get(attr)
+                row.append(str(val) if val is not None else '')
+            
             writer.writerow(row)
 
         output.seek(0)
         return Response(
             output.getvalue(),
             mimetype="text/csv; charset=utf-8-sig",
-            headers={"Content-Disposition": "attachment;filename=export_ad_data.csv"}
+            headers={"Content-Disposition": "attachment;filename=export_ad_custom.csv"}
         )
 
     except Exception as e:
-        logging.error(f"Erro na exportação de dados: {e}", exc_info=True)
+        logging.error(f"Erro na exportação customizada: {e}", exc_info=True)
         flash("Erro ao gerar exportação. Verifique os logs.", "error")
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('export_ad_data'))
 
 @app.route('/export_group_members/<group_name>')
 @require_auth

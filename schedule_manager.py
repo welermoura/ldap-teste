@@ -1,14 +1,36 @@
-#!/usr/bin/env python3
-import os
-import json
-from datetime import date
-import logging
-import ldap3
-from ldap3 import MODIFY_REPLACE
-from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, DISABLE_SCHEDULE_FILE, GROUP_SCHEDULE_FILE
+from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, DISABLE_SCHEDULE_FILE, GROUP_SCHEDULE_FILE, HISTORY_FILE
 
 # ==============================================================================
-# Configuração Base
+# Funções de Histórico
+# ==============================================================================
+def save_to_history(action, user_sam, details=""):
+    """Salva uma ação executada no arquivo de histórico."""
+    try:
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        
+        from datetime import datetime
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'action': action,
+            'user_sam': user_sam,
+            'details': details
+        }
+        history.append(entry)
+        
+        # Mantém apenas os últimos 1000 registros para não crescer indefinidamente
+        if len(history) > 1000:
+            history = history[-1000:]
+            
+        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
+            json.dump(history, f, indent=4)
+    except Exception as e:
+        logging.error(f"Erro ao salvar histórico: {e}")
+
+# ==============================================================================
+# Lógica Principal do Script
 # ==============================================================================
 basedir = os.path.abspath(os.path.dirname(__file__))
 logs_dir = os.path.join(basedir, 'logs')
@@ -48,6 +70,7 @@ def process_user_deactivations(conn, search_base):
                     conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
                     if conn.result['description'] == 'success':
                         logging.info(f"Usuário '{username}' desativado com sucesso.")
+                        save_to_history('deactivation', username, f"Desativação agendada para {deactivation_date} executada.")
                     else:
                         logging.error(f"Falha ao desativar '{username}': {conn.result['message']}. Mantendo agendamento.")
                         schedules_to_keep[username] = deactivation_date
