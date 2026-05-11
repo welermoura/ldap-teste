@@ -297,6 +297,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 wrapper.appendChild(leftColumn);
 
+                if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
+                    const rightColumn = document.createElement('div');
+                    rightColumn.className = 'd-flex flex-column align-items-end';
+
+                    const dateBadge = document.createElement('span');
+                    dateBadge.className = 'badge bg-dark';
+                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
+                    rightColumn.appendChild(dateBadge);
+
                     wrapper.appendChild(rightColumn);
                 }
 
