@@ -477,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const name = this.dataset.subordinateName;
             setupConfirmationModal('Remover Subordinado', `Remover ${name} (${sam}) da lista de supervisionados?`, async () => {
                 try {
-                    const response = await fetch(`/users/api/remove_subordinate/${username}`, {
+                    const response = await fetch(`/api/remove_subordinate/${username}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                         body: JSON.stringify({ subordinate_sam: sam })
