@@ -302,14 +302,14 @@ def api_add_user_to_group_temp():
             return jsonify({'error': 'Usuário ou grupo não encontrado.'}), 404
         schedules = load_group_schedules()
         schedule_id = str(uuid.uuid4())
-        add_schedule = {'id': schedule_id, 'user_sam': username, 'group_name': group_name, 'action': 'add', 'execution_date': start_date.isoformat()}
+        add_schedule = {'id': schedule_id, 'user_sam': username.lower(), 'group_name': group_name, 'action': 'add', 'execution_date': start_date.isoformat()}
         schedules.append(add_schedule)
         if start_date <= today:
             conn.extend.microsoft.add_members_to_groups([user_to_add.distinguishedName.value], group_to_modify.distinguishedName.value)
             if conn.result['description'] != 'success':
                 schedules.pop()
                 raise Exception(f"Falha do LDAP: {conn.result['message']}")
-        remove_schedule = {'id': schedule_id, 'user_sam': username, 'group_name': group_name, 'action': 'remove', 'execution_date': end_date.isoformat()}
+        remove_schedule = {'id': schedule_id, 'user_sam': username.lower(), 'group_name': group_name, 'action': 'remove', 'execution_date': end_date.isoformat()}
         schedules.append(remove_schedule)
         save_group_schedules(schedules)
         return jsonify({'success': True, 'message': 'Agendamento realizado com sucesso.'})
@@ -326,7 +326,7 @@ def api_remove_group_schedule():
     remove_now = data.get('remove_now', False)
     try:
         schedules = load_group_schedules()
-        new_schedules = [s for s in schedules if not (s['user_sam'] == user_sam and s['group_name'] == group_name)]
+        new_schedules = [s for s in schedules if not (s['user_sam'].lower() == user_sam.lower() and s['group_name'] == group_name)]
         if len(new_schedules) == len(schedules):
             return jsonify({'error': 'Agendamento não encontrado.'}), 404
         save_group_schedules(new_schedules)

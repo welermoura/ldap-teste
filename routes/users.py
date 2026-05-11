@@ -208,14 +208,15 @@ def view_user(username):
             elif int(expiry_time_ft) == 9223372036854775807 or int(expiry_time_ft) == 0:
                  password_expiry_info = "A senha está configurada para nunca expirar."
 
-        disable_schedules = load_disable_schedules()
-        reactivation_schedules = load_schedules()
-        absence_scheduled = username in disable_schedules and username in reactivation_schedules
+        disable_schedules = {k.lower(): v for k, v in load_disable_schedules().items()}
+        reactivation_schedules = {k.lower(): v for k, v in load_schedules().items()}
+        username_lower = username.lower()
+        absence_scheduled = username_lower in disable_schedules and username_lower in reactivation_schedules
         absence_info = None
         if absence_scheduled:
             try:
-                deactivation_date = datetime.strptime(disable_schedules[username], '%Y-%m-%d').strftime('%d/%m/%Y')
-                reactivation_date = datetime.strptime(reactivation_schedules[username], '%Y-%m-%d').strftime('%d/%m/%Y')
+                deactivation_date = datetime.strptime(disable_schedules[username_lower], '%Y-%m-%d').strftime('%d/%m/%Y')
+                reactivation_date = datetime.strptime(reactivation_schedules[username_lower], '%Y-%m-%d').strftime('%d/%m/%Y')
                 absence_info = {
                     'deactivation': deactivation_date,
                     'reactivation': reactivation_date
@@ -584,7 +585,7 @@ def api_disable_user_temp(username):
             conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac + 2)])]})
         schedules = load_schedules()
         reactivation_date = (date.today() + timedelta(days=days))
-        schedules[username] = reactivation_date.isoformat()
+        schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(schedules)
         logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
         return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
@@ -623,12 +624,12 @@ def api_schedule_absence(username):
                 message = "Usuário já estava desativado. "
         else:
             disable_schedules = load_disable_schedules()
-            disable_schedules[username] = deactivation_date.isoformat()
+            disable_schedules[username.lower()] = deactivation_date.isoformat()
             save_disable_schedules(disable_schedules)
             logging.info(f"[AGENDAMENTO] Desativação de '{username}' agendada para {deactivation_date_str} por '{session.get('user_display_name')}'.")
             message = f"Desativação agendada para {deactivation_date.strftime('%d/%m/%Y')}. "
         reactivation_schedules = load_schedules()
-        reactivation_schedules[username] = reactivation_date.isoformat()
+        reactivation_schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
         logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
         message += f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."
