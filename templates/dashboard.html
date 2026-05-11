@@ -297,8 +297,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 wrapper.appendChild(leftColumn);
 
-                // Adiciona info de data se for desativação agendada
-                if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
+                // Adiciona info de data se for desativação ou reativação agendada
+                if (['pending_deactivations', 'pending_reactivations'].includes(modalCurrentCategory) && item.sam) {
                     const rightCol = document.createElement('div');
                     rightCol.className = 'd-flex flex-column align-items-end';
 
