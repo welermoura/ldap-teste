@@ -215,6 +215,33 @@
     </div>
   </div>
 </div>
+
+<!-- Modal para Agendar Reativação (Dashboard) -->
+<div class="modal fade" id="scheduleReactivationModal" tabindex="-1" aria-labelledby="scheduleReactivationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="scheduleReactivationModalLabel">Reativar Conta</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="scheduleReactivationForm">
+        <input type="hidden" id="reactivation_username" name="username">
+        <div class="modal-body">
+          <p>Reativando conta de <strong id="reactivation_display_name"></strong>.</p>
+          <p>Selecione a data em que a conta deve ser reativada. Deixe a data de hoje para reativar imediatamente.</p>
+          <div class="mb-3">
+            <label for="reactivation_date_only" class="form-label">Data de Reativação</label>
+            <input type="date" class="form-control" id="reactivation_date_only" name="reactivation_date" required value="{{ today_date }}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar Reativação</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -270,16 +297,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 wrapper.appendChild(leftColumn);
 
-                if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
-                    const rightColumn = document.createElement('div');
-                    rightColumn.className = 'd-flex flex-column align-items-end';
-
-                    const dateBadge = document.createElement('span');
-                    dateBadge.className = 'badge bg-dark';
-                    dateBadge.textContent = `Data: ${item.scheduled_date}`;
-                    rightColumn.appendChild(dateBadge);
-
                     wrapper.appendChild(rightColumn);
+                }
+
+                // Adiciona botão de Reativar se for a categoria de desativados
+                if (['disabled_users', 'deactivated_last_week'].includes(modalCurrentCategory)) {
+                    const actionColumn = document.createElement('div');
+                    actionColumn.className = 'ms-3';
+                    
+                    const reactivateBtn = document.createElement('button');
+                    reactivateBtn.className = 'btn btn-sm btn-success dashboard-reactivate-btn';
+                    reactivateBtn.innerHTML = '<i class="fas fa-check-circle me-1"></i>Ativar';
+                    reactivateBtn.dataset.sam = item.sam;
+                    reactivateBtn.dataset.name = item.cn || item.sam;
+                    
+                    actionColumn.appendChild(reactivateBtn);
+                    wrapper.appendChild(actionColumn);
                 }
 
                 modalContent.appendChild(wrapper);
@@ -720,6 +753,55 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Lógica para Reativação no Dashboard
+    const scheduleReactivationModalEl = document.getElementById('scheduleReactivationModal');
+    const scheduleReactivationModal = new bootstrap.Modal(scheduleReactivationModalEl);
+    const scheduleReactivationForm = document.getElementById('scheduleReactivationForm');
+    const reactivationUsernameInput = document.getElementById('reactivation_username');
+    const reactivationDisplayNameText = document.getElementById('reactivation_display_name');
+    const reactivationDateInput = document.getElementById('reactivation_date_only');
+
+    // Event listener para os botões da lista (delegação de eventos)
+    if (modalContent) {
+        modalContent.addEventListener('click', function(e) {
+            const btn = e.target.closest('.dashboard-reactivate-btn');
+            if (btn) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                reactivationUsernameInput.value = btn.dataset.sam;
+                reactivationDisplayNameText.textContent = btn.dataset.name;
+                scheduleReactivationModal.show();
+            }
+        });
+    }
+
+    if (scheduleReactivationForm) {
+        scheduleReactivationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = reactivationUsernameInput.value;
+            const reactivationDate = reactivationDateInput.value;
+            const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+            
+            try {
+                const response = await fetch(`/api/schedule_reactivation/${username}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ reactivation_date: reactivationDate })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast(result.message, 'success');
+                scheduleReactivationModal.hide();
+                // Opcional: recarregar as estatísticas ou o modal
+                fetchDashboardStats();
+            } catch (error) {
+                showToast(`Falha ao agendar reativação: ${error.message}`, 'error');
+            }
+        });
+    }
 
     // A lógica do botão de confirmação do modal genérico já está em base.html
 });

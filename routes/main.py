@@ -21,8 +21,10 @@ def index():
 @require_auth
 def dashboard():
     from flask_wtf import FlaskForm
+    from datetime import date
     form = FlaskForm()
-    return render_template('dashboard.html', form=form)
+    today_date = date.today().isoformat()
+    return render_template('dashboard.html', form=form, today_date=today_date)
 
 @main_bp.route('/profile')
 @require_auth
