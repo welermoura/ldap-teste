@@ -11,6 +11,7 @@
 
 
 {% block content %}
+{% set status = get_user_status(user) %}
 <div class="row">
     <div class="col-lg-4 mb-4">
 
@@ -47,7 +48,6 @@
                 <h5 class="mb-0">Status da Conta</h5>
             </div>
             <div class="card-body">
-                {% set status = get_user_status(user) %}
                 <p><strong>Status:</strong> <span class="badge rounded-pill bg-{{ 'success' if status == 'Ativo' else 'danger' }} fs-6">{{ status }}</span></p>
                 
                 {% if pending_deactivation_date %}
