@@ -579,13 +579,16 @@ document.addEventListener('DOMContentLoaded', function() {
         showLoading(memberOfContainer, 'Carregando grupos...');
         try {
             const response = await fetch(`/api/user_groups/${username}`);
-            if (!response.ok) throw new Error('Falha ao buscar os grupos do usuário.');
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || 'Falha ao buscar os grupos do usuário.');
+            }
             allUserGroups = await response.json();
             renderGroups(allUserGroups);
             tabLoaded = true;
         } catch (error) {
-            showError(memberOfContainer, 'Não foi possível carregar os grupos.');
-            console.error('Erro:', error);
+            showError(memberOfContainer, `Erro: ${error.message}`);
+            console.error('Erro ao carregar grupos:', error);
         }
     }
 

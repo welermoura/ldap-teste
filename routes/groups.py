@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, flash, redirect, url_for,
 from routes.utils import (
     require_auth, get_attr_value, check_permission,
     require_permission, require_api_permission,
-    get_user_by_dn
+    get_user_by_dn, get_read_connection
 )
 from common import (
     load_config, get_user_by_samaccountname, get_group_by_name,
