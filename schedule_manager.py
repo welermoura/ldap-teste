@@ -1,15 +1,17 @@
 import os
 import json
 import logging
+import ldap3
 from datetime import date
 from common import (
     load_config, get_ldap_connection, get_user_by_samaccountname, 
     get_group_by_name, load_disable_schedules, save_disable_schedules,
-    load_group_schedules, save_group_schedules, save_to_history
+    load_group_schedules, save_group_schedules, save_to_history,
+    load_schedules, save_schedules
 )
 
 # ==============================================================================
-# Lógica Principal do Script
+# Configuração de Logs
 # ==============================================================================
 basedir = os.path.abspath(os.path.dirname(__file__))
 logs_dir = os.path.join(basedir, 'logs')
@@ -24,8 +26,9 @@ logging.basicConfig(
 )
 
 # ==============================================================================
-# Lógica Principal do Script
+# Lógica de Processamento
 # ==============================================================================
+
 def process_user_deactivations(conn, search_base):
     """Processa a desativação agendada de contas de usuário."""
     logging.info("Iniciando verificação de desativações de usuários.")
@@ -83,6 +86,7 @@ def process_user_reactivations(conn, search_base):
                     conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
                     if conn.result['description'] == 'success':
                         logging.info(f"Usuário '{username}' reativado com sucesso.")
+                        save_to_history('reactivation', username, f"Reativação agendada para {reactivation_date} executada.")
                     else:
                         logging.error(f"Falha ao reativar '{username}': {conn.result['message']}. Mantendo agendamento.")
                         schedules_to_keep[username] = reactivation_date
@@ -107,7 +111,6 @@ def process_group_membership_changes(conn, search_base):
     today = date.today().isoformat()
     remaining_schedules = []
     for schedule in schedules:
-        # Adaptação para o novo formato de agendamento
         execution_date = schedule.get('execution_date') or schedule.get('revert_date')
         action = schedule.get('action') or schedule.get('revert_action')
 
@@ -134,6 +137,7 @@ def process_group_membership_changes(conn, search_base):
 
                 if conn.result['description'] == 'success':
                     logging.info(f"Sucesso ao executar a ação '{action}' para '{user_sam}' no grupo '{group_name}'.")
+                    save_to_history('group_change', user_sam, f"Ação '{action}' no grupo '{group_name}' executada (agendado).")
                 else:
                     logging.error(f"Falha na ação '{action}' para '{user_sam}': {conn.result['message']}. Mantendo agendamento.")
                     remaining_schedules.append(schedule)
@@ -151,24 +155,23 @@ def process_group_membership_changes(conn, search_base):
 if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando Gerenciador de Agendamentos do AD.")
-    config = load_config()
-    conn = get_ldap_connection()
+    try:
+        config = load_config()
+        conn = get_ldap_connection()
 
-    if conn:
-        search_base = config.get('AD_SEARCH_BASE')
-        if search_base:
-            try:
+        if conn:
+            search_base = config.get('AD_SEARCH_BASE')
+            if search_base:
                 process_user_deactivations(conn, search_base)
                 process_user_reactivations(conn, search_base)
                 process_group_membership_changes(conn, search_base)
-            except Exception as e:
-                logging.critical(f"Erro inesperado durante o processamento de agendamentos: {e}", exc_info=True)
-            finally:
-                conn.unbind()
-                logging.info("Conexão com o AD encerrada.")
+            else:
+                logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
+            conn.unbind()
         else:
-            logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
-    else:
-        logging.error("Não foi possível conectar ao AD. As operações de AD foram puladas.")
+            logging.error("Não foi possível conectar ao AD.")
+    except Exception as e:
+        logging.critical(f"Erro inesperado durante o processamento: {e}", exc_info=True)
+    
     logging.info("Gerenciador de Agendamentos do AD finalizado.")
     logging.info("=============================================\n")
