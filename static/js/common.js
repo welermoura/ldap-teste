@@ -73,7 +73,7 @@ async function handleCancelAbsence(username, csrfToken, callback) {
         `Tem certeza que deseja cancelar o agendamento de ausência para ${username}? A conta será reativada imediatamente se o período de ausência já tiver começado.`,
         async () => {
             try {
-                const response = await fetch(`/users/api/cancel_absence/${username}`, {
+                const response = await fetch(`/api/cancel_absence/${username}`, {
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
                 });
