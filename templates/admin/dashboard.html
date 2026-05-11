@@ -5,7 +5,7 @@
 {% block page_title %}
 <div class="page-header">
     <h1><i class="fas fa-cogs me-2"></i>Painel de Administração</h1>
-    <a href="{{ url_for('admin_logout') }}" class="btn btn-outline-secondary">
+    <a href="{{ url_for('admin.admin_logout') }}" class="btn btn-outline-secondary">
         <i class="fas fa-sign-out-alt me-2"></i>Sair do Admin ({{ session.get('master_admin') }})
     </a>
 </div>
@@ -14,7 +14,7 @@
 {% block content %}
 <div class="row">
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('config') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('admin.admin_config') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
                 <i class="fas fa-server fa-3x mb-3"></i>
                 <h5 class="card-title">Configurações Gerais</h5>
@@ -23,7 +23,7 @@
         </a>
     </div>
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('permissions') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('admin.admin_permissions') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
                 <i class="fas fa-user-shield fa-3x mb-3"></i>
                 <h5 class="card-title">Permissões de Grupo</h5>
@@ -32,16 +32,25 @@
         </a>
     </div>
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('admin_logs') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('admin.admin_logs') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-clipboard-list fa-3x mb-3"></i>
-                <h5 class="card-title">Visualizar Logs</h5>
-                <p class="card-text text-muted">Ver os logs de atividade da aplicação para auditoria.</p>
+                <i class="fas fa-terminal fa-3x mb-3"></i>
+                <h5 class="card-title">Logs do Sistema</h5>
+                <p class="card-text text-muted">Acompanhe os logs técnicos do servidor em tempo real.</p>
             </div>
         </a>
     </div>
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('admin_change_password') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('admin.admin_history') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+            <div class="card-body text-center">
+                <i class="fas fa-history fa-3x mb-3"></i>
+                <h5 class="card-title">Histórico de Ações</h5>
+                <p class="card-text text-muted">Histórico simplificado de criações e alterações de usuários.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 mb-4">
+        <a href="{{ url_for('admin.admin_change_password') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
                 <i class="fas fa-key fa-3x mb-3"></i>
                 <h5 class="card-title">Alterar Senha do Admin</h5>
@@ -50,7 +59,7 @@
         </a>
     </div>
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('manage_schedules') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('groups.manage_schedules') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
                 <i class="fas fa-calendar-alt fa-3x mb-3"></i>
                 <h5 class="card-title">Gerenciar Agendamentos</h5>
@@ -59,11 +68,20 @@
         </a>
     </div>
     <div class="col-md-6 mb-4">
-        <a href="{{ url_for('appearance') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+        <a href="{{ url_for('admin.admin_appearance') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
                 <i class="fas fa-paint-brush fa-3x mb-3"></i>
                 <h5 class="card-title">Aparência Organograma</h5>
                 <p class="card-text text-muted">Personalize cores, logo e imagem de fundo do organograma público.</p>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 mb-4">
+        <a href="{{ url_for('admin.admin_users') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+            <div class="card-body text-center">
+                <i class="fas fa-users-cog fa-3x mb-3"></i>
+                <h5 class="card-title">Administradores Locais</h5>
+                <p class="card-text text-muted">Gerencie quem pode acessar este painel de administração.</p>
             </div>
         </a>
     </div>

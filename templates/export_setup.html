@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Configurar Exportação - Gestão AD{% endblock %}
+
+{% from "_macros.html" import render_page_header %}
+
+{% block page_title %}
+    {{ render_page_header('<i class="fas fa-file-export me-2"></i>Exportação Customizada') }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <form method="POST" action="{{ url_for('users.export_ad_data') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
+            <div class="card glass-card mb-4 animate-in">
+                <div class="card-header border-0 bg-transparent py-3">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2 text-primary"></i>1. Filtros de Seleção</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Unidade Organizacional (Base de Busca)</label>
+                        <select name="search_base" class="form-select">
+                            <option value="{{ default_search_base }}">{{ default_search_base }} (Padrão)</option>
+                            {% for ou in ous %}
+                            <option value="{{ ou.dn }}">{{ ou.name }} ({{ ou.dn }})</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Selecione uma OU específica se desejar limitar a exportação.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card glass-card mb-4 animate-in" style="animation-delay: 0.1s;">
+                <div class="card-header border-0 bg-transparent py-3">
+                    <h5 class="mb-0"><i class="fas fa-list-check me-2 text-primary"></i>2. Campos para Exportar</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">Selecione as colunas que deseja incluir no arquivo CSV.</p>
+                    <div class="row g-3">
+                        {% for attr, label in available_attributes.items() %}
+                        <div class="col-md-4">
+                            <div class="form-check custom-checkbox">
+                                <input class="form-check-input" type="checkbox" name="attributes" value="{{ attr }}" id="attr_{{ attr }}" checked>
+                                <label class="form-check-label" for="attr_{{ attr }}">
+                                    {{ label }}
+                                </label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card glass-card mb-4 animate-in" style="animation-delay: 0.2s;">
+                <div class="card-header border-0 bg-transparent py-3">
+                    <h5 class="mb-0"><i class="fas fa-file-csv me-2 text-primary"></i>3. Opções de Formato</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Formato do Arquivo</label>
+                        <select name="export_format" class="form-select">
+                            <option value="csv">CSV (Compatível com todos)</option>
+                            <option value="xlsx">Excel (.xlsx)</option>
+                        </select>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="onlyActive" name="only_active" checked>
+                        <label class="form-check-label" for="onlyActive">Exportar apenas usuários ativos</label>
+                    </div>
+                    <div class="form-text">Usuários desativados no AD serão excluídos se marcado.</div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 animate-in" style="animation-delay: 0.3s;">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-download me-2"></i> Gerar e Baixar CSV
+                </button>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-link text-muted">Cancelar e Voltar</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .custom-checkbox .form-check-input:checked {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+</style>
+{% endblock %}

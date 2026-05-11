@@ -13,6 +13,8 @@ pycparser==2.23
 Werkzeug==3.1.3
 Pillow>=10.0.0
 WTForms==3.2.1
+Flask-Limiter>=2.0.0
+openpyxl==3.1.5
 
 # Para habilitar o Single Sign-On (SSO) com Kerberos, descomente a linha abaixo.
 # Nota: Requer a instalação de bibliotecas de desenvolvimento Kerberos no sistema

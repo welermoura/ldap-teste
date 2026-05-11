@@ -7,15 +7,15 @@
 <div class="page-header">
     <h1><i class="fas fa-cogs me-2"></i>Configurações do Sistema</h1>
     <div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-home me-2"></i>Home</a>
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar ao Painel</a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary"><i class="fas fa-home me-2"></i>Home</a>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar ao Painel</a>
     </div>
 </div>
 {% endblock %}
 
 {% block content %}
 <div class="card glass-card">
-    <form method="POST" action="{{ url_for('config') }}">
+    <form method="POST" action="{{ url_for('admin.admin_config') }}">
         {{ form.hidden_tag() }}
         <div class="card-body">
             <p class="card-text mb-4">Preencha as informações abaixo para que a aplicação possa conectar e interagir com seu Active Directory.</p>
@@ -32,7 +32,10 @@
                 </div>
                 <div class="mb-3">
                     {{ render_field(form.ad_search_base, placeholder="ex: OU=Usuarios,DC=dominio,DC=local") }}
-                    <div class="form-text text-muted">O sufixo UPN para novos usuários (ex: @dominio.local) será derivado deste campo.</div>
+                </div>
+                <div class="mb-3">
+                    {{ render_field(form.upn_suffixes, placeholder="ex: @dominio.com.br, @empresa.com") }}
+                    <div class="form-text text-muted">Defina os domínios disponíveis para novos usuários. O primeiro será o padrão.</div>
                 </div>
                 <div class="form-check form-switch mb-3">
                     {{ form.use_ldaps(class="form-check-input") }}

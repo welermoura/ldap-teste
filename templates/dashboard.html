@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         pageData.forEach(user => {
             const listItem = document.createElement('a');
-            listItem.href = `/view_user/${user.sam}`;
+            listItem.href = `/users/view_user/${user.sam}`;
             listItem.className = 'list-group-item list-group-item-action flex-column align-items-start border-0 px-3 mb-2 rounded-4 glass-list-item';
 
             const mainInfo = document.createElement('div');

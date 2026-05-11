@@ -45,34 +45,34 @@
         </div>
         <nav class="sidebar-nav">
             <div class="sidebar-section-label">Principal</div>
-            <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+            <a href="{{ url_for('main.dashboard') }}" class="sidebar-link {% if request.endpoint == 'main.dashboard' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
                 <i class="fas fa-chart-line"></i><span class="nav-label">Dashboard</span>
             </a>
             {% if check_permission(action='can_edit') or check_permission(action='can_disable') %}
-            <a href="{{ url_for('manage_users') }}" class="sidebar-link {% if request.endpoint == 'manage_users' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
+            <a href="{{ url_for('users.manage_users') }}" class="sidebar-link {% if request.endpoint == 'users.manage_users' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Usuários">
                 <i class="fas fa-users-cog"></i><span class="nav-label">Gerenciar Usuários</span>
             </a>
             {% endif %}
             {% if check_permission(action='can_create') %}
-            <a href="{{ url_for('create_user_form') }}" class="sidebar-link {% if request.endpoint == 'create_user_form' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
+            <a href="{{ url_for('users.create_user_form') }}" class="sidebar-link {% if request.endpoint == 'users.create_user_form' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Criar Usuário">
                 <i class="fas fa-user-plus"></i><span class="nav-label">Criar Usuário</span>
             </a>
             {% endif %}
             {% if check_permission(action='can_manage_groups') %}
-            <a href="{{ url_for('group_management') }}" class="sidebar-link {% if request.endpoint == 'group_management' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
+            <a href="{{ url_for('groups.group_management') }}" class="sidebar-link {% if request.endpoint == 'groups.group_management' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
                 <i class="fas fa-layer-group"></i><span class="nav-label">Gerenciar Grupos</span>
             </a>
             {% endif %}
             
             <div class="sidebar-section-label">Ferramentas</div>
-            <a href="{{ url_for('organograma') }}" class="sidebar-link {% if request.endpoint == 'organograma' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
+            <a href="{{ url_for('main.organograma') }}" class="sidebar-link {% if request.endpoint == 'main.organograma' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
                 <i class="fas fa-sitemap"></i><span class="nav-label">Organograma</span>
             </a>
-            <a href="{{ url_for('ad_tree') }}" class="sidebar-link {% if request.endpoint == 'ad_tree' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
+            <a href="{{ url_for('users.ad_tree') }}" class="sidebar-link {% if request.endpoint == 'users.ad_tree' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
                 <i class="fas fa-network-wired"></i><span class="nav-label">Active Directory</span>
             </a>
             {% if check_permission(view='can_export_data') %}
-            <a href="{{ url_for('export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'export_ad_data' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
+            <a href="{{ url_for('users.export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'users.export_ad_data' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
                 <i class="fas fa-file-csv"></i><span class="nav-label">Exportar Base AD</span>
             </a>
             {% endif %}
@@ -84,7 +84,7 @@
             </div>
             <div class="sidebar-footer-actions">
                 <button id="theme-toggle" class="sidebar-icon-btn btn" title="Alternar tema"><i class="fas fa-moon"></i></button>
-                <a href="{{ url_for('logout') }}" class="sidebar-icon-btn btn" title="Sair"><i class="fas fa-sign-out-alt"></i></a>
+                <a href="{{ url_for('auth.logout') }}" class="sidebar-icon-btn btn" title="Sair"><i class="fas fa-sign-out-alt"></i></a>
             </div>
         </div>
     </aside>
@@ -93,7 +93,7 @@
     <div class="main-content-wrapper">
         <main class="container-fluid">
 
-            {% block page_title %}{% endblock %}
+
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -111,7 +111,7 @@
 
         </main>
         <footer>
-            <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
+            <p>&copy; {{ year }} - Ferramenta de Gestão AD | <a href="{{ url_for('main.organograma') }}" class="text-decoration-none">Ver Organograma</a></p>
         </footer>
     </div>
 

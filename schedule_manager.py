@@ -1,33 +1,12 @@
-from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, DISABLE_SCHEDULE_FILE, GROUP_SCHEDULE_FILE, HISTORY_FILE
-
-# ==============================================================================
-# Funções de Histórico
-# ==============================================================================
-def save_to_history(action, user_sam, details=""):
-    """Salva uma ação executada no arquivo de histórico."""
-    try:
-        history = []
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-                history = json.load(f)
-        
-        from datetime import datetime
-        entry = {
-            'timestamp': datetime.now().isoformat(),
-            'action': action,
-            'user_sam': user_sam,
-            'details': details
-        }
-        history.append(entry)
-        
-        # Mantém apenas os últimos 1000 registros para não crescer indefinidamente
-        if len(history) > 1000:
-            history = history[-1000:]
-            
-        with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(history, f, indent=4)
-    except Exception as e:
-        logging.error(f"Erro ao salvar histórico: {e}")
+import os
+import json
+import logging
+from datetime import date
+from common import (
+    load_config, get_ldap_connection, get_user_by_samaccountname, 
+    get_group_by_name, load_disable_schedules, save_disable_schedules,
+    load_group_schedules, save_group_schedules, save_to_history
+)
 
 # ==============================================================================
 # Lógica Principal do Script
@@ -50,11 +29,9 @@ logging.basicConfig(
 def process_user_deactivations(conn, search_base):
     """Processa a desativação agendada de contas de usuário."""
     logging.info("Iniciando verificação de desativações de usuários.")
-    try:
-        with open(DISABLE_SCHEDULE_FILE, 'r') as f:
-            schedules = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Nenhum arquivo de agendamento de desativação ('disable_schedules.json') encontrado.")
+    schedules = load_disable_schedules()
+    if not schedules:
+        logging.info("Nenhum agendamento de desativação pendente.")
         return
 
     today = date.today().isoformat()
@@ -81,19 +58,16 @@ def process_user_deactivations(conn, search_base):
         else:
             schedules_to_keep[username] = deactivation_date
 
-    with open(DISABLE_SCHEDULE_FILE, 'w') as f:
-        json.dump(schedules_to_keep, f, indent=4)
+    save_disable_schedules(schedules_to_keep)
     logging.info("Verificação de desativações de usuários concluída.")
 
 
 def process_user_reactivations(conn, search_base):
     """Processa a reativação de contas de usuário."""
     logging.info("Iniciando verificação de reativações de usuários.")
-    try:
-        with open(SCHEDULE_FILE, 'r') as f:
-            schedules = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Nenhum arquivo de agendamento de reativação ('schedules.json') encontrado.")
+    schedules = load_schedules()
+    if not schedules:
+        logging.info("Nenhum agendamento de reativação pendente.")
         return
 
     today = date.today().isoformat()
@@ -119,18 +93,15 @@ def process_user_reactivations(conn, search_base):
         else:
             schedules_to_keep[username] = reactivation_date
 
-    with open(SCHEDULE_FILE, 'w') as f:
-        json.dump(schedules_to_keep, f, indent=4)
+    save_schedules(schedules_to_keep)
     logging.info("Verificação de reativações de usuários concluída.")
 
 def process_group_membership_changes(conn, search_base):
     """Processa as alterações agendadas de associação a grupos."""
     logging.info("Iniciando verificação de alterações de associação a grupos.")
-    try:
-        with open(GROUP_SCHEDULE_FILE, 'r') as f:
-            schedules = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Nenhum arquivo de agendamento de grupos ('group_schedules.json') encontrado.")
+    schedules = load_group_schedules()
+    if not schedules:
+        logging.info("Nenhum agendamento de grupos pendente.")
         return
 
     today = date.today().isoformat()
@@ -173,8 +144,7 @@ def process_group_membership_changes(conn, search_base):
         else:
             remaining_schedules.append(schedule)
 
-    with open(GROUP_SCHEDULE_FILE, 'w') as f:
-        json.dump(remaining_schedules, f, indent=4)
+    save_group_schedules(remaining_schedules)
     logging.info("Verificação de alterações de associação a grupos concluída.")
 
 

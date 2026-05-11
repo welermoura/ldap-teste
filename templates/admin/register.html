@@ -24,7 +24,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('admin_register') }}" class="needs-validation" novalidate>
+        <form method="POST" action="{{ url_for('admin.admin_register') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
                 {{ render_field(form.username, class='form-control-lg text-center', placeholder='Nome de Usuário do Admin', label_visible=false) }}

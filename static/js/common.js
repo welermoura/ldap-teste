@@ -73,7 +73,7 @@ async function handleCancelAbsence(username, csrfToken, callback) {
         `Tem certeza que deseja cancelar o agendamento de ausência para ${username}? A conta será reativada imediatamente se o período de ausência já tiver começado.`,
         async () => {
             try {
-                const response = await fetch(`/api/cancel_absence/${username}`, {
+                const response = await fetch(`/users/api/cancel_absence/${username}`, {
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
                 });
@@ -91,6 +91,39 @@ async function handleCancelAbsence(username, csrfToken, callback) {
             }
         }
     );
+}
+
+/**
+ * Escapa strings para evitar XSS.
+ */
+function escapeHTML(str) {
+    if (!str) return "";
+    const p = document.createElement('p');
+    p.textContent = str;
+    return p.innerHTML;
+}
+
+/**
+ * Exibe um spinner de carregamento em um container.
+ */
+function showLoading(container, message = "Carregando...") {
+    container.innerHTML = `
+        <div class="text-center p-5">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <p class="text-muted small">${message}</p>
+        </div>
+    `;
+}
+
+/**
+ * Exibe uma mensagem de erro em um container.
+ */
+function showError(container, message = "Erro ao carregar dados.") {
+    container.innerHTML = `
+        <div class="alert alert-danger m-3">
+            <i class="fas fa-exclamation-circle me-2"></i>${message}
+        </div>
+    `;
 }
 
 // Adiciona o listener de evento para o botão de confirmação do modal assim que o DOM for carregado.

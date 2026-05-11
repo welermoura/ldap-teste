@@ -6,7 +6,7 @@
 
 {% block page_title %}
     {% set title_text = '<i class="fas fa-user-circle me-2"></i>Detalhes de: ' ~ (get_attr_value(user, 'displayName') or 'N/A') %}
-    {{ render_page_header(title_text, back_url=url_for('manage_users')) }}
+    {{ render_page_header(title_text, back_url=url_for('users.manage_users')) }}
 {% endblock %}
 
 
@@ -19,23 +19,22 @@
             <div class="card-body py-4">
                 {% set sam = get_attr_value(user, 'sAMAccountName') %}
                 {% if has_photo %}
-                    <img src="{{ url_for('api_user_photo', username=sam) }}"
+                    <img src="{{ url_for('users.api_user_photo', username=sam) }}"
                          alt="Foto de {{ get_attr_value(user, 'displayName') }}"
                          id="profile-avatar-img"
                          class="rounded-circle border border-3 mb-3"
                          style="width:110px;height:110px;object-fit:cover;border-color:var(--primary-color,#7c3aed)!important;">
                 {% else %}
                     <div id="profile-avatar-placeholder"
-                         class="rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3"
-                         style="width:110px;height:110px;background:rgba(255,255,255,0.08);border:3px solid rgba(255,255,255,0.2);">
-                        <i class="fas fa-user-circle" style="font-size:80px;color:rgba(255,255,255,0.35);"></i>
+                         class="rounded-circle avatar-initials mx-auto mb-3">
+                        {{ (get_attr_value(user, 'displayName').split()|map('first')|join('') if get_attr_value(user, 'displayName') else 'U')[:2] | upper }}
                     </div>
                 {% endif %}
                 <h6 class="mb-0 fw-semibold">{{ get_attr_value(user, 'displayName') or 'N/A' }}</h6>
                 <small class="text-muted">{{ get_attr_value(user, 'title') or '' }}</small>
                 {% if check_permission(action='can_edit') %}
                     <div class="mt-3">
-                        <a href="{{ url_for('edit_user', username=sam) }}" class="btn btn-sm btn-outline-light">
+                        <a href="{{ url_for('users.edit_user', username=sam) }}" class="btn btn-sm btn-outline-light">
                             <i class="fas fa-camera me-1"></i>Alterar Foto
                         </a>
                     </div>
@@ -80,7 +79,7 @@
                 <div class="d-grid gap-2">
                     {% if check_permission(action='can_disable') %}
                         {% if status == 'Desativado' %}
-                            <form action="{{ url_for('toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                            <form action="{{ url_for('users.toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                                 {{ form.csrf_token }}
                                 <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-circle me-2"></i>Reativar Conta</button>
                             </form>
@@ -88,7 +87,7 @@
                             <button type="button" class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#scheduleAbsenceModal">
                                 <i class="fas fa-calendar-alt me-2"></i>Agendar Ausência
                             </button>
-                            <form id="deactivate-form" action="{{ url_for('toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                            <form id="deactivate-form" action="{{ url_for('users.toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                                 {{ form.csrf_token }}
                                 <button type="button" id="deactivate-btn" class="btn btn-danger w-100"><i class="fas fa-ban me-2"></i>Desativar Permanente</button>
                             </form>
@@ -96,14 +95,14 @@
                     {% endif %}
 
                     {% if check_permission(action='can_reset_password') %}
-                    <form id="reset-password-form" action="{{ url_for('api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+                    <form id="reset-password-form" action="{{ url_for('users.api_reset_password', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
                         {{ form.csrf_token }}
                         <button type="button" id="reset-password-btn" class="btn btn-secondary w-100"><i class="fas fa-key me-2"></i>Resetar Senha</button>
                     </form>
                     {% endif %}
 
                     {% if check_permission(action='can_edit') %}
-                        <a href="{{ url_for('edit_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Editar Usuário</a>
+                        <a href="{{ url_for('users.edit_user', username=get_attr_value(user, 'sAMAccountName')) }}" class="btn btn-primary w-100"><i class="fas fa-edit me-2"></i>Editar Usuário</a>
                     {% endif %}
                 </div>
             </div>
@@ -128,13 +127,16 @@
         <div class="card glass-card">
             <div class="card-header">
                 <ul class="nav nav-tabs card-header-tabs" id="user-details-tabs" role="tablist">
-                    <li class="nav-item" role="presentation"><button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab">Geral</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="endereco-tab" data-bs-toggle="tab" data-bs-target="#endereco" type="button" role="tab">Endereço</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="telefones-tab" data-bs-toggle="tab" data-bs-target="#telefones" type="button" role="tab">Telefones</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="organizacao-tab" data-bs-toggle="tab" data-bs-target="#organizacao" type="button" role="tab">Organização</button></li>
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="organograma-tab" data-bs-toggle="tab" data-bs-target="#organograma" type="button" role="tab">Organograma</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="geral-tab" data-bs-toggle="tab" data-bs-target="#geral" type="button" role="tab"><i class="fas fa-info-circle me-1"></i>Geral</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="endereco-tab" data-bs-toggle="tab" data-bs-target="#endereco" type="button" role="tab"><i class="fas fa-map-marker-alt me-1"></i>Endereço</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="telefones-tab" data-bs-toggle="tab" data-bs-target="#telefones" type="button" role="tab"><i class="fas fa-phone-alt me-1"></i>Telefones</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="organizacao-tab" data-bs-toggle="tab" data-bs-target="#organizacao" type="button" role="tab"><i class="fas fa-briefcase me-1"></i>Organização</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="organograma-tab" data-bs-toggle="tab" data-bs-target="#organograma" type="button" role="tab"><i class="fas fa-sitemap me-1"></i>Organograma</button></li>
                     {% if check_permission(action='can_manage_groups') %}
-                    <li class="nav-item" role="presentation"><button class="nav-link" id="memberof-tab" data-bs-toggle="tab" data-bs-target="#memberof" type="button" role="tab">Membro de</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="memberof-tab" data-bs-toggle="tab" data-bs-target="#memberof" type="button" role="tab"><i class="fas fa-users me-1"></i>Membro de</button></li>
+                    {% endif %}
+                    {% if check_permission(action='can_manage_exchange') %}
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="exchange-tab" data-bs-toggle="tab" data-bs-target="#exchange" type="button" role="tab"><i class="fas fa-envelope me-1"></i>Exchange</button></li>
                     {% endif %}
                 </ul>
             </div>
@@ -184,7 +186,7 @@
                                 <td style="width: 30%;"><strong>Gerente:</strong></td>
                                 <td>
                                     {% if manager_info %}
-                                        <a href="{{ url_for('view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
+                                        <a href="{{ url_for('users.view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
                                     {% else %}
                                         <span class="text-muted">N/A</span>
                                     {% endif %}
@@ -209,7 +211,7 @@
                             <div class="list-group glass-list-group" style="max-height: 200px; overflow-y: auto;">
                                 {% for dr in direct_reports_info %}
                                     <div class="list-group-item bg-transparent border-0 ps-0 d-flex justify-content-between align-items-center" style="color:var(--text-color)">
-                                        <a href="{{ url_for('view_user', username=dr.sam) }}" class="text-decoration-none" style="color:var(--text-color)">
+                                        <a href="{{ url_for('users.view_user', username=dr.sam) }}" class="text-decoration-none" style="color:var(--text-color)">
                                             <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
                                         </a>
                                         {% if check_permission(action='can_edit') %}
@@ -237,6 +239,22 @@
                         </div>
                     </div>
                     {% endif %}
+                    {% if check_permission(action='can_manage_exchange') %}
+                    <div class="tab-pane fade" id="exchange" role="tabpanel" aria-labelledby="exchange-tab">
+                        <div class="d-flex justify-content-between align-items-end mb-3">
+                            <div class="flex-grow-1 me-2">
+                                <label for="new-alias-input" class="form-label mb-1">Adicionar novo e-mail (Alias):</label>
+                                <input type="email" id="new-alias-input" class="form-control form-control-sm" placeholder="ex: contato@dominio.com">
+                            </div>
+                            <button class="btn btn-success btn-sm h-100" id="add-alias-btn" style="margin-bottom: 2px;">
+                                <i class="fas fa-plus me-2"></i>Adicionar
+                            </button>
+                        </div>
+                        <div id="exchange-list-container" class="table-responsive" style="min-height: 200px;">
+                            <!-- O conteúdo será carregado via JS -->
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -251,7 +269,7 @@
         <h5 class="modal-title" id="scheduleAbsenceModalLabel">Agendar Ausência para {{ get_attr_value(user, 'displayName') }}</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form id="scheduleAbsenceForm" action="{{ url_for('schedule_absence', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+      <form id="scheduleAbsenceForm" action="{{ url_for('users.api_schedule_absence', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
         {{ form.csrf_token }}
         <div class="modal-body">
           <div class="mb-3">
@@ -388,7 +406,7 @@
         <h5 class="modal-title" id="deleteUserModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form id="deleteUserForm" action="{{ url_for('delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
+      <form id="deleteUserForm" action="{{ url_for('users.delete_user', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
         {{ delete_form.hidden_tag() }}
         <div class="modal-body">
           <p>Esta ação <strong>não pode ser desfeita</strong>. O usuário <strong>{{ get_attr_value(user, 'displayName') }}</strong> será removido permanentemente.</p>
@@ -477,7 +495,7 @@ document.addEventListener('DOMContentLoaded', function() {
         groups.forEach(group => {
             const row = tbody.insertRow();
             row.innerHTML = `
-                <td><a href="/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
+                <td><a href="/groups/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
                 <td>${escapeHTML(group.description) || 'N/A'}</td>
                 <td class="text-end">
                     <button class="btn btn-danger btn-sm remove-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Remover do grupo">
@@ -521,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabLoaded) return;
         showLoading(memberOfContainer, 'Carregando grupos...');
         try {
-            const response = await fetch(`/api/user_groups/${username}`);
+            const response = await fetch(`/groups/api/user_groups/${username}`);
             if (!response.ok) throw new Error('Falha ao buscar os grupos do usuário.');
             allUserGroups = await response.json();
             renderGroups(allUserGroups);
@@ -535,7 +553,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function removeGroup(groupName) {
         setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover o usuário do grupo "${groupName}"?`, async () => {
             try {
-                const response = await fetch('/api/remove_user_from_group', {
+                const response = await fetch('/groups/api/remove_user_from_group', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ username, group_name: groupName })
@@ -555,7 +573,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function addGroup(groupName) {
         try {
-            const response = await fetch('/api/add_user_to_group', {
+            const response = await fetch('/groups/api/add_user_to_group', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({ username, group_name: groupName })
@@ -579,7 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         try {
-            const response = await fetch('/api/add_user_to_group_temp', {
+            const response = await fetch('/groups/api/add_user_to_group_temp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({
@@ -610,7 +628,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         showLoading(groupSearchResults, 'Buscando...');
         try {
-            const response = await fetch(`/api/search_groups?q=${encodeURIComponent(query)}&username=${encodeURIComponent(username)}`);
+            const response = await fetch(`/groups/api/search_groups?q=${encodeURIComponent(query)}&username=${encodeURIComponent(username)}`);
             if (!response.ok) throw new Error('Falha na busca.');
             const groups = await response.json();
             renderSearchResults(groups);
@@ -636,9 +654,156 @@ document.addEventListener('DOMContentLoaded', function() {
         return p.innerHTML;
     }
 
+    // === Variáveis do Exchange ===
+    const exchangeTab = document.getElementById('exchange-tab');
+    const exchangeContainer = document.getElementById('exchange-list-container');
+    const newAliasInput = document.getElementById('new-alias-input');
+    const addAliasBtn = document.getElementById('add-alias-btn');
+    let exchangeLoaded = false;
+
+    // === Funções da Aba Exchange ===
+    async function fetchExchangeData() {
+        if (exchangeLoaded) return;
+        showLoading(exchangeContainer, 'Carregando aliases...');
+        try {
+            const response = await fetch(`/api/user_exchange/${username}`);
+            if (!response.ok) throw new Error('Falha ao buscar os dados do Exchange.');
+            const data = await response.json();
+            renderExchangeData(data);
+            exchangeLoaded = true;
+        } catch (error) {
+            showError(exchangeContainer, 'Não foi possível carregar os aliases.');
+            console.error('Erro:', error);
+        }
+    }
+
+    function renderExchangeData(data) {
+        exchangeContainer.innerHTML = '';
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover glass-table mb-0';
+        table.innerHTML = `<thead><tr><th>Endereço de E-mail</th><th class="text-center">Status</th><th class="text-end">Ação</th></tr></thead>`;
+        const tbody = table.createTBody();
+
+        // Adiciona o principal primeiro
+        if (data.primary) {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><strong>${escapeHTML(data.primary)}</strong></td>
+                <td class="text-center"><span class="badge bg-success">Principal</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-secondary" disabled title="Já é o e-mail principal"><i class="fas fa-star text-warning"></i></button>
+                </td>
+            `;
+        }
+
+        // Adiciona os aliases
+        if (data.aliases && data.aliases.length > 0) {
+            data.aliases.forEach(alias => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${escapeHTML(alias)}</td>
+                    <td class="text-center"><span class="badge bg-secondary">Alias</span></td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-warning set-primary-btn" data-alias="${escapeHTML(alias)}" title="Definir como Principal">
+                            <i class="far fa-star"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger remove-alias-btn ms-1" data-alias="${escapeHTML(alias)}" title="Remover alias">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        if (!data.primary && (!data.aliases || data.aliases.length === 0)) {
+            exchangeContainer.innerHTML = '<div class="alert alert-info m-2">Nenhum e-mail (proxyAddresses) encontrado para este usuário.</div>';
+            return;
+        }
+
+        exchangeContainer.appendChild(table);
+    }
+
+    if (addAliasBtn) {
+        addAliasBtn.addEventListener('click', async function() {
+            const alias = newAliasInput.value.trim();
+            if (!alias) {
+                showToast('Digite um e-mail válido.', 'warning');
+                return;
+            }
+            try {
+                const response = await fetch(`/api/add_alias/${username}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ alias })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast(result.message, 'success');
+                newAliasInput.value = '';
+                exchangeLoaded = false;
+                fetchExchangeData();
+            } catch (error) {
+                showToast(`Falha ao adicionar: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    if (exchangeContainer) {
+        exchangeContainer.addEventListener('click', async function(e) {
+            const removeBtn = e.target.closest('.remove-alias-btn');
+            if (removeBtn) {
+                const alias = removeBtn.dataset.alias;
+                setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover o alias "${alias}"?`, async () => {
+                    try {
+                        const response = await fetch(`/api/remove_alias/${username}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                            body: JSON.stringify({ alias })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                        showToast(result.message, 'success');
+                        exchangeLoaded = false;
+                        fetchExchangeData();
+                    } catch (error) {
+                        showToast(`Falha ao remover: ${error.message}`, 'error');
+                    }
+                });
+            }
+
+            const primaryBtn = e.target.closest('.set-primary-btn');
+            if (primaryBtn) {
+                const alias = primaryBtn.dataset.alias;
+                setupConfirmationModal('Alterar E-mail Principal', `Deseja definir "${alias}" como o e-mail principal? O e-mail atual será convertido em alias secundário.`, async () => {
+                    try {
+                        const response = await fetch(`/api/set_primary_alias/${username}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                            body: JSON.stringify({ alias })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                        showToast(result.message, 'success');
+                        exchangeLoaded = false;
+                        fetchExchangeData();
+                    } catch (error) {
+                        showToast(`Falha ao alterar principal: ${error.message}`, 'error');
+                    }
+                });
+            }
+        });
+    }
+
     // === Event Listeners ===
     if (memberOfTab) {
         memberOfTab.addEventListener('shown.bs.tab', fetchUserGroups);
+    }
+    
+    if (exchangeTab) {
+        exchangeTab.addEventListener('shown.bs.tab', fetchExchangeData);
     }
 
     if (groupMembershipSearchInput) {
@@ -733,7 +898,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         try {
-            const response = await fetch(`/api/reset_password/${username}`, {
+            const response = await fetch(`/users/api/reset_password/${username}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -782,7 +947,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsContainer.innerHTML = '<div class="text-center p-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
 
         try {
-            const response = await fetch(`/api/search_ad?q=${encodeURIComponent(query)}`);
+            const response = await fetch("{{ url_for('admin.api_search_ad') }}?q=" + encodeURIComponent(query));
             if (!response.ok) throw new Error('Falha na busca.');
             const results = await response.json();
 
@@ -802,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h6 class="mb-1">${escapeHTML(user.name)}</h6>
                         <small>${escapeHTML(user.sam)}</small>
                     </div>
-                    <small class="text-muted">${escapeHTML(user.ou_path || '')}</small>
+                    <div class="small text-muted">${escapeHTML(user.title || 'Sem cargo')} - ${escapeHTML(user.department || 'Sem departamento')}</div>
                 `;
                 item.onclick = () => {
                     if (type === 'manager') {
@@ -823,7 +988,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function setManager(managerSam) {
         setupConfirmationModal('Confirmar Gerente', `Definir ${managerSam} como gerente de ${username}?`, async () => {
             try {
-                const response = await fetch('/api/set_manager', {
+                const response = await fetch("{{ url_for('users.api_set_manager') }}", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ user_sam: username, manager_sam: managerSam })
@@ -843,7 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function addSubordinate(subordinateSam) {
         setupConfirmationModal('Adicionar Subordinado', `Definir ${username} como gerente de ${subordinateSam}?`, async () => {
             try {
-                const response = await fetch('/api/add_subordinate', {
+                const response = await fetch("{{ url_for('users.api_add_subordinate') }}", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ manager_sam: username, subordinate_sam: subordinateSam })
@@ -863,7 +1028,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function removeSubordinate(subordinateSam, subordinateName) {
         setupConfirmationModal('Remover Subordinado', `Remover ${subordinateName} (${subordinateSam}) da lista de supervisionados?`, async () => {
             try {
-                const response = await fetch('/api/remove_subordinate', {
+                const response = await fetch('/users/api/remove_subordinate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ subordinate_sam: subordinateSam })

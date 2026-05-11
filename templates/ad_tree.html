@@ -7,7 +7,7 @@
 {% block head %}
   {{ super() }}
   {% if css_file %}
-  <link rel="stylesheet" href="{{ url_for('ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
+  <link rel="stylesheet" href="{{ url_for('users.ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
   {% endif %}
 {% endblock %}
 
@@ -15,8 +15,8 @@
     <div class="page-header mb-4">
         <h2><i class="fas fa-sitemap me-2"></i>Explorador do Active Directory</h2>
         <div class="page-actions d-flex align-items-center">
-            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-primary me-2"><i class="fas fa-home me-1"></i>Home</a>
-            <a href="javascript:history.back()" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary me-2"><i class="fas fa-home me-1"></i>Home</a>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left me-1"></i>Voltar</a>
 
             {% if session.ad_user %}
             <div class="dropdown me-2">
@@ -24,7 +24,7 @@
                     <i class="fas fa-user-circle me-1"></i>{{ session.user_display_name or 'Usuário' }}
                 </button>
                 <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end" aria-labelledby="userMenuButton">
-                    <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair</a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Sair</a></li>
                 </ul>
             </div>
             {% endif %}
@@ -49,6 +49,6 @@
 {% block scripts %}
   {{ super() }}
   {% if js_file %}
-  <script type="module" src="{{ url_for('ad_tree_assets', filename=js_file.replace('assets/', '')) }}"></script>
+  <script type="module" src="{{ url_for('users.ad_tree_assets', filename=js_file.replace('assets/', '')) }}"></script>
   {% endif %}
 {% endblock %}

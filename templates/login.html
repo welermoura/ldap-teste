@@ -30,7 +30,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('login') }}" class="needs-validation" novalidate>
+        <form method="POST" action="{{ url_for('auth.login') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
                 <div class="input-group">
@@ -52,7 +52,7 @@
         <div class="login-help mt-4">
             <p><i class="fas fa-info-circle me-2"></i>Utilize suas credenciais de rede padrão para acessar o portal.</p>
         </div>
-        <a href="{{ url_for('admin_login') }}" class="admin-link">Acesso Master (Administrador)</a>
+        <a href="{{ url_for('admin.admin_login') }}" class="admin-link">Acesso Master (Administrador)</a>
     </div>
 </div>
 {% endblock %}

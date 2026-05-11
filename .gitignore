@@ -12,3 +12,5 @@ data/
 logs/
 secret.key
 __pycache__/
+scratch/
+static/uploads/

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Adicionar Administrador - Gestão AD{% endblock %}
+
+{% block page_title %}
+<div class="page-header">
+    <h1><i class="fas fa-user-plus me-2"></i>Novo Administrador</h1>
+    <a href="{{ url_for('admin.admin_users') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Voltar
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card glass-card animate-in">
+            <div class="card-body p-4">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nome de Usuário</label>
+                        {{ form.username(class="form-control", placeholder="Ex: admin_joao") }}
+                        {% for error in form.username.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Senha</label>
+                        {{ form.password(class="form-control", placeholder="Digite a senha") }}
+                        {% for error in form.password.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Confirmar Senha</label>
+                        {{ form.confirm_password(class="form-control", placeholder="Repita a senha") }}
+                        {% for error in form.confirm_password.errors %}
+                            <div class="text-danger small mt-1">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>Salvar Administrador
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="alert alert-info mt-4 glass-card border-0">
+            <i class="fas fa-info-circle me-2"></i>
+            <strong>Nota:</strong> Este usuário terá acesso completo ao painel de administração e poderá alterar configurações críticas do sistema.
+        </div>
+    </div>
+</div>
+{% endblock %}

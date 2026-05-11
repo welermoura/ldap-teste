@@ -14,7 +14,7 @@
     {% endif %}
 
     {% if css_file %}
-    <link rel="stylesheet" href="{{ url_for('ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
+    <link rel="stylesheet" href="{{ url_for('users.ad_tree_assets', filename=css_file.replace('assets/', '')) }}">
     {% endif %}
 
     <script>
@@ -42,7 +42,7 @@
   <body>
     <div id="root"></div>
     {% if js_file %}
-    <script type="module" src="{{ url_for('ad_tree_assets', filename=js_file.replace('assets/', '')) }}"></script>
+    <script type="module" src="{{ url_for('users.ad_tree_assets', filename=js_file.replace('assets/', '')) }}"></script>
     {% else %}
     <p>Erro: Arquivo JS não encontrado. Execute o build do frontend.</p>
     {% endif %}

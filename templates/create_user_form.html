@@ -14,7 +14,7 @@
     <div class="card-body">
         <p class="card-text mb-4">Preencha os dados básicos do novo usuário e, em seguida, busque por um usuário modelo para copiar as permissões e atributos.</p>
 
-        <form method="POST" action="{{ url_for('create_user_form') }}" class="needs-validation" novalidate>
+        <form method="POST" action="{{ url_for('users.create_user_form') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
 
             <fieldset>
@@ -38,6 +38,9 @@
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         {{ render_field(form.telephone) }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        {{ render_field(form.upn_suffix) }}
                     </div>
                 </div>
             </fieldset>
@@ -91,6 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { id: 'first_name', label: 'Primeiro Nome' },
             { id: 'last_name', label: 'Sobrenome' },
             { id: 'sam_account', label: 'Login de Usuário' },
+            { id: 'upn_suffix', label: 'Domínio / UPN Suffix' },
             { id: 'matricula', label: 'Matrícula', numeric: true },
             { id: 'model_name', label: 'Nome do Usuário Modelo' }
         ];

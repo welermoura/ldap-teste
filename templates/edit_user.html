@@ -22,11 +22,11 @@
             <div class="col-auto">
                 <div id="photo-avatar-wrapper" title="Clique para selecionar uma foto">
                     <img id="photo-preview"
-                         src="{{ url_for('api_user_photo', username=username) }}"
+                         src="{{ url_for('users.api_user_photo', username=username) }}"
                          onerror="this.style.display='none'; document.getElementById('photo-placeholder').style.display='flex';"
                          alt="Foto atual">
-                    <div id="photo-placeholder" style="display:none;">
-                        <i class="fas fa-user-circle"></i>
+                    <div id="photo-placeholder" class="avatar-initials" style="display:none;">
+                        {{ (user_name.split()|map('first')|join('') if user_name else 'U')[:2] | upper }}
                     </div>
                     <div class="photo-overlay">
                         <i class="fas fa-camera"></i>
@@ -58,18 +58,30 @@
     'Endereço': ['street', 'post_office_box', 'city', 'state', 'zip_code'],
     'Telefones': ['telephone', 'home_phone', 'pager', 'mobile', 'fax'],
     'Organização': ['title', 'department', 'company', 'matricula'],
+    'Exchange': [],
     'Organograma': ['manager']
 } %}
 
+{% set tab_icons = {
+    'Geral': 'fas fa-info-circle',
+    'Endereço': 'fas fa-map-marker-alt',
+    'Telefones': 'fas fa-phone-alt',
+    'Organização': 'fas fa-briefcase',
+    'Exchange': 'fas fa-envelope',
+    'Organograma': 'fas fa-sitemap'
+} %}
+
 <div class="card glass-card">
-    <form method="POST" action="{{ url_for('edit_user', username=username) }}">
+    <form method="POST" action="{{ url_for('users.edit_user', username=username) }}">
         {{ form.hidden_tag() }}
 
         <div class="card-header">
             <ul class="nav nav-tabs card-header-tabs" id="edit-user-tabs" role="tablist">
                 {% for tab_name in tabs.keys() %}
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link {% if loop.first %}active{% endif %}" id="{{ tab_name|lower }}-tab" data-bs-toggle="tab" data-bs-target="#{{ tab_name|lower }}" type="button" role="tab">{{ tab_name }}</button>
+                    <button class="nav-link {% if loop.first %}active{% endif %}" id="{{ tab_name|lower }}-tab" data-bs-toggle="tab" data-bs-target="#{{ tab_name|lower }}" type="button" role="tab">
+                        <i class="{{ tab_icons.get(tab_name, 'fas fa-folder') }} me-2"></i>{{ tab_name }}
+                    </button>
                 </li>
                 {% endfor %}
             </ul>
@@ -80,12 +92,84 @@
                 {% for tab_name, tab_fields in tabs.items() %}
                 <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="{{ tab_name|lower }}" role="tabpanel">
                     <div class="row p-3">
-                        {% for field_name in tab_fields %}
-                        {% set field = form[field_name] %}
-                        <div class="col-md-6 mb-3 {% if field_name in editable_fields %}is-editable{% endif %}">
-                            {{ render_field(field, disabled=(field_name not in editable_fields)) }}
-                        </div>
-                        {% endfor %}
+                        {% if tab_name == 'Organograma' %}
+                            <div class="col-12">
+                                <table class="table glass-table table-borderless mb-4">
+                                    <tr>
+                                        <td style="width: 30%;"><strong>Gerente:</strong></td>
+                                        <td>
+                                            {% if manager_info %}
+                                                <a href="{{ url_for('users.view_user', username=manager_info.sam) }}" class="text-decoration-none">{{ manager_info.name }}</a>
+                                            {% else %}
+                                                <span class="text-muted">N/A</span>
+                                            {% endif %}
+                                            {% if 'manager' in editable_fields %}
+                                                <button type="button" class="btn btn-sm btn-outline-info ms-2" data-bs-toggle="modal" data-bs-target="#changeManagerModal">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                <h6 class="mt-4 mb-3 border-bottom pb-2 d-flex justify-content-between align-items-center">
+                                    Supervisiona:
+                                    {% if check_permission(action='can_edit') %}
+                                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addSubordinateModal">
+                                            <i class="fas fa-plus me-1"></i>Adicionar
+                                        </button>
+                                    {% endif %}
+                                </h6>
+                                {% if direct_reports_info %}
+                                    <div class="list-group glass-list-group" style="max-height: 200px; overflow-y: auto;">
+                                        {% for dr in direct_reports_info %}
+                                            <div class="list-group-item bg-transparent border-0 ps-0 d-flex justify-content-between align-items-center" style="color:var(--text-color)">
+                                                <a href="{{ url_for('users.view_user', username=dr.sam) }}" class="text-decoration-none" style="color:var(--text-color)">
+                                                    <i class="fas fa-user-tie me-2"></i>{{ dr.name }}
+                                                </a>
+                                                {% if check_permission(action='can_edit') %}
+                                                    <button type="button" class="btn btn-sm btn-danger remove-subordinate-btn" data-subordinate-sam="{{ dr.sam }}" data-subordinate-name="{{ dr.name }}">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                {% endif %}
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted">Não supervisiona ninguém.</p>
+                                {% endif %}
+                            </div>
+                        {% elif tab_name == 'Exchange' %}
+                            {% if check_permission(action='can_manage_exchange') %}
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-between align-items-end mb-3">
+                                        <div class="flex-grow-1 me-2">
+                                            <label for="new-alias-input" class="form-label mb-1">Adicionar novo e-mail (Alias):</label>
+                                            <input type="email" id="new-alias-input" class="form-control form-control-sm" placeholder="ex: contato@dominio.com">
+                                        </div>
+                                        <button type="button" class="btn btn-success btn-sm h-100" id="add-alias-btn" style="margin-bottom: 2px;">
+                                            <i class="fas fa-plus me-2"></i>Adicionar
+                                        </button>
+                                    </div>
+                                    <div id="exchange-list-container" class="table-responsive" style="min-height: 200px;">
+                                        <!-- O conteúdo será carregado via JS -->
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>Você não tem permissão para gerenciar as configurações de e-mail deste usuário.
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% else %}
+                            {% for field_name in tab_fields %}
+                            {% set field = form[field_name] %}
+                            <div class="col-md-6 mb-3 {% if field_name in editable_fields %}is-editable{% endif %}">
+                                {{ render_field(field, disabled=(field_name not in editable_fields)) }}
+                            </div>
+                            {% endfor %}
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
@@ -174,6 +258,7 @@
     font-size: 85px;
     color: var(--avatar-placeholder-color);
 }
+
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -197,6 +282,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (photoPreview) {
                 photoPreview.src = e.target.result;
                 photoPreview.style.display = 'block';
+                if (photoPlaceholder) photoPlaceholder.style.display = 'none';
             } else {
                 // Cria a tag img se ainda não existe (estava no placeholder)
                 const img = document.createElement('img');
@@ -204,8 +290,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 img.src = e.target.result;
                 img.className = '';
                 img.style.cssText = 'width:120px;height:120px;border-radius:50%;object-fit:cover;border:3px solid var(--primary-color,#7c3aed);display:block;';
-                if (photoPlaceholder) photoPlaceholder.replaceWith(img);
+                if (photoPlaceholder) {
+                    photoPlaceholder.style.display = 'none';
+                    photoPlaceholder.parentElement.prepend(img);
+                }
             }
+            savePhotoButton.disabled = false;
         };
         reader.readAsDataURL(file);
         newPhotoSelected = true;
@@ -292,6 +382,296 @@ document.addEventListener('DOMContentLoaded', function () {
             );
         });
     }
+
+    // === Lógica do Organograma ===
+    const managerSearchInput = document.getElementById('managerSearchInput');
+    const managerSearchResults = document.getElementById('managerSearchResults');
+    const subordinateSearchInput = document.getElementById('subordinateSearchInput');
+    const subordinateSearchResults = document.getElementById('subordinateSearchResults');
+    let searchTimeout;
+
+    async function searchUsersForHierarchy(query, resultsContainer, type) {
+        if (query.length < 3) {
+            resultsContainer.innerHTML = '<p class="text-muted p-2">Digite pelo menos 3 caracteres.</p>';
+            return;
+        }
+        resultsContainer.innerHTML = '<div class="text-center p-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div></div>';
+        try {
+            const response = await fetch("{{ url_for('admin.api_search_ad') }}?q=" + encodeURIComponent(query));
+            if (!response.ok) throw new Error('Falha na busca.');
+            const results = await response.json();
+            resultsContainer.innerHTML = '';
+            const users = results.filter(item => item.type === 'user');
+            if (users.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-muted p-2">Nenhum usuário encontrado.</p>';
+                return;
+            }
+            users.forEach(user => {
+                const item = document.createElement('button');
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${user.name}</strong> <small class="text-muted">(${user.sam})</small>
+                            <div class="small text-muted">${user.title || 'Sem cargo'} - ${user.department || 'Sem departamento'}</div>
+                        </div>
+                    </div>
+                `;
+                item.addEventListener('click', () => type === 'manager' ? setManager(user.sam) : addSubordinate(user.sam));
+                resultsContainer.appendChild(item);
+            });
+        } catch(error) {
+            resultsContainer.innerHTML = '<p class="text-danger p-2">Erro ao buscar usuários.</p>';
+        }
+    }
+
+    async function setManager(managerSam) {
+        try {
+            const response = await fetch("{{ url_for('users.api_set_manager') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ user_sam: username, manager_sam: managerSam })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+            showToast('Gerente atualizado com sucesso!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } catch(error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    async function addSubordinate(subordinateSam) {
+        try {
+            const response = await fetch("{{ url_for('users.api_add_subordinate') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ manager_sam: username, subordinate_sam: subordinateSam })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+            showToast('Subordinado adicionado com sucesso!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } catch(error) {
+            showToast(error.message, 'error');
+        }
+    }
+
+    if (managerSearchInput) {
+        managerSearchInput.addEventListener('keyup', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => searchUsersForHierarchy(managerSearchInput.value, managerSearchResults, 'manager'), 300);
+        });
+    }
+
+    if (subordinateSearchInput) {
+        subordinateSearchInput.addEventListener('keyup', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => searchUsersForHierarchy(subordinateSearchInput.value, subordinateSearchResults, 'subordinate'), 300);
+        });
+    }
+
+    document.querySelectorAll('.remove-subordinate-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const sam = this.dataset.subordinateSam;
+            const name = this.dataset.subordinateName;
+            setupConfirmationModal('Remover Subordinado', `Remover ${name} (${sam}) da lista de supervisionados?`, async () => {
+                try {
+                    const response = await fetch(`/users/api/remove_subordinate/${username}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                        body: JSON.stringify({ subordinate_sam: sam })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                    showToast('Subordinado removido com sucesso!', 'success');
+                    setTimeout(() => window.location.reload(), 1000);
+                } catch(error) {
+                    showToast(error.message, 'error');
+                }
+            });
+        });
+    });
+
+    // === Lógica da Aba Exchange ===
+    const exchangeTabBtn = document.getElementById('exchange-tab');
+    const exchangeContainer = document.getElementById('exchange-list-container');
+    const newAliasInput = document.getElementById('new-alias-input');
+    const addAliasBtn = document.getElementById('add-alias-btn');
+    let exchangeLoaded = false;
+
+    async function fetchExchangeData() {
+        if (exchangeLoaded || !exchangeContainer) return;
+        showLoading(exchangeContainer, 'Carregando aliases...');
+        try {
+            const response = await fetch(`/api/user_exchange/${username}`);
+            if (!response.ok) throw new Error('Falha ao buscar os dados do Exchange.');
+            const data = await response.json();
+            renderExchangeData(data);
+            exchangeLoaded = true;
+        } catch (error) {
+            showError(exchangeContainer, 'Não foi possível carregar os aliases.');
+            console.error('Erro:', error);
+        }
+    }
+
+    function renderExchangeData(data) {
+        if (!exchangeContainer) return;
+        exchangeContainer.innerHTML = '';
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover glass-table mb-0';
+        table.innerHTML = `<thead><tr><th style="color:var(--text-color)">Endereço de E-mail</th><th class="text-center" style="color:var(--text-color)">Status</th><th class="text-end" style="color:var(--text-color)">Ação</th></tr></thead>`;
+        const tbody = table.createTBody();
+
+        if (data.primary) {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td style="color:var(--text-color)"><strong>${escapeHTML(data.primary)}</strong></td>
+                <td class="text-center"><span class="badge bg-success">Principal</span></td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-secondary" disabled title="Já é o e-mail principal"><i class="fas fa-star text-warning"></i></button>
+                </td>
+            `;
+        }
+
+        if (data.aliases && data.aliases.length > 0) {
+            data.aliases.forEach(alias => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td style="color:var(--text-color)">${escapeHTML(alias)}</td>
+                    <td class="text-center"><span class="badge bg-secondary">Alias</span></td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-warning set-primary-btn" data-alias="${escapeHTML(alias)}" title="Definir como Principal">
+                            <i class="far fa-star"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger remove-alias-btn ms-1" data-alias="${escapeHTML(alias)}" title="Remover alias">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+            });
+        }
+
+        if (!data.primary && (!data.aliases || data.aliases.length === 0)) {
+            exchangeContainer.innerHTML = '<div class="alert alert-info m-2">Nenhum e-mail encontrado para este usuário.</div>';
+            return;
+        }
+        exchangeContainer.appendChild(table);
+    }
+
+    if (exchangeTabBtn) {
+        exchangeTabBtn.addEventListener('shown.bs.tab', fetchExchangeData);
+    }
+
+    if (addAliasBtn) {
+        addAliasBtn.addEventListener('click', async function() {
+            const alias = newAliasInput.value.trim();
+            if (!alias) {
+                showToast('Digite um e-mail válido.', 'warning');
+                return;
+            }
+            try {
+                const response = await fetch(`/api/add_alias/${username}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ alias })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                showToast(result.message, 'success');
+                newAliasInput.value = '';
+                exchangeLoaded = false;
+                fetchExchangeData();
+            } catch (error) {
+                showToast(`Falha ao adicionar: ${error.message}`, 'error');
+            }
+        });
+    }
+
+    if (exchangeContainer) {
+        exchangeContainer.addEventListener('click', async function(e) {
+            const removeBtn = e.target.closest('.remove-alias-btn');
+            if (removeBtn) {
+                const alias = removeBtn.dataset.alias;
+                setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover o alias "${alias}"?`, async () => {
+                    try {
+                        const response = await fetch(`/api/remove_alias/${username}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                            body: JSON.stringify({ alias })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                        showToast(result.message, 'success');
+                        exchangeLoaded = false;
+                        fetchExchangeData();
+                    } catch (error) {
+                        showToast(`Falha ao remover: ${error.message}`, 'error');
+                    }
+                });
+            }
+
+            const primaryBtn = e.target.closest('.set-primary-btn');
+            if (primaryBtn) {
+                const alias = primaryBtn.dataset.alias;
+                setupConfirmationModal('Alterar E-mail Principal', `Deseja definir "${alias}" como o e-mail principal?`, async () => {
+                    try {
+                        const response = await fetch(`/api/set_primary_alias/${username}`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                            body: JSON.stringify({ alias })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                        showToast(result.message, 'success');
+                        exchangeLoaded = false;
+                        fetchExchangeData();
+                    } catch (error) {
+                        showToast(`Falha ao alterar principal: ${error.message}`, 'error');
+                    }
+                });
+            }
+        });
+    }
 });
 </script>
+
+<!-- Modal Alterar Gerente -->
+<div class="modal fade" id="changeManagerModal" tabindex="-1" aria-labelledby="changeManagerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changeManagerModalLabel">Alterar Gerente de {{ user_name }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="managerSearchInput" class="form-label">Buscar Gerente (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="managerSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="managerSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Subordinado -->
+<div class="modal fade" id="addSubordinateModal" tabindex="-1" aria-labelledby="addSubordinateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSubordinateModalLabel">Adicionar Subordinado para {{ user_name }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="subordinateSearchInput" class="form-label">Buscar Subordinado (Login ou Nome):</label>
+                    <input type="text" class="form-control" id="subordinateSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="subordinateSearchResults" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

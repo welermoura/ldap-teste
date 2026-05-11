@@ -30,7 +30,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('admin_login') }}" class="needs-validation" novalidate>
+        <form method="POST" action="{{ url_for('admin.admin_login') }}" class="needs-validation" novalidate>
             {{ form.hidden_tag() }}
             <div class="mb-3">
                 {{ render_field(form.username, class='form-control text-center', placeholder='Usuário Admin', label_visible=false) }}
@@ -43,7 +43,7 @@
             </div>
         </form>
 
-        <a href="{{ url_for('login') }}" class="admin-link mt-4">Voltar para o Login de Operador</a>
+        <a href="{{ url_for('auth.login') }}" class="admin-link mt-4">Voltar para o Login de Operador</a>
     </div>
 </div>
 {% endblock %}

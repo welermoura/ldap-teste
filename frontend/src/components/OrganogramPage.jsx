@@ -414,6 +414,7 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                 ${isDirectSubordinate ? 'state-subordinate' : ''}
                 ${isAncestor ? 'state-ancestor' : ''}
                 ${isDimmed ? 'state-dimmed' : ''}
+                ${node.isDisabled ? 'state-disabled' : ''}
             `}
             onClick={(e) => {
                 e.stopPropagation();
@@ -444,7 +445,14 @@ const NodeCard = ({ node, isExpanded, toggleNode, hasChildren, isMatch, parentId
                         {getInitials(node.name)}
                     </div>
                     <div className="info">
-                        <h6 className="name" title={node.name}>{node.name}</h6>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <h6 className="name" title={node.name}>{node.name}</h6>
+                            {node.isDisabled && (
+                                <span title="Afastado / Bloqueado" style={{ color: '#ef4444' }}>
+                                    <XCircle size={14} />
+                                </span>
+                            )}
+                        </div>
                         <p className="role" title={node.title}>{node.title || 'Cargo não definido'}</p>
                     </div>
                 </div>
@@ -542,6 +550,19 @@ const ProfileOffcanvas = () => {
                         }}>
                             {node.department}
                         </span>
+                    )}
+
+                    {node.isDisabled && (
+                        <div style={{ 
+                            marginTop: '16px', padding: '8px 12px', borderRadius: '8px', 
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', 
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                            fontSize: '0.9rem', fontWeight: '500'
+                        }}>
+                            <AlertTriangle size={16} />
+                            Status: Bloqueado / Afastado
+                        </div>
                     )}
                 </div>
 
@@ -1463,18 +1484,17 @@ const OrganogramPage = () => {
 
                     /* --- Card Styles --- */
                     .org-card {
-                        background: var(--bg-card);
                         width: 280px;
-                        position: relative;
+                        background-color: #fff;
+                        border: 1px solid var(--border-color);
                         border-radius: 16px;
-                        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -4px rgba(0,0,0,0.05);
-                        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                        cursor: pointer;
-                        z-index: 2;
-                        border: 1px solid transparent;
+                        box-shadow: var(--shadow-sm);
                         display: flex;
                         flex-direction: row;
-                        outline: none;
+                        transition: all 0.3s var(--ease-out);
+                        cursor: pointer;
+                        overflow: visible;
+                        position: relative;
                     }
 
                     /* Left Accent Bar */
@@ -1525,9 +1545,19 @@ const OrganogramPage = () => {
 
                     /* Dimmed State */
                     .org-card.state-dimmed {
-                        opacity: 0.55;
-                        filter: grayscale(0.6);
+                        filter: grayscale(0.8) contrast(0.9);
                         transform: scale(0.98);
+                    }
+
+                    /* Disabled / On Vacation State */
+                    .org-card.state-disabled {
+                        filter: grayscale(0.4);
+                        border: 1px dashed #ef4444 !important;
+                        background-color: #fff !important;
+                    }
+                    .org-card.state-disabled .avatar {
+                        filter: grayscale(1);
+                        opacity: 0.8;
                     }
 
                     /* Highlight (Search Match) */
