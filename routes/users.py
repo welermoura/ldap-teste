@@ -666,8 +666,9 @@ def api_schedule_reactivation(username):
                 if conn.result['description'] == 'success':
                     # Limpa qualquer agendamento de reativação pendente
                     schedules = load_schedules()
-                    if username in schedules:
-                        del schedules[username]
+                    username_lower = username.lower()
+                    if username_lower in schedules:
+                        del schedules[username_lower]
                         save_schedules(schedules)
                     
                     logging.info(f"[ALTERAÇÃO] Conta '{username}' reativada IMEDIATAMENTE por '{session.get('user_display_name')}'.")
@@ -680,7 +681,7 @@ def api_schedule_reactivation(username):
         else:
             # Agendar para o FUTURO
             schedules = load_schedules()
-            schedules[username] = reactivation_date.isoformat()
+            schedules[username.lower()] = reactivation_date.isoformat()
             save_schedules(schedules)
             logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
             return jsonify({'success': True, 'message': f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
@@ -698,18 +699,19 @@ def api_cancel_absence(username):
     try:
         disable_schedules = load_disable_schedules()
         reactivation_schedules = load_schedules()
-        deactivation_scheduled = username in disable_schedules
-        reactivation_scheduled = username in reactivation_schedules
+        username_lower = username.lower()
+        deactivation_scheduled = username_lower in disable_schedules
+        reactivation_scheduled = username_lower in reactivation_schedules
         if not deactivation_scheduled and not reactivation_scheduled:
             return jsonify({'error': 'Nenhum agendamento de ausência encontrado para este usuário.'}), 404
         message = ""
         if deactivation_scheduled:
-            del disable_schedules[username]
+            del disable_schedules[username_lower]
             save_disable_schedules(disable_schedules)
             logging.info(f"[AGENDAMENTO CANCELADO] A desativação futura de '{username}' foi cancelada por '{session.get('user_display_name')}'.")
             message += "Agendamento de desativação cancelado. "
         if reactivation_scheduled:
-            del reactivation_schedules[username]
+            del reactivation_schedules[username_lower]
             save_schedules(reactivation_schedules)
             conn = get_service_account_connection()
             user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
