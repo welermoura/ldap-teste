@@ -990,6 +990,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    const scheduleAbsenceForm = document.getElementById('scheduleAbsenceForm');
+    if (scheduleAbsenceForm) {
+        scheduleAbsenceForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const deactivationDate = document.getElementById('deactivation_date').value;
+            const reactivationDate = document.getElementById('reactivation_date').value;
+            
+            try {
+                const response = await fetch(`/api/schedule_absence/${username}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ 
+                        deactivation_date: deactivationDate,
+                        reactivation_date: reactivationDate 
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast(result.message, 'success');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleAbsenceModal'));
+                if (modal) modal.hide();
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                showToast(`Falha ao agendar ausência: ${error.message}`, 'error');
+            }
+        });
+    }
+
     // === Lógica do Organograma ===
 
     // Função genérica de busca de usuários para o Organograma
