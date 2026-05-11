@@ -526,7 +526,7 @@ def api_search_ad():
         conn = get_read_connection()
         config = load_config()
         search_base = config.get('AD_SEARCH_BASE')
-        search_filter = f"(&(objectCategory=person)(|(sAMAccountName=*{query}*)(displayName=*{query}*)(cn=*{query}*)))"
+        search_filter = f"(&(objectCategory=person)(|(sAMAccountName=*{query}*)(displayName=*{query}*)(cn=*{query}*)(extensionAttribute4=*{query}*)))"
         conn.search(search_base, search_filter, SUBTREE, attributes=['displayName', 'cn', 'sAMAccountName', 'objectClass', 'distinguishedName', 'title', 'department'])
         results = []
         for entry in conn.entries:

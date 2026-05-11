@@ -862,6 +862,7 @@ def export_ad_data():
         'sAMAccountName': 'Login (Pre-2k)',
         'userPrincipalName': 'Login (UPN)',
         'displayName': 'Nome para Exibição',
+        'extensionAttribute4': 'Matrícula',
         'whenCreated': 'Data de Criação',
         'whenChanged': 'Última Alteração'
     }
