@@ -256,7 +256,8 @@ def view_user(username):
         has_photo = 'thumbnailPhoto' in user and user.thumbnailPhoto.value is not None
         form = EditUserForm()
         delete_form = DeleteUserForm()
-        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info, manager_info=manager_info, direct_reports_info=direct_reports_info, has_photo=has_photo)
+        today_date = date.today().isoformat()
+        return render_template('view_user.html', user=user, form=form, delete_form=delete_form, password_expiry_info=password_expiry_info, absence_scheduled=absence_scheduled, absence_info=absence_info, manager_info=manager_info, direct_reports_info=direct_reports_info, has_photo=has_photo, today_date=today_date)
     except Exception as e:
         flash(f"Erro ao buscar detalhes do usuário: {e}", "error")
         logging.error(f"Erro ao buscar detalhes do usuário para {username}: {e}", exc_info=True)
@@ -637,6 +638,57 @@ def api_schedule_absence(username):
     except Exception as e:
         logging.error(f"Erro em api_schedule_absence para '{username}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao agendar ausência: {e}'}), 500
+
+@users_bp.route('/api/schedule_reactivation/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_disable')
+def api_schedule_reactivation(username):
+    data = request.get_json()
+    reactivation_date_str = data.get('reactivation_date')
+    if not reactivation_date_str:
+        return jsonify({'error': 'A data de reativação é obrigatória.'}), 400
+    try:
+        reactivation_date = date.fromisoformat(reactivation_date_str)
+        today = date.today()
+        
+        if reactivation_date <= today:
+            # Reativar IMEDIATAMENTE
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, username, ['userAccountControl', 'distinguishedName'])
+            if not user:
+                return jsonify({'error': 'Usuário não encontrado.'}), 404
+            
+            uac = user.userAccountControl.value
+            if uac & 2: # Se a conta estiver desativada
+                new_uac = uac - 2
+                conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])]})
+                if conn.result['description'] == 'success':
+                    # Limpa qualquer agendamento de reativação pendente
+                    schedules = load_schedules()
+                    if username in schedules:
+                        del schedules[username]
+                        save_schedules(schedules)
+                    
+                    logging.info(f"[ALTERAÇÃO] Conta '{username}' reativada IMEDIATAMENTE por '{session.get('user_display_name')}'.")
+                    save_to_history('activation', username, f"Reativado manualmente por {session.get('user_display_name')}")
+                    return jsonify({'success': True, 'message': 'Conta reativada com sucesso!'})
+                else:
+                    return jsonify({'error': f"Falha ao reativar no AD: {conn.result['message']}"}), 500
+            else:
+                return jsonify({'success': True, 'message': 'A conta já está ativa.'})
+        else:
+            # Agendar para o FUTURO
+            schedules = load_schedules()
+            schedules[username] = reactivation_date.isoformat()
+            save_schedules(schedules)
+            logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
+            
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
+    except Exception as e:
+        logging.error(f"Erro em api_schedule_reactivation para '{username}': {e}", exc_info=True)
+        return jsonify({'error': f'Falha ao processar reativação: {e}'}), 500
 
 @users_bp.route('/api/cancel_absence/<username>', methods=['POST'])
 @require_auth

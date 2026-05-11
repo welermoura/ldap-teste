@@ -79,10 +79,9 @@
                 <div class="d-grid gap-2">
                     {% if check_permission(action='can_disable') %}
                         {% if status == 'Desativado' %}
-                            <form action="{{ url_for('users.toggle_status', username=get_attr_value(user, 'sAMAccountName')) }}" method="POST">
-                                {{ form.csrf_token }}
-                                <button type="submit" class="btn btn-success w-100"><i class="fas fa-check-circle me-2"></i>Reativar Conta</button>
-                            </form>
+                            <button type="button" class="btn btn-success w-100" data-bs-toggle="modal" data-bs-target="#scheduleReactivationModal">
+                                <i class="fas fa-check-circle me-2"></i>Reativar Conta
+                            </button>
                         {% elif status == 'Ativo' %}
                             <button type="button" class="btn btn-info w-100" data-bs-toggle="modal" data-bs-target="#scheduleAbsenceModal">
                                 <i class="fas fa-calendar-alt me-2"></i>Agendar Ausência
@@ -261,6 +260,10 @@
     </div>
 </div>
 
+    </div>
+  </div>
+</div>
+
 <!-- Modal para Agendar Ausência -->
 <div class="modal fade" id="scheduleAbsenceModal" tabindex="-1" aria-labelledby="scheduleAbsenceModalLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -284,6 +287,32 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar Agendamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Agendar Reativação -->
+<div class="modal fade" id="scheduleReactivationModal" tabindex="-1" aria-labelledby="scheduleReactivationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="scheduleReactivationModalLabel">Reativar Conta de {{ get_attr_value(user, 'displayName') }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="scheduleReactivationForm">
+        {{ form.csrf_token }}
+        <div class="modal-body">
+          <p>Selecione a data em que a conta deve ser reativada. Deixe a data de hoje para reativar imediatamente.</p>
+          <div class="mb-3">
+            <label for="reactivation_date_only" class="form-label">Data de Reativação</label>
+            <input type="date" class="form-control" id="reactivation_date_only" name="reactivation_date" required value="{{ today_date }}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar Reativação</button>
         </div>
       </form>
     </div>
@@ -926,6 +955,31 @@ document.addEventListener('DOMContentLoaded', function() {
         newPasswordInput.value = '';
         confirmPasswordInput.value = '';
     });
+
+    const scheduleReactivationForm = document.getElementById('scheduleReactivationForm');
+    const reactivationDateInput = document.getElementById('reactivation_date_only');
+
+    if (scheduleReactivationForm) {
+        scheduleReactivationForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const reactivationDate = reactivationDateInput.value;
+            
+            try {
+                const response = await fetch(`/api/schedule_reactivation/${username}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ reactivation_date: reactivationDate })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast(result.message, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                showToast(`Falha ao agendar reativação: ${error.message}`, 'error');
+            }
+        });
+    }
 
     if(cancelAbsenceBtn) {
         cancelAbsenceBtn.addEventListener('click', function() {
