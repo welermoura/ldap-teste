@@ -534,7 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
         groups.forEach(group => {
             const row = tbody.insertRow();
             row.innerHTML = `
-                <td><a href="/groups/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
+                <td><a href="/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
                 <td>${escapeHTML(group.description) || 'N/A'}</td>
                 <td class="text-end">
                     <button class="btn btn-danger btn-sm remove-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Remover do grupo">
@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tabLoaded) return;
         showLoading(memberOfContainer, 'Carregando grupos...');
         try {
-            const response = await fetch(`/groups/api/user_groups/${username}`);
+            const response = await fetch(`/api/user_groups/${username}`);
             if (!response.ok) throw new Error('Falha ao buscar os grupos do usuário.');
             allUserGroups = await response.json();
             renderGroups(allUserGroups);
@@ -592,7 +592,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function removeGroup(groupName) {
         setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover o usuário do grupo "${groupName}"?`, async () => {
             try {
-                const response = await fetch('/groups/api/remove_user_from_group', {
+                const response = await fetch('/api/remove_user_from_group', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ username, group_name: groupName })
@@ -612,7 +612,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function addGroup(groupName) {
         try {
-            const response = await fetch('/groups/api/add_user_to_group', {
+            const response = await fetch('/api/add_user_to_group', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({ username, group_name: groupName })
@@ -636,7 +636,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         try {
-            const response = await fetch('/groups/api/add_user_to_group_temp', {
+            const response = await fetch('/api/add_user_to_group_temp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({
@@ -667,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         showLoading(groupSearchResults, 'Buscando...');
         try {
-            const response = await fetch(`/groups/api/search_groups?q=${encodeURIComponent(query)}&username=${encodeURIComponent(username)}`);
+            const response = await fetch(`/api/search_groups?q=${encodeURIComponent(query)}&username=${encodeURIComponent(username)}`);
             if (!response.ok) throw new Error('Falha na busca.');
             const groups = await response.json();
             renderSearchResults(groups);
