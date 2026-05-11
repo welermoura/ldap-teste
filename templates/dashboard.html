@@ -297,22 +297,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 wrapper.appendChild(leftColumn);
 
+                // Adiciona info de data se for desativação agendada
                 if (modalCurrentCategory === 'pending_deactivations' && item.sam) {
-                    const rightColumn = document.createElement('div');
-                    rightColumn.className = 'd-flex flex-column align-items-end';
+                    const rightCol = document.createElement('div');
+                    rightCol.className = 'd-flex flex-column align-items-end';
 
                     const dateBadge = document.createElement('span');
                     dateBadge.className = 'badge bg-dark';
                     dateBadge.textContent = `Data: ${item.scheduled_date}`;
-                    rightColumn.appendChild(dateBadge);
+                    rightCol.appendChild(dateBadge);
 
-                    wrapper.appendChild(rightColumn);
+                    wrapper.appendChild(rightCol);
                 }
 
                 // Adiciona botão de Reativar se for a categoria de desativados
                 if (['disabled_users', 'deactivated_last_week'].includes(modalCurrentCategory)) {
-                    const actionColumn = document.createElement('div');
-                    actionColumn.className = 'ms-3';
+                    const actionCol = document.createElement('div');
+                    actionCol.className = 'ms-3';
                     
                     const reactivateBtn = document.createElement('button');
                     reactivateBtn.className = 'btn btn-sm btn-success dashboard-reactivate-btn';
@@ -320,8 +321,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     reactivateBtn.dataset.sam = item.sam;
                     reactivateBtn.dataset.name = item.cn || item.sam;
                     
-                    actionColumn.appendChild(reactivateBtn);
-                    wrapper.appendChild(actionColumn);
+                    actionCol.appendChild(reactivateBtn);
+                    wrapper.appendChild(actionCol);
                 }
 
                 modalContent.appendChild(wrapper);
