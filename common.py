@@ -189,7 +189,7 @@ def load_schedules():
         with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return []
+        return {}
 
 def save_schedules(schedules):
     with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
@@ -200,7 +200,7 @@ def load_disable_schedules():
         with open(DISABLE_SCHEDULE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return []
+        return {}
 
 def save_disable_schedules(schedules):
     with open(DISABLE_SCHEDULE_FILE, 'w', encoding='utf-8') as f:
