@@ -668,7 +668,7 @@ def api_dashboard_list(category):
             sorted_users = sorted(scheduled_users, key=lambda x: x['date'])
             sam_names = [user['sam'] for user in sorted_users]
             items, total_pages = get_paginated_user_details(conn, search_base, sam_names, page, per_page, attributes)
-            user_dates = {user['sam'].lower(): user['date'].strftime('%d/%m/%Y') for user in sorted_users}
+            user_dates = {user['sam'].lower(): user['date'].strftime('%d-%m-%Y') for user in sorted_users}
             for item in items: item['scheduled_date'] = user_dates.get(item['sam'].lower())
 
         elif category == 'pending_deactivations':
@@ -687,7 +687,7 @@ def api_dashboard_list(category):
             sorted_users = sorted(scheduled_users, key=lambda x: x['date'])
             sam_names = [user['sam'] for user in sorted_users]
             items, total_pages = get_paginated_user_details(conn, search_base, sam_names, page, per_page, attributes)
-            user_dates = {user['sam'].lower(): user['date'].strftime('%d/%m/%Y') for user in sorted_users}
+            user_dates = {user['sam'].lower(): user['date'].strftime('%d-%m-%Y') for user in sorted_users}
             for item in items: item['scheduled_date'] = user_dates.get(item['sam'].lower())
 
         elif category in ['active_users', 'disabled_users']:

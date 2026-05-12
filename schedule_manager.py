@@ -22,6 +22,7 @@ logging.basicConfig(
     filename=log_path,
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%d-%m-%Y %H:%M:%S',
     encoding='utf-8'
 )
 

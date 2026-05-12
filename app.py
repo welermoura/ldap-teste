@@ -22,6 +22,7 @@ logging.basicConfig(
     filename=log_path,
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%d-%m-%Y %H:%M:%S',
     encoding='utf-8'
 )
 
@@ -72,7 +73,7 @@ def inject_global_vars():
 # Filtros Jinja customizados (se necessário)
 # ==============================================================================
 @app.template_filter('datetime')
-def format_datetime(value, format="%d/%m/%Y %H:%M"):
+def format_datetime(value, format="%d-%m-%Y %H:%M"):
     if value is None:
         return ""
     if isinstance(value, str):

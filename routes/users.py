@@ -202,9 +202,9 @@ def view_user(username):
             if expiry_datetime:
                 delta = expiry_datetime - datetime.now(timezone.utc)
                 if delta.days >= 0:
-                    password_expiry_info = f"Expira em {delta.days} dia(s) (em {expiry_datetime.strftime('%d/%m/%Y')})"
+                    password_expiry_info = f"Expira em {delta.days} dia(s) (em {expiry_datetime.strftime('%d-%m-%Y')})"
                 else:
-                    password_expiry_info = f"Expirou há {-delta.days} dia(s) (em {expiry_datetime.strftime('%d/%m/%Y')})"
+                    password_expiry_info = f"Expirou há {-delta.days} dia(s) (em {expiry_datetime.strftime('%d-%m-%Y')})"
             elif int(expiry_time_ft) == 9223372036854775807 or int(expiry_time_ft) == 0:
                  password_expiry_info = "A senha está configurada para nunca expirar."
 
@@ -215,8 +215,8 @@ def view_user(username):
         absence_info = None
         if absence_scheduled:
             try:
-                deactivation_date = datetime.strptime(disable_schedules[username_lower], '%Y-%m-%d').strftime('%d/%m/%Y')
-                reactivation_date = datetime.strptime(reactivation_schedules[username_lower], '%Y-%m-%d').strftime('%d/%m/%Y')
+                deactivation_date = datetime.strptime(disable_schedules[username_lower], '%Y-%m-%d').strftime('%d-%m-%Y')
+                reactivation_date = datetime.strptime(reactivation_schedules[username_lower], '%Y-%m-%d').strftime('%d-%m-%Y')
                 absence_info = {
                     'deactivation': deactivation_date,
                     'reactivation': reactivation_date
@@ -588,7 +588,7 @@ def api_disable_user_temp(username):
         schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(schedules)
         logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
-        return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
+        return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."})
     except Exception as e:
         logging.error(f"Erro em api_disable_user_temp para '{username}': {e}", exc_info=True)
         return jsonify({'error': f'Falha ao desativar temporariamente: {e}'}), 500
@@ -627,12 +627,12 @@ def api_schedule_absence(username):
             disable_schedules[username.lower()] = deactivation_date.isoformat()
             save_disable_schedules(disable_schedules)
             logging.info(f"[AGENDAMENTO] Desativação de '{username}' agendada para {deactivation_date_str} por '{session.get('user_display_name')}'.")
-            message = f"Desativação agendada para {deactivation_date.strftime('%d/%m/%Y')}. "
+            message = f"Desativação agendada para {deactivation_date.strftime('%d-%m-%Y')}. "
         reactivation_schedules = load_schedules()
         reactivation_schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
         logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
-        message += f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."
+        message += f"Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."
         return jsonify({'success': True, 'message': message})
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400
@@ -684,7 +684,7 @@ def api_schedule_reactivation(username):
             schedules[username.lower()] = reactivation_date.isoformat()
             save_schedules(schedules)
             logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
-            return jsonify({'success': True, 'message': f"Reativação agendada para {reactivation_date.strftime('%d/%m/%Y')}."})
+            return jsonify({'success': True, 'message': f"Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."})
             
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use AAAA-MM-DD.'}), 400

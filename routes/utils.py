@@ -339,7 +339,7 @@ def get_recycle_bin_items(conn):
             obj_type = 'user' if 'user' in obj_classes else 'group' if 'group' in obj_classes else 'computer' if 'computer' in obj_classes else 'other'
             
             # Data de exclusão aproximada pelo whenChanged
-            deleted_date = entry.whenChanged.value.strftime('%d/%m/%Y %H:%M') if entry.whenChanged else 'N/A'
+            deleted_date = entry.whenChanged.value.strftime('%d-%m-%Y %H:%M') if entry.whenChanged else 'N/A'
             
             items.append({
                 'name': get_attr_value(entry, 'displayName') or get_attr_value(entry, 'cn') or get_attr_value(entry, 'msDS-LastKnownRDN'),

@@ -444,7 +444,7 @@ def create_ad_user(conn, form_data, model_attrs):
         if 'memberOf' in model_attrs and model_attrs.memberOf:
             conn.extend.microsoft.add_members_to_groups(user_dn, [str(g) for g in model_attrs.memberOf])
             
-        logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado.")
+        logging.info(f"[CRIAÇÃO] Usuário '{display_name}' ({sam}) foi criado por '{session.get('user_display_name', session.get('ad_user', 'System'))}'.")
         save_to_history('creation', sam, f"Criado por {session.get('user_display_name', 'System')}")
         return {
             'success': True, 'message': f"Usuário '{display_name}' criado com sucesso!", 
@@ -452,7 +452,7 @@ def create_ad_user(conn, form_data, model_attrs):
             'display_name': display_name, 'initials': initials, 'ou_path': get_ou_path(model_attrs.entry_dn)
         }
     except Exception as e:
-        logging.error(f"Erro ao criar o usuário '{display_name}': {e}")
+        logging.error(f"Erro ao criar o usuário '{display_name}' por '{session.get('user_display_name', session.get('ad_user', 'System'))}': {e}")
         try:
             conn.delete(user_dn)
         except:
