@@ -8,9 +8,9 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Entrar')
 
 class AdminRegistrationForm(FlaskForm):
-    username = StringField('Nome de Usuário do Admin', validators=[DataRequired(), Length(min=4, max=25)])
-    password = PasswordField('Senha do Admin', validators=[DataRequired(), Length(min=8)])
-    confirm_password = PasswordField('Confirmar Senha', validators=[DataRequired(), EqualTo('password')])
+    username = StringField('Nome de Usuário do Admin', validators=[DataRequired(), Length(min=3, max=50)])
+    password = PasswordField('Senha do Admin', validators=[])
+    confirm_password = PasswordField('Confirmar Senha', validators=[EqualTo('password')])
     submit = SubmitField('Registrar Admin')
 
 class AdminLoginForm(FlaskForm):

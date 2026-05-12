@@ -37,36 +37,35 @@ def load_history():
 
 admin_bp = Blueprint('admin', __name__)
 
-@admin_bp.route('/admin/login', methods=['GET', 'POST'])
+@admin_bp.route('/admin/login')
 def admin_login():
-    from common import load_user
-    form = AdminLoginForm()
-    if form.validate_on_submit():
-        admin_user = load_user()
-        if admin_user and admin_user['username'] == form.username.data and check_password_hash(admin_user['password_hash'], form.password.data):
-            session['master_admin'] = admin_user['username']
-            return redirect(url_for('admin.dashboard'))
-        else:
-            flash('Nome de usuário ou senha do administrador inválidos.', 'danger')
-    return render_template('admin/login.html', form=form)
+    # Redireciona para o login único do sistema
+    return redirect(url_for('auth.login'))
 
 @admin_bp.route('/admin/logout')
 def admin_logout():
-    session.pop('master_admin', None)
-    flash('Você foi desconectado do painel de administração.', 'info')
-    return redirect(url_for('admin.admin_login'))
+    session.clear()
+    flash('Você foi desconectado.', 'info')
+    return redirect(url_for('auth.login'))
 
 @admin_bp.route('/admin/register', methods=['GET', 'POST'])
 def admin_register():
-    from common import load_user, save_user
-    if load_user():
-        flash('O administrador já está registrado.', 'warning')
-        return redirect(url_for('admin.admin_login'))
+    data_dir = os.path.join(current_app.root_path, 'data')
+    users_file = os.path.join(data_dir, 'users.json')
+    
+    # Se já existir qualquer admin, redireciona para login
+    if os.path.exists(users_file):
+        with open(users_file, 'r') as f:
+            if json.load(f):
+                flash('O administrador já está registrado.', 'warning')
+                return redirect(url_for('admin.admin_login'))
     
     form = AdminRegistrationForm()
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data)
-        save_user({'username': form.username.data, 'password_hash': hashed_password})
+        users = {form.username.data: hashed_password}
+        with open(users_file, 'w') as f:
+            json.dump(users, f)
         flash('Administrador registrado com sucesso! Agora você pode fazer login.', 'success')
         return redirect(url_for('admin.admin_login'))
     return render_template('admin/register.html', form=form)
@@ -74,26 +73,34 @@ def admin_register():
 @admin_bp.route('/admin/dashboard')
 @require_auth
 def dashboard():
-    if 'master_admin' not in session and not check_permission(action='can_edit_config'):
+    if not session.get('is_admin'):
         return redirect(url_for('main.dashboard'))
     return render_template('admin/dashboard.html')
 
 @admin_bp.route('/admin/change_password', methods=['GET', 'POST'])
 @require_auth
 def admin_change_password():
-    from common import load_user, save_user
     if 'master_admin' not in session:
         return redirect(url_for('admin.admin_login'))
+    
     form = AdminChangePasswordForm()
     if form.validate_on_submit():
-        admin_user = load_user()
-        if check_password_hash(admin_user['password_hash'], form.current_password.data):
-            admin_user['password_hash'] = generate_password_hash(form.new_password.data)
-            save_user(admin_user)
-            flash('Senha alterada com sucesso!', 'success')
-            return redirect(url_for('admin.dashboard'))
-        else:
-            flash('A senha atual está incorreta.', 'danger')
+        username = session['master_admin']
+        data_dir = os.path.join(current_app.root_path, 'data')
+        users_file = os.path.join(data_dir, 'users.json')
+        
+        if os.path.exists(users_file):
+            with open(users_file, 'r') as f:
+                users = json.load(f)
+            
+            if username in users and check_password_hash(users[username], form.current_password.data):
+                users[username] = generate_password_hash(form.new_password.data)
+                with open(users_file, 'w') as f:
+                    json.dump(users, f)
+                flash('Senha alterada com sucesso!', 'success')
+                return redirect(url_for('admin.dashboard'))
+            else:
+                flash('A senha atual está incorreta.', 'danger')
     return render_template('admin/change_password.html', form=form)
 
 @admin_bp.route('/admin/config', methods=['GET', 'POST'])
@@ -232,7 +239,7 @@ def admin_permissions():
 
                 if perm_type == 'custom':
                     # Ações
-                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange']
+                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange', 'can_manage_schedules']
                     for action in actions:
                         new_permissions[group]["actions"][action] = (request.form.get(f"{group}_{action}") == 'on')
                     
@@ -274,25 +281,65 @@ def admin_permissions():
                            search_form=search_form,
                            available_fields=AVAILABLE_FIELDS)
 
-@admin_bp.route('/admin/logs')
+@admin_bp.route('/admin/logs', methods=['GET', 'POST'])
 @require_auth
 @require_permission(action='can_view_logs')
 def admin_logs():
+    from forms.admin import LogSearchForm
     form = LogSearchForm()
-    query = request.args.get('search_query', '').strip()
+    
+    # Busca query do formulário ou da URL
+    query = ""
+    active_tab = request.form.get('active_tab', 'creation')
+    
+    if request.method == 'POST':
+        query = form.search_query.data.strip() if form.search_query.data else ""
+    else:
+        query = request.args.get('search_query', '').strip()
+        form.search_query.data = query
+
     log_path = os.path.join(current_app.root_path, 'logs', 'ad_creator.log')
-    logs = []
+    logs = {
+        'creation': [],
+        'alteration': [],
+        'exclusion': [],
+        'movement': []
+    }
+    
     if os.path.exists(log_path):
         try:
             with open(log_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 for line in reversed(lines):
-                    if not query or query.lower() in line.lower():
-                        logs.append(line.strip())
-                    if len(logs) >= 500: break
+                    line_strip = line.strip()
+                    if not query or query.lower() in line_strip.lower():
+                        # Tenta parsear o formato: YYYY-MM-DD HH:MM:SS,mmm - LEVEL - MESSAGE
+                        parts = line_strip.split(' - ', 2)
+                        if len(parts) >= 3:
+                            ts = parts[0]
+                            msg = parts[2]
+                        else:
+                            ts = ""
+                            msg = line_strip
+                            
+                        log_obj = {'timestamp': ts, 'message': msg}
+                        
+                        if '[CRIAÇÃO]' in line_strip:
+                            logs['creation'].append(log_obj)
+                        elif '[ALTERAÇÃO]' in line_strip:
+                            logs['alteration'].append(log_obj)
+                        elif '[EXCLUSÃO]' in line_strip:
+                            logs['exclusion'].append(log_obj)
+                        elif '[MOVIMENTAÇÃO]' in line_strip:
+                            logs['movement'].append(log_obj)
+                    
+                    # Limita o total de logs para performance
+                    if sum(len(v) for v in logs.values()) >= 1000:
+                        break
         except Exception as e:
             flash(f"Erro ao ler arquivo de log: {e}", "error")
-    return render_template('admin/logs.html', logs=logs, form=form)
+            
+    return render_template('admin/logs.html', logs=logs, search_form=form, active_tab=active_tab)
 
 @admin_bp.route('/admin/history')
 @require_auth
@@ -331,10 +378,19 @@ def admin_add_user():
         if username in users:
             flash('Usuário já existe.', 'error')
         else:
-            users[username] = generate_password_hash(password)
+            use_ad_auth = request.form.get('use_ad_auth') == 'on'
+            if use_ad_auth:
+                users[username] = "AD_AUTH"
+                flash('Administrador do AD adicionado com sucesso!', 'success')
+            else:
+                if not password or len(password) < 8:
+                    flash('Erro: Para administradores locais, a senha deve ter pelo menos 8 caracteres.', 'error')
+                    return render_template('admin/add_user.html', form=form)
+                users[username] = generate_password_hash(password)
+                flash('Administrador local adicionado com sucesso!', 'success')
+            
             with open(users_file, 'w') as f:
                 json.dump(users, f)
-            flash('Usuário admin adicionado com sucesso!', 'success')
             return redirect(url_for('admin.admin_users'))
     return render_template('admin/add_user.html', form=form)
 
@@ -342,7 +398,7 @@ def admin_add_user():
 @require_auth
 @require_permission(action='can_edit_config')
 def admin_delete_user(username):
-    if username == session.get('user'):
+    if username == session.get('master_admin'):
         flash('Você não pode excluir a si mesmo.', 'error')
         return redirect(url_for('admin.admin_users'))
     data_dir = os.path.join(current_app.root_path, 'data')

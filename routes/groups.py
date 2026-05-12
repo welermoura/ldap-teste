@@ -124,12 +124,6 @@ def remove_member(group_name, user_sam):
         logging.error(f"Erro ao remover usuário '{user_sam}' do grupo '{group_name}': {e}", exc_info=True)
     return redirect(url_for('groups.view_group', group_name=group_name))
 
-@groups_bp.route('/group_schedules')
-@require_auth
-@require_permission(action='can_manage_groups')
-def group_schedules():
-    schedules = load_group_schedules()
-    return render_template('group_schedules.html', schedules=schedules)
 
 # API ENDPOINTS
 @groups_bp.route('/api/group_members/<group_name>')

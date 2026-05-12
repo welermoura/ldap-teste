@@ -26,30 +26,73 @@ def login():
         username = form.username.data
         password = form.password.data
         
-        # Lógica de Autenticação (LDAP ou Local)
-        # Primeiro tenta local (admin do sistema)
+        # 1. Carrega a lista de administradores (Locais e AD)
         data_dir = os.path.join(current_app.root_path, 'data')
         users_file = os.path.join(data_dir, 'users.json')
+        admins = {}
         if os.path.exists(users_file):
             with open(users_file, 'r') as f:
-                local_users = json.load(f)
-            if username in local_users and check_password_hash(local_users[username], password):
-                session['ad_user'] = username
-                session['user_display_name'] = f"{username} (Admin Local)"
+                admins = json.load(f)
+        
+        # Fallback para migração do usuário master antigo
+        if not admins or username.lower() == 'admin':
+            from common import load_user
+            old_admin = load_user()
+            if old_admin and old_admin['username'].lower() == username.lower():
+                admins[old_admin['username']] = old_admin['password_hash']
+                with open(users_file, 'w') as f:
+                    json.dump(admins, f)
+        
+        # 2. Busca o usuário na lista de admins (case-insensitive)
+        admin_key = next((k for k in admins if k.lower() == username.lower()), None)
+        
+        # 3. Tenta autenticação como Administrador Local
+        if admin_key and admins[admin_key] != "AD_AUTH":
+            if check_password_hash(admins[admin_key], password):
+                session['ad_user'] = admin_key
+                session['user_display_name'] = f"{admin_key} (Admin Local)"
                 session['is_admin'] = True
                 session['access_level'] = 'full'
                 return redirect(url_for('main.dashboard'))
 
-        # Se não for local, tenta AD
+        # 4. Tenta autenticação via Active Directory (Operadores ou Admins do AD)
         try:
-            user_dn = f"{username}@{config['AD_DOMAIN']}"
+            # Se for um Admin do AD, ele deve estar na lista 'admins' com "AD_AUTH"
+            is_ad_admin = admin_key and admins[admin_key] == "AD_AUTH"
+            
+            # Conexão LDAP
+            config = load_config()
+            user_dn = f"{username}@{config.get('AD_DOMAIN')}"
             conn = get_ldap_connection(user=user_dn, password=password)
             
-            # Busca grupos e nome de exibição
+            # Login bem-sucedido no AD!
+            session['ad_user'] = username
+            session['is_admin'] = is_ad_admin # Define se terá acesso ao menu admin
+            
+            # Busca detalhes do usuário no AD
             user_entry = get_user_by_samaccountname(conn, username, ['displayName', 'memberOf'])
-            if not user_entry:
-                flash('Usuário não encontrado no AD.', 'error')
-                return redirect(url_for('auth.login'))
+            if user_entry:
+                session['user_display_name'] = user_entry.displayName.value if 'displayName' in user_entry else username
+                
+                # Se for admin, acesso total. Se não, verifica grupos.
+                if is_ad_admin:
+                    session['access_level'] = 'full'
+                else:
+                    user_groups = []
+                    if 'memberOf' in user_entry:
+                        for group_dn in user_entry.memberOf:
+                            try:
+                                group_name = group_dn.split(',')[0].split('=')[1]
+                                user_groups.append(group_name)
+                            except: continue
+                    session['user_groups'] = user_groups
+                    session['access_level'] = get_user_access_level(user_groups)
+            
+            return redirect(url_for('main.dashboard'))
+        except Exception as e:
+            logging.warning(f"Falha de login para {username}: {e}")
+            flash('Usuário ou senha incorretos.', 'error')
+            return redirect(url_for('auth.login'))
 
             user_groups = []
             if 'memberOf' in user_entry:

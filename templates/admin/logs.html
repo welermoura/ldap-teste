@@ -4,15 +4,7 @@
 
 {% block title %}Logs do Sistema - Admin{% endblock %}
 
-{% block page_title %}
-<div class="page-header">
-    <h1><i class="fas fa-clipboard-list me-2"></i>Logs do Sistema</h1>
-    <div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-primary"><i class="fas fa-home me-2"></i>Home</a>
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Voltar ao Painel</a>
-    </div>
-</div>
-{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block scripts %}
 {{ super() }}
@@ -42,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {% block content %}
 <div class="card glass-card mb-4">
     <div class="card-body">
-        <form method="POST" action="{{ url_for('admin_logs') }}" class="d-flex" id="searchForm">
+        <form method="POST" action="{{ url_for('admin.admin_logs') }}" class="d-flex" id="searchForm">
             {{ search_form.hidden_tag() }}
             <input type="hidden" name="active_tab" id="active_tab_input" value="{{ active_tab }}">
             <div class="flex-grow-1 me-2">

@@ -4,12 +4,6 @@
 
 {% from "_macros.html" import render_page_header %}
 
-{% block page_title %}
-    {% set title_text = '<i class="fas fa-user-circle me-2"></i>Detalhes de: ' ~ (get_attr_value(user, 'displayName') or 'N/A') %}
-    {{ render_page_header(title_text, back_url=url_for('users.manage_users')) }}
-{% endblock %}
-
-
 {% block content %}
 {% set status = get_user_status(user) %}
 <div class="row">

@@ -2,14 +2,7 @@
 
 {% block title %}Adicionar Administrador - Gestão AD{% endblock %}
 
-{% block page_title %}
-<div class="page-header">
-    <h1><i class="fas fa-user-plus me-2"></i>Novo Administrador</h1>
-    <a href="{{ url_for('admin.admin_users') }}" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-left me-2"></i>Voltar
-    </a>
-</div>
-{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -19,28 +12,48 @@
                 <form method="POST">
                     {{ form.hidden_tag() }}
                     
+                    <div class="mb-4">
+                        <label class="form-label fw-bold"><i class="fas fa-search me-2 text-primary"></i>Pesquisar no AD</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-user-search"></i></span>
+                            <input type="text" id="ad_search" class="form-control" placeholder="Digite o nome ou login para buscar no AD...">
+                        </div>
+                        <div id="search_results" class="list-group mt-2 shadow-sm border-0 glass-card" style="display:none; max-height: 200px; overflow-y: auto; position: absolute; z-index: 1000; width: calc(100% - 3rem);"></div>
+                        <div class="form-text mt-2">Busque o usuário no AD para preencher o login automaticamente.</div>
+                    </div>
+
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Nome de Usuário</label>
-                        {{ form.username(class="form-control", placeholder="Ex: admin_joao") }}
+                        <label class="form-label fw-bold">Login do Administrador</label>
+                        {{ form.username(class="form-control", placeholder="Ex: admin_joao", id="admin_username") }}
                         {% for error in form.username.errors %}
                             <div class="text-danger small mt-1">{{ error }}</div>
                         {% endfor %}
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Senha</label>
-                        {{ form.password(class="form-control", placeholder="Digite a senha") }}
-                        {% for error in form.password.errors %}
-                            <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                    <div class="mb-4 form-check form-switch p-3 glass-card border-0">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" id="use_ad_auth" name="use_ad_auth">
+                        <label class="form-check-label fw-bold" for="use_ad_auth">
+                            <i class="fas fa-network-wired me-1"></i> Usar autenticação do Active Directory
+                        </label>
+                        <div class="form-text mt-2">Se marcado, o administrador usará sua senha do Windows para entrar.</div>
                     </div>
+                    
+                    <div id="local_password_fields">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Senha Local</label>
+                            {{ form.password(class="form-control", placeholder="Digite a senha") }}
+                            {% for error in form.password.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Confirmar Senha</label>
-                        {{ form.confirm_password(class="form-control", placeholder="Repita a senha") }}
-                        {% for error in form.confirm_password.errors %}
-                            <div class="text-danger small mt-1">{{ error }}</div>
-                        {% endfor %}
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Confirmar Senha</label>
+                            {{ form.confirm_password(class="form-control", placeholder="Repita a senha") }}
+                            {% for error in form.confirm_password.errors %}
+                                <div class="text-danger small mt-1">{{ error }}</div>
+                            {% endfor %}
+                        </div>
                     </div>
 
                     <div class="d-grid">
@@ -58,4 +71,81 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const adSearch = document.getElementById('ad_search');
+    const searchResults = document.getElementById('search_results');
+    const adminUsername = document.getElementById('admin_username');
+    let timeout = null;
+
+    const useAdAuth = document.getElementById('use_ad_auth');
+    const localPasswordFields = document.getElementById('local_password_fields');
+
+    useAdAuth.addEventListener('change', function() {
+        if (this.checked) {
+            localPasswordFields.style.display = 'none';
+        } else {
+            localPasswordFields.style.display = 'block';
+        }
+    });
+
+    adSearch.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const query = adSearch.value.trim();
+        
+        if (query.length < 3) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        timeout = setTimeout(() => {
+            fetch(`/api/search_ad?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    searchResults.innerHTML = '';
+                    if (data.length > 0) {
+                        data.filter(item => item.type === 'user').forEach(item => {
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action border-0 py-2 bg-transparent text-reset';
+                            btn.innerHTML = `
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-bold">${item.name}</div>
+                                        <div class="small opacity-75">${item.sam}</div>
+                                    </div>
+                                    <i class="fas fa-plus-circle text-primary"></i>
+                                </div>
+                            `;
+                            btn.onclick = () => {
+                                adminUsername.value = item.sam;
+                                adSearch.value = item.name;
+                                searchResults.style.display = 'none';
+                                
+                                // Ativar autenticação AD automaticamente
+                                useAdAuth.checked = true;
+                                localPasswordFields.style.display = 'none';
+                            };
+                            searchResults.appendChild(btn);
+                        });
+                        searchResults.style.display = 'block';
+                    } else {
+                        searchResults.innerHTML = '<div class="list-group-item text-muted bg-transparent">Nenhum usuário encontrado.</div>';
+                        searchResults.style.display = 'block';
+                    }
+                });
+        }, 300);
+    });
+
+    // Fechar resultados ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!adSearch.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.style.display = 'none';
+        }
+    });
+});
+</script>
 {% endblock %}

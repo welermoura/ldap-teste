@@ -75,6 +75,15 @@ def inject_global_vars():
 def format_datetime(value, format="%d/%m/%Y %H:%M"):
     if value is None:
         return ""
+    if isinstance(value, str):
+        try:
+            from datetime import datetime
+            # Tenta converter de ISO format (comum em JSON)
+            # Remove o 'Z' se presente e substitui por offset UTC para fromisoformat
+            dt_str = value.replace('Z', '+00:00')
+            value = datetime.fromisoformat(dt_str)
+        except (ValueError, TypeError):
+            return value # Retorna a string original se não conseguir converter
     return value.strftime(format)
 
 # ==============================================================================

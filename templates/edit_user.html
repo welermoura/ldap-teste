@@ -5,11 +5,6 @@
 
 {% from "_macros.html" import render_page_header %}
 
-{% block page_title %}
-    {% set title_text = '<i class="fas fa-edit me-2"></i>Editar Usuário: ' ~ user_name %}
-    {{ render_page_header(title_text) }}
-{% endblock %}
-
 {% block content %}
 
 {% if check_permission(action='can_edit') %}

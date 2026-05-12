@@ -2,19 +2,7 @@
 
 {% block title %}Gerenciar Administradores - Gestão AD{% endblock %}
 
-{% block page_title %}
-<div class="page-header">
-    <h1><i class="fas fa-user-shield me-2"></i>Administradores do Sistema</h1>
-    <div>
-        <a href="{{ url_for('admin.admin_add_user') }}" class="btn btn-primary">
-            <i class="fas fa-user-plus me-2"></i>Adicionar Administrador
-        </a>
-        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary ms-2">
-            Voltar ao Painel
-        </a>
-    </div>
-</div>
-{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block content %}
 <div class="card glass-card animate-in">

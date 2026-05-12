@@ -14,10 +14,10 @@ limiter = Limiter(
 )
 
 def is_authenticated():
-    return 'ad_user' in session or 'master_admin' in session
+    return 'ad_user' in session or 'is_admin' in session
 
 def check_permission(action=None, field=None, view=None):
-    if 'master_admin' in session:
+    if session.get('is_admin'):
         return True
     access_level = session.get('access_level')
     if access_level == 'full':

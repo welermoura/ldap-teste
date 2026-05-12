@@ -2,14 +2,7 @@
 
 {% block title %}Painel de Administração - Gestão AD{% endblock %}
 
-{% block page_title %}
-<div class="page-header">
-    <h1><i class="fas fa-cogs me-2"></i>Painel de Administração</h1>
-    <a href="{{ url_for('admin.admin_logout') }}" class="btn btn-outline-secondary">
-        <i class="fas fa-sign-out-alt me-2"></i>Sair do Admin ({{ session.get('master_admin') }})
-    </a>
-</div>
-{% endblock %}
+{% block page_title %}{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -55,15 +48,6 @@
                 <i class="fas fa-key fa-3x mb-3"></i>
                 <h5 class="card-title">Alterar Senha do Admin</h5>
                 <p class="card-text text-muted">Altere a senha de acesso a este painel de administração.</p>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-6 mb-4">
-        <a href="{{ url_for('groups.group_schedules') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
-            <div class="card-body text-center">
-                <i class="fas fa-calendar-alt fa-3x mb-3"></i>
-                <h5 class="card-title">Gerenciar Agendamentos</h5>
-                <p class="card-text text-muted">Visualize, edite ou cancele os agendamentos de acesso temporário.</p>
             </div>
         </a>
     </div>
