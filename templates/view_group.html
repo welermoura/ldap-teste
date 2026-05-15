@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchMembers(page = 1, query = '') {
         showLoading(membersTableContainer);
         try {
-            const response = await fetch(`/groups/api/group_members/${groupName}?page=${page}&query=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/group_members/${groupName}?page=${page}&query=${encodeURIComponent(query)}`);
             if (!response.ok) throw new Error(`Erro na rede: ${response.statusText}`);
             const data = await response.json();
             renderMembers(data.members);
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function searchUsers(query) {
         showLoading(userSearchResultsContainer, 'Buscando...');
         try {
-            const response = await fetch(`/groups/api/search_users_for_group/${groupName}?query=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/search_users_for_group/${groupName}?query=${encodeURIComponent(query)}`);
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Erro na busca');
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function addMember(username) {
         try {
-            const response = await fetch('/groups/api/add_user_to_group', {
+            const response = await fetch('/api/add_user_to_group', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({ username, group_name: groupName })
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         try {
-            const response = await fetch('/groups/api/add_user_to_group_temp', {
+            const response = await fetch('/api/add_user_to_group_temp', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                 body: JSON.stringify({ username, group_name: groupName, start_date: startDate, end_date: endDate })
@@ -265,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function removeMember(username) {
         setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover '${username}' do grupo?`, async () => {
             try {
-                const response = await fetch('/groups/api/remove_user_from_group', {
+                const response = await fetch('/api/remove_user_from_group', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
                     body: JSON.stringify({ username: username, group_name: groupName })

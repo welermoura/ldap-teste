@@ -138,7 +138,7 @@ def api_group_members(group_name):
         group = get_group_by_name(conn, group_name, attributes=['member'])
         if not group:
             return jsonify({'error': 'Group not found'}), 404
-        member_dns = group.member.values if group.member.values else []
+        member_dns = group.member.values if 'member' in group and group.member.values else []
         if search_query:
             escaped_query = re.escape(search_query)
             member_dns = [dn for dn in member_dns if re.search(f'CN={escaped_query}', dn, re.IGNORECASE)]
