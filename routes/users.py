@@ -873,19 +873,11 @@ def export_ad_data():
             config = load_config()
             default_search_base = config.get('AD_SEARCH_BASE')
             
-            # Busca OUs principais para o seletor (limita a 100 por performance)
-            conn.search(default_search_base, '(objectClass=organizationalUnit)', search_scope=SUBTREE, attributes=['ou', 'name', 'distinguishedName'])
-            ous = []
-            for entry in conn.entries[:100]:
-                name = entry.ou.value if 'ou' in entry else entry.name.value if 'name' in entry else 'OU Desconhecida'
-                ous.append({'name': name, 'dn': entry.entry_dn})
-            
             form = FlaskForm()
             return render_template('export_setup.html', 
                                  form=form,
                                  available_attributes=available_attributes,
-                                 default_search_base=default_search_base,
-                                 ous=ous)
+                                 default_search_base=default_search_base)
         except Exception as e:
             logging.error(f"Erro ao carregar setup de exportação: {e}")
             flash("Erro ao carregar configurações de exportação.", "error")
