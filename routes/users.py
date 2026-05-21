@@ -153,6 +153,7 @@ def result():
 
 @users_bp.route('/ad-tree')
 @require_auth
+@require_permission(view='can_view_ad_tree')
 def ad_tree():
     basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     try:
@@ -791,6 +792,7 @@ def api_remove_photo(username):
 
 @users_bp.route('/api/ad-tree/data')
 @require_auth
+@require_permission(view='can_view_ad_tree')
 def api_ad_tree_data():
     try:
         conn = get_read_connection()

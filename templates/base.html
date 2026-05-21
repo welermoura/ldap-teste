@@ -83,9 +83,11 @@
             <a href="{{ url_for('main.organograma') }}" class="sidebar-link {% if request.endpoint == 'main.organograma' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Organograma">
                 <i class="fas fa-sitemap"></i><span class="nav-label">Organograma</span>
             </a>
+            {% if check_permission(view='can_view_ad_tree') %}
             <a href="{{ url_for('users.ad_tree') }}" class="sidebar-link {% if request.endpoint == 'users.ad_tree' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Active Directory">
                 <i class="fas fa-network-wired"></i><span class="nav-label">Active Directory</span>
             </a>
+            {% endif %}
             {% if check_permission(view='can_export_data') %}
             <a href="{{ url_for('users.export_ad_data') }}" class="sidebar-link {% if request.endpoint == 'users.export_ad_data' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exportar Base AD">
                 <i class="fas fa-file-csv"></i><span class="nav-label">Exportar Base AD</span>

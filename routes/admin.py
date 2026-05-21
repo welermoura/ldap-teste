@@ -244,7 +244,7 @@ def admin_permissions():
                         new_permissions[group]["actions"][action] = (request.form.get(f"{group}_{action}") == 'on')
                     
                     # Views
-                    views = ['can_view_user_stats', 'can_view_deactivated_last_week', 'can_view_pending_reactivations', 'can_view_pending_deactivations', 'can_view_expiring_passwords', 'can_export_data', 'can_view_audit_logs']
+                    views = ['can_view_user_stats', 'can_view_deactivated_last_week', 'can_view_pending_reactivations', 'can_view_pending_deactivations', 'can_view_expiring_passwords', 'can_export_data', 'can_view_audit_logs', 'can_view_ad_tree']
                     for view in views:
                         new_permissions[group]["views"][view] = (request.form.get(f"{group}_{view}") == 'on')
                     

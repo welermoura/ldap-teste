@@ -88,6 +88,7 @@
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_pending_deactivations" {% if views.get('can_view_pending_deactivations') %}checked{% endif %}><label class="form-check-label">Card: Desativações Agendadas</label></div>
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_expiring_passwords" {% if views.get('can_view_expiring_passwords') %}checked{% endif %}><label class="form-check-label">Card: Senhas Expirando</label></div>
                                 <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_export_data" {% if views.get('can_export_data') %}checked{% endif %}><label class="form-check-label">Pode Exportar Dados</label></div>
+                                <div class="col-md-4 form-check"><input class="form-check-input" type="checkbox" name="{{ group }}_can_view_ad_tree" {% if views.get('can_view_ad_tree') %}checked{% endif %}><label class="form-check-label">Acessar Active Directory</label></div>
                             </div>
 
                             <div class="editable-fields-section" style="display: {% if actions.get('can_edit') %}block{% else %}none{% endif %};">
