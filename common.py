@@ -59,7 +59,7 @@ def get_flask_secret_key():
 key = load_key()
 cipher_suite = Fernet(key)
 
-SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD']
+SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD', 'ZIMBRA_ADMIN_PASSWORD']
 
 _cached_config = None
 

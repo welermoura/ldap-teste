@@ -239,7 +239,7 @@ def admin_permissions():
 
                 if perm_type == 'custom':
                     # Ações
-                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange', 'can_manage_schedules']
+                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange', 'can_manage_schedules', 'can_manage_zimbra']
                     for action in actions:
                         new_permissions[group]["actions"][action] = (request.form.get(f"{group}_{action}") == 'on')
                     

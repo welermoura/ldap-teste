@@ -21,6 +21,67 @@ from datetime import datetime, date, timedelta
 
 groups_bp = Blueprint('groups', __name__)
 
+def sync_zimbra_member_realtime(group_name, user_sam, action):
+    """
+    Sincroniza um membro em tempo real com o Zimbra em segundo plano (thread) se a integração estiver ativa.
+    action: 'add' ou 'remove'
+    """
+    import threading
+    
+    def _run_sync():
+        try:
+            from common import load_config
+            config = load_config()
+            if not config.get('ZIMBRA_ENABLED', False):
+                return
+                
+            zimbra_url = config.get('ZIMBRA_API_URL')
+            zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+            zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+            
+            if not zimbra_url or not zimbra_user:
+                return
+                
+            # Verifica se o grupo está mapeado
+            from routes.zimbra import load_zimbra_mappings
+            mappings = load_zimbra_mappings()
+            zimbra_email = None
+            for m in mappings:
+                if m['ad_group_name'] == group_name:
+                    zimbra_email = m['zimbra_dl_email']
+                    break
+                    
+            if not zimbra_email:
+                return
+                
+            # Busca o e-mail do usuário no AD
+            from common import get_service_account_connection, get_user_by_samaccountname, get_attr_value
+            conn = get_service_account_connection()
+            user = get_user_by_samaccountname(conn, user_sam, ['mail', 'userPrincipalName'])
+            if not user:
+                return
+                
+            member_email = get_attr_value(user, 'mail') or get_attr_value(user, 'userPrincipalName')
+            if not member_email:
+                return
+                
+            # Conecta e atualiza o Zimbra
+            from routes.zimbra_api import ZimbraSOAPClient
+            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+            
+            if action == 'add':
+                client.add_dl_member(zimbra_email, member_email)
+                logging.info(f"[ZIMBRA-REALTIME-SYNC] Membro '{member_email}' adicionado ao grupo Zimbra '{zimbra_email}' em tempo real.")
+            elif action == 'remove':
+                client.remove_dl_member(zimbra_email, member_email)
+                logging.info(f"[ZIMBRA-REALTIME-SYNC] Membro '{member_email}' removido do grupo Zimbra '{zimbra_email}' em tempo real.")
+                
+        except Exception as e:
+            logging.error(f"[ZIMBRA-REALTIME-SYNC] Erro ao sincronizar em tempo real ({action}) para o grupo {group_name}: {e}")
+
+    # Dispara a sincronização em uma thread separada para não travar a requisição da página do usuário
+    threading.Thread(target=_run_sync, daemon=True).start()
+
 @groups_bp.route('/group_management', methods=['GET', 'POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -113,6 +174,7 @@ def add_member(group_name):
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' com sucesso.", 'success')
                 logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+                sync_zimbra_member_realtime(group_name, user_sam, 'add')
                 try:
                     schedules = load_group_schedules()
                     schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
@@ -143,6 +205,7 @@ def remove_member(group_name, user_sam):
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' com sucesso.", 'success')
                 logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido permanentemente do grupo '{group_name}' por '{session.get('ad_user')}'.")
+                sync_zimbra_member_realtime(group_name, user_sam, 'remove')
                 try:
                     schedules = load_group_schedules()
                     schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == user_sam and s.get('group_name') == group_name)]
@@ -208,6 +271,169 @@ def api_group_members(group_name):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@groups_bp.route('/api/batch_add_members/<group_name>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_batch_add_members(group_name):
+    import os
+    if 'file' not in request.files:
+        return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Arquivo sem nome.'}), 400
+        
+    # Validar extensão do arquivo
+    allowed_extensions = {'.txt', '.csv', '.xlsx'}
+    _, ext = os.path.splitext(file.filename.lower())
+    if ext not in allowed_extensions:
+        return jsonify({'error': 'Formato de arquivo não suportado. Use apenas .txt, .csv ou .xlsx.'}), 400
+        
+    sam_accounts = []
+    try:
+        if ext == '.xlsx':
+            from openpyxl import load_workbook
+            wb = load_workbook(file, read_only=True)
+            sheet = wb.active
+            for row in sheet.iter_rows(values_only=True):
+                if row and row[0]:
+                    val = str(row[0]).strip()
+                    if val and val.lower() not in ['login', 'samaccountname', 'usuario', 'usuário', 'username', 'email', 'e-mail', 'mail']:
+                        sam_accounts.append(val)
+        else: # .txt ou .csv
+            content = file.read().decode('utf-8', errors='ignore')
+            # Divide o conteúdo por novas linhas, vírgulas ou ponto-e-vírgula
+            for line in re.split(r'[\r\n,;]+', content):
+                val = line.strip()
+                if val:
+                    if val.lower() not in ['login', 'samaccountname', 'usuario', 'usuário', 'username', 'email', 'e-mail', 'mail']:
+                        sam_accounts.append(val)
+    except Exception as e:
+        logging.error(f"Erro ao ler arquivo de lote para o grupo {group_name}: {e}", exc_info=True)
+        return jsonify({'error': f"Erro ao ler arquivo: {str(e)}"}), 500
+
+    # Remove duplicados da lista mantendo a ordem original
+    sam_accounts = list(dict.fromkeys(sam_accounts))
+    
+    if not sam_accounts:
+        return jsonify({'error': 'Nenhum login ou e-mail válido encontrado no arquivo.'}), 400
+        
+    results = []
+    stats = {
+        'total': len(sam_accounts),
+        'success': 0,
+        'already_member': 0,
+        'failed': 0
+    }
+    
+    def get_user_by_login_or_email(conn, identifier, attributes=None):
+        if attributes is None:
+            attributes = ['distinguishedName', 'displayName', 'sAMAccountName']
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+        if not search_base:
+            if conn.server.info and conn.server.info.other:
+                search_base = conn.server.info.other['defaultNamingContext'][0]
+            else:
+                raise Exception("AD_SEARCH_BASE não configurado.")
+        
+        # Se contiver '@', busca por mail ou userPrincipalName. Caso contrário, busca por sAMAccountName
+        if '@' in identifier:
+            search_filter = f"(|(mail={escape_filter_chars(identifier)})(userPrincipalName={escape_filter_chars(identifier)}))"
+        else:
+            search_filter = f"(sAMAccountName={escape_filter_chars(identifier)})"
+            
+        conn.search(search_base, search_filter, attributes=attributes)
+        if conn.entries:
+            return conn.entries[0]
+        return None
+
+    try:
+        conn = get_service_account_connection()
+        group_to_modify = get_group_by_name(conn, group_name, ['distinguishedName', 'member'])
+        if not group_to_modify:
+            return jsonify({'error': 'Grupo não encontrado.'}), 404
+            
+        group_dn = group_to_modify.distinguishedName.value
+        current_member_dns = set(group_to_modify.member.values) if 'member' in group_to_modify and group_to_modify.member.values else set()
+        
+        for sam in sam_accounts:
+            try:
+                # Busca o usuário por login ou e-mail/UPN
+                user = get_user_by_login_or_email(conn, sam, ['distinguishedName', 'displayName', 'sAMAccountName'])
+                if not user:
+                    results.append({
+                        'sam': sam,
+                        'name': 'Desconhecido',
+                        'status': 'error',
+                        'message': 'Não encontrado no AD'
+                    })
+                    stats['failed'] += 1
+                    continue
+                    
+                user_dn = user.distinguishedName.value
+                display_name = get_attr_value(user, 'displayName') or sam
+                sam_real = user.sAMAccountName.value if 'sAMAccountName' in user else sam
+                
+                # Verifica se já é membro
+                if user_dn in current_member_dns:
+                    results.append({
+                        'sam': sam,
+                        'name': display_name,
+                        'status': 'already_member',
+                        'message': f"Já é membro (Login: {sam_real})"
+                    })
+                    stats['already_member'] += 1
+                    continue
+                    
+                # Adiciona ao grupo
+                conn.extend.microsoft.add_members_to_groups([user_dn], group_dn)
+                if conn.result['description'] == 'success':
+                    results.append({
+                        'sam': sam,
+                        'name': display_name,
+                        'status': 'success',
+                        'message': f"Adicionado (Login: {sam_real})"
+                    })
+                    stats['success'] += 1
+                    logging.info(f"[LOTE-ALTERAÇÃO] Usuário '{sam_real}' (pesquisado por '{sam}') adicionado ao grupo '{group_name}' em lote por '{session.get('user_display_name')}'.")
+                    sync_zimbra_member_realtime(group_name, sam_real, 'add')
+                    
+                    # Tenta remover de agendamentos pendentes se houver
+                    try:
+                        schedules = load_group_schedules()
+                        schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == sam_real and s.get('group_name') == group_name)]
+                        if len(schedules_to_keep) < len(schedules):
+                            save_group_schedules(schedules_to_keep)
+                    except Exception as e_sched:
+                        logging.error(f"Erro ao limpar agendamento em lote para {sam_real} no grupo {group_name}: {e_sched}")
+                else:
+                    results.append({
+                        'sam': sam,
+                        'name': display_name,
+                        'status': 'error',
+                        'message': f"Erro AD: {conn.result['message']}"
+                    })
+                    stats['failed'] += 1
+            except Exception as e_user:
+                results.append({
+                    'sam': sam,
+                    'name': 'Desconhecido',
+                    'status': 'error',
+                    'message': f"Erro: {str(e_user)}"
+                })
+                stats['failed'] += 1
+                logging.error(f"Erro ao adicionar usuário {sam} em lote ao grupo {group_name}: {e_user}", exc_info=True)
+                
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'results': results
+        })
+    except Exception as e:
+        logging.error(f"Erro crítico no processamento em lote para o grupo {group_name}: {e}", exc_info=True)
+        return jsonify({'error': f"Erro interno do servidor: {str(e)}"}), 500
+
 @groups_bp.route('/api/user_groups/<username>')
 @require_auth
 def api_user_groups(username):
@@ -264,6 +490,7 @@ def api_add_user_to_group():
         conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
         if conn.result['description'] == 'success':
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            sync_zimbra_member_realtime(group_name, username, 'add')
             try:
                 schedules = load_group_schedules()
                 schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
@@ -295,6 +522,7 @@ def api_remove_user_from_group():
         conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
         if conn.result['description'] == 'success':
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido permanentemente do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            sync_zimbra_member_realtime(group_name, username, 'remove')
             try:
                 schedules = load_group_schedules()
                 schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
@@ -307,6 +535,68 @@ def api_remove_user_from_group():
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/remove_users_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_users_from_group():
+    data = request.get_json()
+    usernames = data.get('usernames', [])
+    group_name = data.get('group_name')
+    
+    if not usernames or not group_name:
+        return jsonify({'error': 'Nomes de usuários e nome do grupo são obrigatórios.'}), 400
+        
+    try:
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, ['distinguishedName'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado.'}), 404
+            
+        group_dn = group.distinguishedName.value
+        
+        results = []
+        stats = {'total': len(usernames), 'success': 0, 'failed': 0}
+        
+        for username in usernames:
+            try:
+                user = get_user_by_samaccountname(conn, username, ['distinguishedName'])
+                if not user:
+                    results.append({'sam': username, 'status': 'error', 'message': 'Não encontrado no AD'})
+                    stats['failed'] += 1
+                    continue
+                    
+                user_dn = user.distinguishedName.value
+                conn.extend.microsoft.remove_members_from_groups([user_dn], group_dn)
+                if conn.result['description'] == 'success':
+                    results.append({'sam': username, 'status': 'success', 'message': 'Removido com sucesso'})
+                    stats['success'] += 1
+                    logging.info(f"[LOTE-REMOÇÃO] Usuário '{username}' removido do grupo '{group_name}' em lote por '{session.get('user_display_name')}'.")
+                    sync_zimbra_member_realtime(group_name, username, 'remove')
+                    
+                    # Limpar agendamentos se houver
+                    try:
+                        schedules = load_group_schedules()
+                        schedules_to_keep = [s for s in schedules if not (s.get('user_sam') == username and s.get('group_name') == group_name)]
+                        if len(schedules_to_keep) < len(schedules):
+                            save_group_schedules(schedules_to_keep)
+                    except Exception as e_sched:
+                        logging.error(f"Erro ao limpar agendamento na remoção em lote para {username}: {e_sched}")
+                else:
+                    results.append({'sam': username, 'status': 'error', 'message': f"Erro AD: {conn.result['message']}"})
+                    stats['failed'] += 1
+            except Exception as e_user:
+                results.append({'sam': username, 'status': 'error', 'message': str(e_user)})
+                stats['failed'] += 1
+                
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'results': results
+        })
+    except Exception as e:
+        logging.error(f"Erro crítico na remoção múltipla do grupo {group_name}: {e}", exc_info=True)
+        return jsonify({'error': f"Erro interno do servidor: {str(e)}"}), 500
 
 @groups_bp.route('/api/add_user_to_group_temp', methods=['POST'])
 @require_auth

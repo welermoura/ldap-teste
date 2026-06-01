@@ -1,0 +1,1005 @@
+{% extends "base.html" %}
+
+{% block title %}Integração Zimbra - Configurações{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.theme-code-text {
+    color: var(--text-color, #f8fafc) !important;
+    font-weight: 600;
+    font-family: var(--bs-font-monospace), monospace;
+    font-size: 0.9em;
+}
+</style>
+{% endblock %}
+
+{% from "_macros.html" import render_page_header %}
+
+{% block content %}
+{{ render_page_header('<i class="fas fa-envelope-open-text me-2"></i>Integração Zimbra - Configurações', back_url=url_for('admin.dashboard') if 'admin.dashboard' in url_map else '/') }}
+
+<ul class="nav nav-tabs mb-4" id="zimbraTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false">
+            <i class="fas fa-server me-2"></i>Servidor & Conexão
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="auto-match-tab" data-bs-toggle="tab" data-bs-target="#auto-match-tab-pane" type="button" role="tab" aria-controls="auto-match-tab-pane" aria-selected="true">
+            <i class="fas fa-magic me-2"></i>Mapeamento Assistido (Auto-Match)
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="active-rules-tab" data-bs-toggle="tab" data-bs-target="#active-rules-tab-pane" type="button" role="tab" aria-controls="active-rules-tab-pane" aria-selected="false">
+            <i class="fas fa-list-ul me-2"></i>Regras de Sincronização Ativas
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="zimbraTabsContent">
+    <!-- ABA 1: CONFIGURAÇÃO DO SERVIDOR -->
+    <div class="tab-pane fade" id="config-tab-pane" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+        <div class="row">
+            <div class="col-lg-7 mb-4">
+                <div class="card glass-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Configurações do Servidor Zimbra</h5>
+                        <span class="badge {% if connection_ok %}bg-success{% else %}bg-danger{% endif %} py-2 px-3" id="conn-status-badge">
+                            {% if connection_ok %}<i class="fas fa-check-circle me-1"></i> Conectado{% else %}<i class="fas fa-times-circle me-1"></i> Desconectado{% endif %}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <form id="zimbra-config-form">
+                            <div class="form-check form-switch mb-4">
+                                <input class="form-check-input" type="checkbox" id="zimbra_enabled" {% if zimbra_enabled %}checked{% endif %} disabled>
+                                <label class="form-check-label fw-bold text-primary" for="zimbra_enabled">Ativar Sincronização Global AD ➔ Zimbra</label>
+                                <div class="form-text">Quando ativado, qualquer alteração de membros de grupos mapeados no AD será espelhada instantaneamente no Zimbra.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="zimbra_url" class="form-label fw-bold">URL da API Administrativa SOAP</label>
+                                <input type="url" class="form-control" id="zimbra_url" placeholder="https://mail.suaempresa.com:7071/service/admin/soap" value="{{ zimbra_url }}" required disabled>
+                                <div class="form-text">Geralmente utiliza a porta administrativa <code>7071</code> e o endpoint <code>/service/admin/soap</code>.</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="zimbra_user" class="form-label fw-bold">E-mail do Administrador (Zimbra)</label>
+                                <input type="email" class="form-control" id="zimbra_user" placeholder="admin@suaempresa.com.br" value="{{ zimbra_user }}" required disabled>
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="zimbra_password" class="form-label fw-bold">Senha do Administrador</label>
+                                <input type="password" class="form-control" id="zimbra_password" placeholder="••••••••••••" autocomplete="new-password" disabled>
+                                <div class="form-text text-muted small"><i class="fas fa-shield-alt me-1"></i> Deixe em branco para manter a senha atual configurada com criptografia de disco.</div>
+                            </div>
+
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-outline-warning animate-hover" id="btn-unlock-config">
+                                    <i class="fas fa-lock me-1"></i> Habilitar Edição
+                                </button>
+                                <button type="button" class="btn btn-secondary" id="btn-test-connection">
+                                    <i class="fas fa-sync-alt me-1"></i> Testar Conexão
+                                </button>
+                                <button type="submit" class="btn btn-primary ms-auto" id="btn-save-config" disabled>
+                                    <i class="fas fa-save me-1"></i> Salvar Configurações
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-5 mb-4">
+                <div class="card glass-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Domínios Detectados no Zimbra</h5>
+                    </div>
+                    <div class="card-body" id="zimbra-domains-container">
+                        {% if connection_ok and domains %}
+                            <p class="text-success small fw-bold mb-3"><i class="fas fa-check me-1"></i> {{ domains|length }} domínio(s) corporativo(s) localizado(s) no Zimbra:</p>
+                            <div class="list-group list-group-flush border rounded overflow-auto" style="max-height: 250px;">
+                                {% for d in domains %}
+                                    <div class="list-group-item py-2 d-flex justify-content-between align-items-center">
+                                        <span class="theme-code-text">{{ d.name or d['name'] or d }}</span>
+                                        <span class="badge small" style="background-color: rgba(99, 102, 241, 0.15) !important; color: #a5b4fc !important; border: 1px solid rgba(99, 102, 241, 0.3) !important;">Principal</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-5 text-muted" id="domains-empty-state">
+                                <i class="fas fa-globe fa-3x mb-3 text-secondary"></i>
+                                <p>Efetue um teste de conexão bem-sucedido para carregar os domínios em tempo real.</p>
+                                {% if error_message %}
+                                    <div class="alert alert-danger mx-3 py-2 small text-start">{{ error_message }}</div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 2: MAPEAMENTO ASSISTIDO (AUTO-MATCH) -->
+    <div class="tab-pane fade show active" id="auto-match-tab-pane" role="tabpanel" aria-labelledby="auto-match-tab" tabindex="0">
+        <div class="row">
+            <!-- Painel de Auto-Match Inteligente -->
+            <div class="col-12 mb-4">
+                <div class="card glass-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Mapeamento Assistido por Auto-Match</h5>
+                        <button class="btn btn-sm btn-outline-primary animate-hover" type="button" id="btn-run-auto-match" title="Recalcular Auto-Matches">
+                            <i class="fas fa-magic me-1"></i> Buscar Matches
+                        </button>
+                    </div>
+                    <div class="card-body p-3 d-flex flex-column">
+                        <div class="text-muted small mb-3">
+                            <i class="fas fa-info-circle me-1 text-primary"></i> <strong>Varredura Inteligente:</strong> O sistema analisa e cruza os e-mails e apelidos (aliases) do AD e do Zimbra para propor vínculos ou expor discrepâncias.
+                        </div>
+                        
+                        <!-- Navegação de Sub-Abas do Auto-Match (Pills Moderno) -->
+                        <ul class="nav nav-pills nav-fill bg-light bg-opacity-10 p-1 rounded-pill mb-3 border border-secondary border-opacity-25" id="matchSubTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active py-1.5 px-3 rounded-pill text-xs fw-bold d-flex align-items-center justify-content-center" id="matches-subtab" data-bs-toggle="pill" data-bs-target="#matches-pane" type="button" role="tab" aria-controls="matches-pane" aria-selected="true">
+                                    <i class="fas fa-magic me-1.5 text-primary"></i>Matches <span class="badge bg-primary ms-1.5 rounded-pill" id="count-matches">0</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link py-1.5 px-3 rounded-pill text-xs fw-bold d-flex align-items-center justify-content-center" id="only-ad-subtab" data-bs-toggle="pill" data-bs-target="#only-ad-pane" type="button" role="tab" aria-controls="only-ad-pane" aria-selected="false">
+                                    <i class="fab fa-windows me-1.5 text-info"></i>Apenas AD <span class="badge bg-secondary ms-1.5 rounded-pill" id="count-only-ad">0</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link py-1.5 px-3 rounded-pill text-xs fw-bold d-flex align-items-center justify-content-center" id="only-zimbra-subtab" data-bs-toggle="pill" data-bs-target="#only-zimbra-pane" type="button" role="tab" aria-controls="only-zimbra-pane" aria-selected="false">
+                                    <i class="fas fa-envelope me-1.5 text-warning"></i>Apenas Zimbra <span class="badge bg-secondary ms-1.5 rounded-pill" id="count-only-zimbra">0</span>
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Campo de Busca em Tempo Real -->
+                        <div class="mb-3 px-1">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light bg-opacity-10 border-secondary border-opacity-25 text-muted">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" id="search-subtab-input" class="form-control bg-light bg-opacity-10 border-secondary border-opacity-25 text-light" placeholder="Pesquisar nesta aba..." autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- Conteúdo das Sub-Abas -->
+                        <div class="tab-content flex-grow-1" id="matchSubTabsContent" style="max-height: 480px; overflow-y: auto;">
+                            <!-- ABA 1: MATCHES -->
+                            <div class="tab-pane fade show active" id="matches-pane" role="tabpanel" aria-labelledby="matches-subtab">
+                                <div class="table-responsive">
+                                    <table class="table table-hover glass-table mb-0 align-middle" id="auto-matches-table">
+                                        <thead class="table-dark border-bottom border-secondary border-opacity-25 sticky-top">
+                                            <tr>
+                                                <th>Grupo AD</th>
+                                                <th>E-mail do Match</th>
+                                                <th>Lista Zimbra</th>
+                                                <th class="text-end pe-3" style="width: 120px;">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr id="auto-matches-empty-row">
+                                                <td colspan="4" class="text-center py-5 text-muted">
+                                                    <i class="fas fa-magic fa-3x mb-3 text-secondary"></i>
+                                                    <p>Aguardando varredura. Clique em "Buscar Matches" acima.</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- ABA 2: APENAS NO AD -->
+                            <div class="tab-pane fade" id="only-ad-pane" role="tabpanel" aria-labelledby="only-ad-subtab">
+                                <div class="table-responsive">
+                                    <table class="table table-hover glass-table mb-0 align-middle" id="only-ad-table">
+                                        <thead class="table-dark border-bottom border-secondary border-opacity-25 sticky-top">
+                                            <tr>
+                                                <th>Grupo AD</th>
+                                                <th>E-mails no AD</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr id="only-ad-empty-row">
+                                                <td colspan="2" class="text-center py-5 text-muted">
+                                                    <i class="fab fa-windows fa-3x mb-3 text-secondary"></i>
+                                                    <p>Aguardando busca para listar grupos apenas no AD.</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- ABA 3: APENAS NO ZIMBRA -->
+                            <div class="tab-pane fade" id="only-zimbra-pane" role="tabpanel" aria-labelledby="only-zimbra-subtab">
+                                <div class="table-responsive">
+                                    <table class="table table-hover glass-table mb-0 align-middle" id="only-zimbra-table">
+                                        <thead class="table-dark border-bottom border-secondary border-opacity-25 sticky-top">
+                                            <tr>
+                                                <th>Lista Zimbra</th>
+                                                <th>Apelidos / Aliases</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr id="only-zimbra-empty-row">
+                                                <td colspan="2" class="text-center py-5 text-muted">
+                                                    <i class="fas fa-envelope fa-3x mb-3 text-secondary"></i>
+                                                    <p>Aguardando busca para listar grupos apenas no Zimbra.</p>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA 3: REGRAS DE SINCRONIZAÇÃO ATIVAS -->
+    <div class="tab-pane fade" id="active-rules-tab-pane" role="tabpanel" aria-labelledby="active-rules-tab" tabindex="0">
+        <div class="row">
+            <!-- Listagem de Mapeamentos Ativos -->
+            <div class="col-12 mb-4">
+                <div class="card glass-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Regras de Sincronização Ativas</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                            <table class="table table-hover glass-table mb-0 align-middle" id="mappings-table">
+                                <thead class="table-dark border-bottom border-secondary border-opacity-25 sticky-top">
+                                    <tr>
+                                        <th>Grupo AD (Origem)</th>
+                                        <th></th>
+                                        <th>Lista Zimbra (Destino)</th>
+                                        <th class="text-end pe-3" style="width: 200px;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if mappings %}
+                                        {% for m in mappings %}
+                                            <tr data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}">
+                                                <td><strong class="text-primary">{{ m.ad_group_name or m['ad_group_name'] or m }}</strong></td>
+                                                <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
+                                                <td><span class="theme-code-text">{{ m.zimbra_dl_email or m['zimbra_dl_email'] or m }}</span></td>
+                                                <td class="text-end pe-3">
+                                                    <button class="btn btn-sm btn-outline-primary btn-sync-mapping me-1 animate-hover" data-ad-group="{{ m.ad_group_name }}" title="Sincronizar agora">
+                                                        <i class="fas fa-sync"></i> Sync
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger btn-delete-mapping animate-hover" data-ad-group="{{ m.ad_group_name }}" title="Excluir regra">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr id="mappings-empty-row">
+                                            <td colspan="4" class="text-center py-5 text-muted">
+                                                <i class="fas fa-exchange-alt fa-3x mb-3 text-secondary"></i>
+                                                <p>Nenhuma regra de sincronização configurada até o momento.</p>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Resultados de Sincronização Manual -->
+<div class="modal fade" id="syncResultModal" tabindex="-1" aria-labelledby="syncResultModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="syncResultModalLabel"><i class="fas fa-sync me-2"></i>Status da Sincronização</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success py-2 d-none" id="sync-success-alert">
+                    <i class="fas fa-check-circle me-1"></i> Sincronização executada com sucesso para a lista: <strong id="sync-dl-name"></strong>
+                </div>
+                
+                <!-- Grid Estatístico -->
+                <div class="row g-2 mb-4">
+                    <div class="col-4">
+                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-success">
+                            <span class="fs-4 fw-bold text-success" id="sync-stat-added">0</span>
+                            <span class="text-muted small">Adicionados</span>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-danger">
+                            <span class="fs-4 fw-bold text-danger" id="sync-stat-removed">0</span>
+                            <span class="text-muted small">Removidos</span>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-warning">
+                            <span class="fs-4 fw-bold text-warning" id="sync-stat-failed">0</span>
+                            <span class="text-muted small">Falhas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detalhes das Operações -->
+                <h6 class="border-bottom pb-2 mb-2">Relatório de Operações</h6>
+                <div class="table-responsive border rounded" style="max-height: 250px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0" id="sync-details-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>E-mail do Membro</th>
+                                <th>Ação</th>
+                                <th>Status</th>
+                                <th>Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<meta id="csrf-token-meta" name="csrf-token" content="{{ csrf_token() }}">
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.getElementById('csrf-token-meta').getAttribute('content');
+    window.csrfToken = csrfToken;
+    
+    // Elementos DOM Configuração e Trava
+    const configForm = document.getElementById('zimbra-config-form');
+    const urlInput = document.getElementById('zimbra_url');
+    const userInput = document.getElementById('zimbra_user');
+    const passwordInput = document.getElementById('zimbra_password');
+    const enabledSwitch = document.getElementById('zimbra_enabled');
+    const btnTestConn = document.getElementById('btn-test-connection');
+    const badgeStatus = document.getElementById('conn-status-badge');
+    const domainsContainer = document.getElementById('zimbra-domains-container');
+    const domainSelect = document.getElementById('zimbra_dl_domain');
+    const btnUnlockConfig = document.getElementById('btn-unlock-config');
+    const btnSaveConfig = document.getElementById('btn-save-config');
+    
+    // Elementos DOM Mapeamento & Auto-Match
+    const btnRunAutoMatch = document.getElementById('btn-run-auto-match');
+    const autoMatchesTableBody = document.querySelector('#auto-matches-table tbody');
+    const onlyAdTableBody = document.querySelector('#only-ad-table tbody');
+    const onlyZimbraTableBody = document.querySelector('#only-zimbra-table tbody');
+    const mappingsTableBody = document.querySelector('#mappings-table tbody');
+    
+    // Pesquisa e Contadores das Sub-Abas
+    const searchInput = document.getElementById('search-subtab-input');
+    const countMatches = document.getElementById('count-matches');
+    const countOnlyAd = document.getElementById('count-only-ad');
+    const countOnlyZimbra = document.getElementById('count-only-zimbra');
+    
+    // Elementos DOM Modal de Sincronização
+    const syncResultModalEl = document.getElementById('syncResultModal');
+    const syncResultModal = new bootstrap.Modal(syncResultModalEl);
+    const syncSuccessAlert = document.getElementById('sync-success-alert');
+    const syncDlName = document.getElementById('sync-dl-name');
+    const syncStatAdded = document.getElementById('sync-stat-added');
+    const syncStatRemoved = document.getElementById('sync-stat-removed');
+    const syncStatFailed = document.getElementById('sync-stat-failed');
+    const syncDetailsTableBody = document.querySelector('#sync-details-table tbody');
+
+    // === FUNÇÕES PARA CARREGAR AUTO-MATCHES (E-MAIL & APELIDOS) ===
+    async function loadAutoMatches() {
+        if (!btnRunAutoMatch) return;
+        
+        // Limpa a caixa de busca ao iniciar nova varredura
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        
+        const originalHtml = btnRunAutoMatch.innerHTML;
+        btnRunAutoMatch.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Procurando...';
+        btnRunAutoMatch.disabled = true;
+        
+        try {
+            const response = await fetch('/api/zimbra/auto_matches');
+            const data = await response.json();
+            
+            if (!response.ok) throw new Error(data.error || 'Erro ao processar matches');
+            
+            // Atualiza contadores
+            countMatches.innerText = data.matches ? data.matches.length : 0;
+            countOnlyAd.innerText = data.only_in_ad ? data.only_in_ad.length : 0;
+            countOnlyZimbra.innerText = data.only_in_zimbra ? data.only_in_zimbra.length : 0;
+            
+            // 1. Renderiza ABA 1 (Matches)
+            autoMatchesTableBody.innerHTML = '';
+            if (!data.matches || data.matches.length === 0) {
+                autoMatchesTableBody.innerHTML = `
+                    <tr id="auto-matches-empty-row">
+                        <td colspan="4" class="text-center py-5 text-muted">
+                            <i class="fas fa-search fa-3x mb-3 text-secondary"></i>
+                            <p>Nenhuma sugestão de mapeamento automático localizada.</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                data.matches.forEach(m => {
+                    const tr = document.createElement('tr');
+                    tr.setAttribute('data-ad-match-group', m.ad_group_name);
+                    
+                    let actionHtml = '';
+                    if (m.already_mapped) {
+                        actionHtml = '<span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3"><i class="fas fa-check me-1"></i> Ativo</span>';
+                    } else {
+                        actionHtml = `
+                            <button class="btn btn-xs btn-success btn-activate-match animate-hover py-1 px-2.5" 
+                                    data-ad-group="${m.ad_group_name}" 
+                                    data-zimbra-email="${m.zimbra_dl_email}">
+                                <i class="fas fa-plus me-1"></i> Ativar
+                            </button>
+                        `;
+                    }
+                    
+                    tr.innerHTML = `
+                        <td><strong class="text-primary">${m.ad_group_name}</strong></td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge text-start px-2.5 py-1.5 font-monospace" style="background-color: rgba(13, 202, 240, 0.15) !important; color: #0dcaf0 !important; border: 1px solid rgba(13, 202, 240, 0.25) !important; max-width: fit-content; display: inline-flex; align-items: center;">
+                                    <i class="fab fa-windows me-1.5"></i>AD: ${m.ad_matching_email}
+                                </span>
+                                <span class="badge text-start px-2.5 py-1.5 font-monospace" style="background-color: rgba(255, 193, 7, 0.15) !important; color: #ffc107 !important; border: 1px solid rgba(255, 193, 7, 0.25) !important; max-width: fit-content; display: inline-flex; align-items: center;">
+                                    <i class="fas fa-envelope me-1.5"></i>Zim: ${m.zimbra_matching_email}
+                                </span>
+                            </div>
+                        </td>
+                        <td><span class="theme-code-text fw-bold text-light">${m.zimbra_dl_email}</span></td>
+                        <td class="text-end pe-3">${actionHtml}</td>
+                    `;
+                    autoMatchesTableBody.appendChild(tr);
+                });
+            }
+            
+            // 2. Renderiza ABA 2 (Apenas no AD)
+            onlyAdTableBody.innerHTML = '';
+            if (!data.only_in_ad || data.only_in_ad.length === 0) {
+                onlyAdTableBody.innerHTML = `
+                    <tr id="only-ad-empty-row">
+                        <td colspan="2" class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                            <p>Todos os grupos do AD possuem e-mails vinculados ao Zimbra!</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                data.only_in_ad.forEach(m => {
+                    const tr = document.createElement('tr');
+                    
+                    const emailsListHtml = m.emails.length > 0 ? m.emails.map(e => `
+                        <span class="badge px-2.5 py-1.5 font-monospace me-1 mb-1" style="background-color: rgba(13, 202, 240, 0.15) !important; color: #0dcaf0 !important; border: 1px solid rgba(13, 202, 240, 0.25) !important; display: inline-flex; align-items: center;">
+                            <i class="fab fa-windows me-1.5"></i>${e}
+                        </span>
+                    `).join('') : '<span class="text-muted small">Sem e-mail cadastrado</span>';
+                    
+                    tr.innerHTML = `
+                        <td><strong class="text-primary">${m.name}</strong></td>
+                        <td>${emailsListHtml}</td>
+                    `;
+                    onlyAdTableBody.appendChild(tr);
+                });
+            }
+            
+            // 3. Renderiza ABA 3 (Apenas no Zimbra)
+            onlyZimbraTableBody.innerHTML = '';
+            if (!data.only_in_zimbra || data.only_in_zimbra.length === 0) {
+                onlyZimbraTableBody.innerHTML = `
+                    <tr id="only-zimbra-empty-row">
+                        <td colspan="2" class="text-center py-5 text-muted">
+                            <i class="fas fa-check-circle fa-3x mb-3 text-success"></i>
+                            <p>Todas as listas do Zimbra possuem correspondência com grupos do AD!</p>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                data.only_in_zimbra.forEach(m => {
+                    const tr = document.createElement('tr');
+                    
+                    const aliasesListHtml = m.aliases.length > 0 ? m.aliases.map(a => `
+                        <span class="badge px-2.5 py-1.5 font-monospace me-1 mb-1" style="background-color: rgba(255, 193, 7, 0.15) !important; color: #ffc107 !important; border: 1px solid rgba(255, 193, 7, 0.25) !important; display: inline-flex; align-items: center;">
+                            <i class="fas fa-envelope me-1.5"></i>${a}
+                        </span>
+                    `).join('') : '<span class="text-muted small">Sem apelidos</span>';
+                    
+                    tr.innerHTML = `
+                        <td><span class="theme-code-text fw-bold text-light">${m.name}</span></td>
+                        <td>${aliasesListHtml}</td>
+                    `;
+                    onlyZimbraTableBody.appendChild(tr);
+                });
+            }
+            
+        } catch (err) {
+            showToast(err.message, 'error');
+            autoMatchesTableBody.innerHTML = `
+                <tr id="auto-matches-empty-row">
+                    <td colspan="4" class="text-center py-5 text-danger">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <p>Falha ao carregar matches: ${err.message}</p>
+                    </td>
+                </tr>
+            `;
+        } finally {
+            btnRunAutoMatch.innerHTML = originalHtml;
+            btnRunAutoMatch.disabled = false;
+        }
+    }
+
+    if (btnRunAutoMatch) {
+        btnRunAutoMatch.addEventListener('click', loadAutoMatches);
+    }
+    
+    // Carrega matches se já estiver conectado ao iniciar
+    {% if connection_ok %}
+    loadAutoMatches();
+    {% endif %}
+
+    // === LÓGICA DE PESQUISA DENTRO DAS SUB-ABAS DO AUTO-MATCH ===
+    function filterActiveTab() {
+        if (!searchInput) return;
+        const query = searchInput.value.toLowerCase().trim();
+        const activePane = document.querySelector('#matchSubTabsContent .tab-pane.active');
+        if (!activePane) return;
+        
+        const table = activePane.querySelector('table');
+        if (!table) return;
+        
+        const tbody = table.querySelector('tbody');
+        if (!tbody) return;
+        
+        // Remove no-results-row if it already exists
+        const existingNoResults = tbody.querySelector('.no-results-row');
+        if (existingNoResults) {
+            existingNoResults.remove();
+        }
+        
+        // Check if there is an empty-row
+        const emptyRow = tbody.querySelector('tr[id$="-empty-row"]');
+        
+        // Get all normal rows (exclude empty-row and no-results-row)
+        const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+            return !row.id.endsWith('-empty-row') && !row.classList.contains('no-results-row');
+        });
+        
+        if (rows.length === 0) {
+            if (emptyRow) {
+                emptyRow.classList.remove('d-none');
+            }
+            return;
+        }
+        
+        let visibleCount = 0;
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            if (text.includes(query)) {
+                row.classList.remove('d-none');
+                visibleCount++;
+            } else {
+                row.classList.add('d-none');
+            }
+        });
+        
+        // Handle emptyRow visibility
+        if (emptyRow) {
+            emptyRow.classList.add('d-none');
+        }
+        
+        // If query returned no results, show the info row
+        if (visibleCount === 0 && query !== "") {
+            const colSpan = table.querySelectorAll('thead th').length || 3;
+            const tr = document.createElement('tr');
+            tr.className = 'no-results-row';
+            tr.innerHTML = `
+                <td colspan="${colSpan}" class="text-center py-4 text-muted">
+                    <i class="fas fa-search-minus fa-2x mb-2 text-secondary"></i>
+                    <p class="mb-0">Nenhum resultado correspondente a "${searchInput.value}" nesta aba.</p>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterActiveTab);
+    }
+
+    // Limpa a busca ao alternar de sub-aba
+    const matchPills = document.querySelectorAll('#matchSubTabs button[data-bs-toggle="pill"]');
+    matchPills.forEach(pill => {
+        pill.addEventListener('shown.bs.tab', function () {
+            if (searchInput) {
+                searchInput.value = '';
+                // Reseta visibilidade de todas as linhas da aba ativa
+                const activePane = document.querySelector('#matchSubTabsContent .tab-pane.active');
+                if (activePane) {
+                    const tbody = activePane.querySelector('table tbody');
+                    if (tbody) {
+                        const existingNoResults = tbody.querySelector('.no-results-row');
+                        if (existingNoResults) existingNoResults.remove();
+                        
+                        const emptyRow = tbody.querySelector('tr[id$="-empty-row"]');
+                        const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                            return !row.id.endsWith('-empty-row') && !row.classList.contains('no-results-row');
+                        });
+                        
+                        rows.forEach(r => r.classList.remove('d-none'));
+                        
+                        if (emptyRow) {
+                            if (rows.length === 0) {
+                                emptyRow.classList.remove('d-none');
+                            } else {
+                                emptyRow.classList.add('d-none');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // Função interna para atualizar a tabela de mapeamentos ativos
+    function addOrUpdateActiveMapping(adGroup, dlEmail) {
+        let existingRow = document.querySelector(`tr[data-ad-group="${adGroup}"]`);
+        if (existingRow) {
+            existingRow.cells[2].innerHTML = `<span class="theme-code-text">${dlEmail}</span>`;
+        } else {
+            const emptyRow = document.getElementById('mappings-empty-row');
+            if (emptyRow) emptyRow.remove();
+            
+            const tr = document.createElement('tr');
+            tr.setAttribute('data-ad-group', adGroup);
+            tr.innerHTML = `
+                <td><strong class="text-primary">${adGroup}</strong></td>
+                <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
+                <td><span class="theme-code-text">${dlEmail}</span></td>
+                <td class="text-end pe-3">
+                    <button class="btn btn-sm btn-outline-primary btn-sync-mapping me-1 animate-hover" data-ad-group="${adGroup}" title="Sincronizar agora">
+                        <i class="fas fa-sync"></i> Sync
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger btn-delete-mapping animate-hover" data-ad-group="${adGroup}" title="Excluir regra">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            `;
+            mappingsTableBody.appendChild(tr);
+        }
+    }
+
+    // === DELEGAÇÃO DE EVENTO PARA ATIVAR O MATCH COM 1 CLIQUE (ABA 1) ===
+    autoMatchesTableBody.addEventListener('click', async (e) => {
+        const activateBtn = e.target.closest('.btn-activate-match');
+        if (!activateBtn) return;
+        
+        const adGroup = activateBtn.dataset.adGroup;
+        const dlEmail = activateBtn.dataset.zimbraEmail;
+        
+        const originalContent = activateBtn.innerHTML;
+        activateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        activateBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/zimbra/save_mapping', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    ad_group_name: adGroup,
+                    zimbra_dl_email: dlEmail
+                })
+            });
+            
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro ao salvar mapeamento');
+            
+            showToast(result.message, 'success');
+            
+            // Atualiza o botão na tabela de matches para "[✓ Ativo]"
+            const cell = activateBtn.parentElement;
+            cell.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3"><i class="fas fa-check me-1"></i> Ativo</span>';
+            
+            addOrUpdateActiveMapping(adGroup, dlEmail);
+            
+        } catch (error) {
+            activateBtn.innerHTML = originalContent;
+            activateBtn.disabled = false;
+            showToast(error.message, 'error');
+        }
+    });
+
+    // === TESTAR CONEXÃO ===
+    btnTestConn.addEventListener('click', async () => {
+        const url = urlInput.value.trim();
+        const user = userInput.value.trim();
+        const password = passwordInput.value;
+        
+        if (!url || !user) {
+            showToast('Preencha os campos URL e Usuário antes de testar.', 'error');
+            return;
+        }
+        
+        const originalContent = btnTestConn.innerHTML;
+        btnTestConn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Testando...';
+        btnTestConn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/zimbra/test_connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    zimbra_url: url,
+                    zimbra_user: user,
+                    zimbra_password: password
+                })
+            });
+            
+            const result = await response.json();
+            btnTestConn.innerHTML = originalContent;
+            btnTestConn.disabled = false;
+            
+            if (!response.ok) throw new Error(result.error || 'Erro na conexão');
+            
+            // Sucesso
+            showToast(result.message, 'success');
+            
+            // Atualiza Badge
+            badgeStatus.className = 'badge bg-success py-2 px-3';
+            badgeStatus.innerHTML = '<i class="fas fa-check-circle me-1"></i> Conectado';
+            
+            // Atualiza Painel de Domínios
+            let domainsHtml = `
+                <p class="text-success small fw-bold mb-3"><i class="fas fa-check me-1"></i> ${result.domains.length} domínio(s) corporativo(s) localizado(s) no Zimbra:</p>
+                <div class="list-group list-group-flush border rounded overflow-auto" style="max-height: 250px;">
+            `;
+            
+            result.domains.forEach(d => {
+                domainsHtml += `
+                    <div class="list-group-item py-2 d-flex justify-content-between align-items-center">
+                        <span class="theme-code-text">${d.name || d}</span>
+                        <span class="badge small" style="background-color: rgba(99, 102, 241, 0.15) !important; color: #a5b4fc !important; border: 1px solid rgba(99, 102, 241, 0.3) !important;">Principal</span>
+                    </div>
+                `;
+            });
+            
+            domainsHtml += '</div>';
+            domainsContainer.innerHTML = domainsHtml;
+            
+            // Recarrega dinamicamente os matches após conexão bem-sucedida!
+            loadAutoMatches();
+            
+        } catch (error) {
+            btnTestConn.innerHTML = originalContent;
+            btnTestConn.disabled = false;
+            
+            showToast(error.message, 'error');
+            badgeStatus.className = 'badge bg-danger py-2 px-3';
+            badgeStatus.innerHTML = '<i class="fas fa-times-circle me-1"></i> Desconectado';
+            
+            domainsContainer.innerHTML = `
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-globe fa-3x mb-3 text-secondary"></i>
+                    <p>Efetue um teste de conexão bem-sucedido para carregar os domínios em tempo real.</p>
+                    <div class="alert alert-danger mx-3 py-2 small text-start">${error.message}</div>
+                </div>
+            `;
+        }
+    });
+
+    // === DESTRAVAR / TRAVAR CONFIGURAÇÃO ===
+    if (btnUnlockConfig) {
+        btnUnlockConfig.addEventListener('click', function() {
+            const isLocked = urlInput.hasAttribute('disabled');
+            
+            if (isLocked) {
+                // Destrava
+                urlInput.removeAttribute('disabled');
+                userInput.removeAttribute('disabled');
+                passwordInput.removeAttribute('disabled');
+                enabledSwitch.removeAttribute('disabled');
+                if (btnSaveConfig) btnSaveConfig.removeAttribute('disabled');
+                
+                btnUnlockConfig.className = 'btn btn-warning animate-hover';
+                btnUnlockConfig.innerHTML = '<i class="fas fa-lock-open me-1"></i> Bloquear Edição';
+                showToast('Campos habilitados para edição!', 'info');
+            } else {
+                // Trava
+                urlInput.setAttribute('disabled', 'true');
+                userInput.setAttribute('disabled', 'true');
+                passwordInput.setAttribute('disabled', 'true');
+                enabledSwitch.setAttribute('disabled', 'true');
+                if (btnSaveConfig) btnSaveConfig.setAttribute('disabled', 'true');
+                
+                passwordInput.value = ''; // Limpa digitação não salva por segurança
+                
+                btnUnlockConfig.className = 'btn btn-outline-warning animate-hover';
+                btnUnlockConfig.innerHTML = '<i class="fas fa-lock me-1"></i> Habilitar Edição';
+                showToast('Campos bloqueados contra edições acidentais.', 'info');
+            }
+        });
+    }
+
+    // === SALVAR CONFIGURAÇÃO ===
+    configForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+            const response = await fetch('/api/zimbra/save_config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    zimbra_url: urlInput.value.trim(),
+                    zimbra_user: userInput.value.trim(),
+                    zimbra_password: passwordInput.value,
+                    zimbra_enabled: enabledSwitch.checked
+                })
+            });
+            
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro ao salvar');
+            
+            showToast(result.message, 'success');
+            passwordInput.value = ''; // Limpa o campo de senha por segurança
+            
+            // Trava novamente após salvar com sucesso
+            urlInput.setAttribute('disabled', 'true');
+            userInput.setAttribute('disabled', 'true');
+            passwordInput.setAttribute('disabled', 'true');
+            enabledSwitch.setAttribute('disabled', 'true');
+            if (btnSaveConfig) btnSaveConfig.setAttribute('disabled', 'true');
+            
+            if (btnUnlockConfig) {
+                btnUnlockConfig.className = 'btn btn-outline-warning animate-hover';
+                btnUnlockConfig.innerHTML = '<i class="fas fa-lock me-1"></i> Habilitar Edição';
+            }
+            
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    });
+
+    // O formulário de mapeamento manual foi substituído pelo Painel de Auto-Match Inteligente.
+
+    // === DELEGAÇÃO DE EVENTOS NA TABELA (DELETAR OU SINCRONIZAR) ===
+    mappingsTableBody.addEventListener('click', async (e) => {
+        // Ação de Deletar Mapeamento
+        const delBtn = e.target.closest('.btn-delete-mapping');
+        if (delBtn) {
+            const adGroup = delBtn.dataset.adGroup;
+            if (confirm(`Excluir a regra de sincronização para o grupo '${adGroup}'?`)) {
+                try {
+                    const response = await fetch('/api/zimbra/delete_mapping', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken
+                        },
+                        body: JSON.stringify({ ad_group_name: adGroup })
+                    });
+                    
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Erro ao excluir');
+                    
+                    showToast(result.message, 'success');
+                    
+                    // Remove linha da tabela
+                    const row = document.querySelector(`tr[data-ad-group="${adGroup}"]`);
+                    if (row) row.remove();
+                    
+                    // Se a tabela ficou vazia, mostra empty row
+                    if (mappingsTableBody.children.length === 0) {
+                        mappingsTableBody.innerHTML = `
+                            <tr id="mappings-empty-row">
+                                <td colspan="4" class="text-center py-5 text-muted">
+                                    <i class="fas fa-exchange-alt fa-3x mb-3 text-secondary"></i>
+                                    <p>Nenhuma regra de sincronização configurada até o momento.</p>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            }
+            return;
+        }
+        
+        // Ação de Sincronizar Mapeamento Individual
+        const syncBtn = e.target.closest('.btn-sync-mapping');
+        if (syncBtn) {
+            const adGroup = syncBtn.dataset.adGroup;
+            const originalContent = syncBtn.innerHTML;
+            
+            syncBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            syncBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/zimbra/sync_group', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ ad_group_name: adGroup })
+                });
+                
+                const result = await response.json();
+                syncBtn.innerHTML = originalContent;
+                syncBtn.disabled = false;
+                
+                if (!response.ok) throw new Error(result.error || 'Falha na sincronização');
+                
+                // Abre o Modal com resultados detalhados
+                syncSuccessAlert.classList.remove('d-none');
+                syncDlName.textContent = result.zimbra_email;
+                syncStatAdded.textContent = result.stats.added;
+                syncStatRemoved.textContent = result.stats.removed;
+                syncStatFailed.textContent = result.stats.failed;
+                
+                syncDetailsTableBody.innerHTML = '';
+                
+                if (result.details.length === 0) {
+                    syncDetailsTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center py-4 text-muted small">Os membros do AD e da Lista do Zimbra já estavam em perfeita sincronia! Nenhuma alteração foi necessária.</td>
+                        </tr>
+                    `;
+                } else {
+                    result.details.forEach(det => {
+                        let actionBadge = det.action === 'add' ? '<span class="badge bg-success">Adição</span>' : '<span class="badge bg-danger">Remoção</span>';
+                        let statusBadge = det.status === 'success' ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Sucesso</span>' : '<span class="badge bg-danger-subtle text-danger border border-danger-subtle">Falha</span>';
+                        
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><span class="theme-code-text">${det.email}</span></td>
+                            <td>${actionBadge}</td>
+                            <td>${statusBadge}</td>
+                            <td class="small text-muted">${det.message}</td>
+                        `;
+                        syncDetailsTableBody.appendChild(tr);
+                    });
+                }
+                
+                syncResultModal.show();
+                
+            } catch (error) {
+                syncBtn.innerHTML = originalContent;
+                syncBtn.disabled = false;
+                showToast(error.message, 'error');
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

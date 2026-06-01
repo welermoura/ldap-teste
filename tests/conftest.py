@@ -18,18 +18,19 @@ def client(app):
 
 @pytest.fixture
 def mocker_ldap(mocker):
-    # Um mock simples para a função get_user_connection do routes.auth ou common
+    # Um mock simples para a função get_ldap_connection
     # Isso impede que o teste tente bater num AD de verdade
-    mock_conn = mocker.patch('common.get_user_connection')
+    mock_conn = mocker.patch('common.get_ldap_connection')
     mock_conn.return_value = mocker.MagicMock(result={'description': 'success'})
+
     return mock_conn
 
 @pytest.fixture
 def authenticated_client(client, mocker):
-    # Um cliente já logado
     with client.session_transaction() as sess:
         sess['ad_user'] = 'usuario.teste'
         sess['user_display_name'] = 'Usuário Teste'
+        sess['is_admin'] = True
         sess['permissions'] = {
             'can_create': True,
             'can_disable': True,
@@ -37,3 +38,4 @@ def authenticated_client(client, mocker):
             'can_manage_groups': True
         }
     return client
+

@@ -8,6 +8,7 @@ from routes.main import main_bp
 from routes.users import users_bp
 from routes.groups import groups_bp
 from routes.admin import admin_bp
+from routes.zimbra import zimbra_bp
 from common import load_config, get_flask_secret_key
 
 # ==============================================================================
@@ -33,6 +34,7 @@ app = Flask(__name__)
 app.secret_key = get_flask_secret_key()
 
 from flask_wtf.csrf import CSRFProtect
+app.config['WTF_CSRF_ENABLED'] = True
 csrf = CSRFProtect(app)
 
 # Configuração do Limiter
@@ -46,6 +48,8 @@ app.register_blueprint(main_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(groups_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(zimbra_bp)
+csrf.exempt(zimbra_bp)
 
 # ==============================================================================
 # Processador de Contexto Global (Branding e Ano)

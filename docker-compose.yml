@@ -1,6 +1,9 @@
 services:
   web:
     build: .
+    dns:
+      - 10.10.1.41
+      - 10.10.1.54
     ports:
       - "5000:5000"
     environment:
@@ -14,6 +17,9 @@ services:
 
   scheduler:
     build: .
+    dns:
+      - 10.10.1.41
+      - 10.10.1.54
     environment:
       - TZ=America/Sao_Paulo
     volumes:

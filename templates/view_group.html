@@ -30,9 +30,15 @@
                 <h5 class="mb-0 me-3">Membros Atuais</h5>
 
                 <div class="d-flex gap-2 flex-wrap">
+                     <button class="btn btn-sm btn-danger animate-hover d-none" id="btn-batch-remove-members">
+                        <i class="fas fa-trash-alt me-1"></i> Remover Selecionados (<span id="batch-remove-count">0</span>)
+                     </button>
                      <a href="{{ url_for('groups.api_export_group_members', group_name=group.cn) }}" class="btn btn-sm btn-secondary">
                         <i class="fas fa-file-csv me-1"></i> Exportar Membros
                     </a>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#batchAddMembersModal">
+                        <i class="fas fa-file-import me-1"></i> Adicionar em Lote
+                    </button>
                     <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
                         <i class="fas fa-user-plus me-1"></i> Adicionar Usuário
                     </button>
@@ -165,6 +171,130 @@
         </div>
     </div>
 </div>
+
+<!-- ========================================================================== -->
+<!-- Modal de Adição em Lote                                                    -->
+<!-- ========================================================================== -->
+<div class="modal fade" id="batchAddMembersModal" tabindex="-1" aria-labelledby="batchAddMembersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="batchAddMembersModalLabel"><i class="fas fa-file-import me-2"></i>Adicionar Membros em Lote</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" id="batch-close-x-btn"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Painel de Seleção e Upload -->
+                <div id="batch-upload-panel">
+                    <p class="text-muted">Importe múltiplos usuários de uma vez carregando um arquivo. O sistema processará cada login no Active Directory e efetuará a associação de forma automatizada.</p>
+                    
+                    <div class="alert alert-info py-2 small">
+                        <h6 class="alert-heading fw-bold mb-1"><i class="fas fa-info-circle me-1"></i>Formatos Suportados:</h6>
+                        <ul class="mb-0 ps-3">
+                            <li><strong>.txt ou .csv:</strong> Arquivo de texto simples com um <strong>login</strong> (sAMAccountName) ou <strong>e-mail</strong> por linha.</li>
+                            <li><strong>.xlsx (Excel):</strong> Planilha com os <strong>logins</strong> ou <strong>e-mails</strong> inseridos na primeira coluna.</li>
+                        </ul>
+                    </div>
+
+                    <!-- Área de Drag & Drop -->
+                    <div class="drag-drop-zone p-4 text-center border border-dashed rounded mb-3 bg-light cursor-pointer" id="batch-drag-drop-zone">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                        <h5>Arraste seu arquivo aqui</h5>
+                        <p class="text-muted small">ou clique para selecionar do computador</p>
+                        <input type="file" id="batch-file-input" accept=".txt,.csv,.xlsx" style="display: none;">
+                        <div class="fw-bold text-success mt-2 d-none" id="selected-file-info">
+                            <i class="fas fa-file-alt me-1"></i> <span id="selected-file-name"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="btn-process-batch-file" disabled>
+                            <i class="fas fa-cogs me-1"></i> Processar Arquivo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Painel de Carregamento (Loading) -->
+                <div id="batch-loading-panel" class="text-center py-5 d-none">
+                    <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                    <h5>Processando logins no AD...</h5>
+                    <p class="text-muted small">Isso pode levar alguns segundos dependendo do tamanho do lote.</p>
+                </div>
+
+                <!-- Painel de Resultados -->
+                <div id="batch-results-panel" class="d-none">
+                    <h5 class="mb-3 border-bottom pb-2">Resultado do Processamento</h5>
+                    
+                    <!-- Grid de Estatísticas -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="card bg-light border-0 text-center py-2 h-100">
+                                <span class="fs-4 fw-bold text-dark" id="stat-batch-total">0</span>
+                                <span class="text-muted small">Total</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card bg-light border-0 text-center py-2 h-100 border-start border-4 border-success">
+                                <span class="fs-4 fw-bold text-success" id="stat-batch-success">0</span>
+                                <span class="text-muted small">Adicionados</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card bg-light border-0 text-center py-2 h-100 border-start border-4 border-warning">
+                                <span class="fs-4 fw-bold text-warning" id="stat-batch-already">0</span>
+                                <span class="text-muted small">Já Membros</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="card bg-light border-0 text-center py-2 h-100 border-start border-4 border-danger">
+                                <span class="fs-4 fw-bold text-danger" id="stat-batch-failed">0</span>
+                                <span class="text-muted small">Erros</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela Detalhada com rolagem -->
+                    <div class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-hover glass-table mb-0" id="batch-results-table">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Login</th>
+                                    <th>Nome no AD</th>
+                                    <th>Status</th>
+                                    <th>Detalhes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Inserido dinamicamente por JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="button" class="btn btn-primary" id="btn-batch-finish">Concluído</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-dashed {
+    border-style: dashed !important;
+}
+.cursor-pointer {
+    cursor: pointer;
+}
+.drag-drop-zone {
+    transition: all 0.3s ease;
+    border-width: 2px !important;
+}
+.drag-drop-zone:hover, .drag-drop-zone.dragover {
+    background-color: rgba(13, 110, 253, 0.05) !important;
+    border-color: #0d6efd !important;
+}
+</style>
 
 <!-- Formulários ocultos para ações que precisam de POST. Eles são acionados via JavaScript. -->
 <form id="remove-member-form" method="POST" style="display: none;"></form>
@@ -387,26 +517,74 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderMembers(members) {
         if (!members || members.length === 0) {
             membersTableContainer.innerHTML = `<div class="alert alert-info m-3">Nenhum membro encontrado.</div>`;
+            toggleBatchRemoveButton(false);
             return;
         }
-        const table = createTable(['Nome', 'Login', 'Cargo', 'Cidade', 'Ação']);
+        
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover glass-table mb-0 align-middle';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th style="width: 40px;" class="text-center">
+                        <input class="form-check-input" type="checkbox" id="select-all-members" title="Selecionar todos">
+                    </th>
+                    <th>Nome</th>
+                    <th>Login</th>
+                    <th>Cargo</th>
+                    <th>Cidade</th>
+                    <th class="text-end pe-3" style="width: 100px;">Ação</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        
         const tbody = table.querySelector('tbody');
         members.forEach(member => {
             const row = tbody.insertRow();
             row.innerHTML = `
+                <td class="text-center">
+                    <input class="form-check-input member-checkbox" type="checkbox" value="${member.sAMAccountName}">
+                </td>
                 <td>${member.displayName}</td>
-                <td>${member.sAMAccountName}</td>
+                <td><code class="text-dark fw-bold">${member.sAMAccountName}</code></td>
                 <td>${member.title || 'N/A'}</td>
                 <td>${member.city || 'N/A'}</td>
-                <td class="text-end">
+                <td class="text-end pe-3">
                     <button class="btn btn-sm btn-danger remove-btn" data-user-sam="${member.sAMAccountName}" title="Remover">
                         <i class="fas fa-trash"></i>
                     </button>
                 </td>
             `;
         });
+        
         membersTableContainer.innerHTML = '';
         membersTableContainer.appendChild(table);
+        
+        // Registra eventos para os checkboxes
+        const selectAllCheckbox = document.getElementById('select-all-members');
+        const memberCheckboxes = document.querySelectorAll('.member-checkbox');
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            memberCheckboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+            updateBatchRemoveButtonState();
+        });
+        
+        memberCheckboxes.forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (!cb.checked) {
+                    selectAllCheckbox.checked = false;
+                } else {
+                    const allChecked = Array.from(memberCheckboxes).every(c => c.checked);
+                    selectAllCheckbox.checked = allChecked;
+                }
+                updateBatchRemoveButtonState();
+            });
+        });
+        
+        updateBatchRemoveButtonState();
     }
 
     function renderUserSearchResults(users) {
@@ -709,6 +887,242 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+
+        // === BATCH REMOVE MEMBERS JAVASCRIPT ===
+        const btnBatchRemoveMembers = document.getElementById('btn-batch-remove-members');
+        const batchRemoveCountSpan = document.getElementById('batch-remove-count');
+
+        function updateBatchRemoveButtonState() {
+            const checkedCheckboxes = document.querySelectorAll('.member-checkbox:checked');
+            const count = checkedCheckboxes.length;
+            
+            if (count > 0) {
+                batchRemoveCountSpan.textContent = count;
+                btnBatchRemoveMembers.classList.remove('d-none');
+            } else {
+                btnBatchRemoveMembers.classList.add('d-none');
+            }
+        }
+
+        function toggleBatchRemoveButton(visible) {
+            if (!visible && btnBatchRemoveMembers) {
+                btnBatchRemoveMembers.classList.add('d-none');
+            }
+        }
+
+        if (btnBatchRemoveMembers) {
+            btnBatchRemoveMembers.addEventListener('click', function() {
+                const checkedCheckboxes = document.querySelectorAll('.member-checkbox:checked');
+                const usernames = Array.from(checkedCheckboxes).map(cb => cb.value);
+                
+                if (usernames.length === 0) return;
+                
+                setupConfirmationModal('Remover em Lote', `Tem certeza que deseja remover os ${usernames.length} usuários selecionados do grupo?`, async () => {
+                    showLoading(membersTableContainer, 'Removendo membros em lote...');
+                    btnBatchRemoveMembers.classList.add('d-none');
+                    
+                    try {
+                        const response = await fetch('/api/remove_users_from_group', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrfToken
+                            },
+                            body: JSON.stringify({
+                                usernames: usernames,
+                                group_name: groupName
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                        
+                        const successCount = result.stats.success;
+                        const failedCount = result.stats.failed;
+                        
+                        if (failedCount === 0) {
+                            showToast('Sucesso', `${successCount} usuário(s) removido(s) com sucesso.`, 'success');
+                        } else {
+                            showToast('Aviso', `Processamento concluído: ${successCount} removido(s), ${failedCount} falha(s).`, 'warning');
+                        }
+                        
+                        // Recarrega lista
+                        memberListPage = 1;
+                        fetchMembers(memberListPage, memberListQuery);
+                        
+                    } catch (error) {
+                        showToast(`Falha ao remover em lote: ${error.message}`, 'error', 'Erro');
+                        fetchMembers(memberListPage, memberListQuery);
+                    }
+                });
+            });
+        }
+
+        // === BATCH ADD MEMBERS JAVASCRIPT ===
+        const batchAddModalEl = document.getElementById('batchAddMembersModal');
+        const batchAddModal = new bootstrap.Modal(batchAddModalEl);
+        const dragDropZone = document.getElementById('batch-drag-drop-zone');
+        const batchFileInput = document.getElementById('batch-file-input');
+        const selectedFileInfo = document.getElementById('selected-file-info');
+        const selectedFileName = document.getElementById('selected-file-name');
+        const btnProcessBatchFile = document.getElementById('btn-process-batch-file');
+        const batchUploadPanel = document.getElementById('batch-upload-panel');
+        const batchLoadingPanel = document.getElementById('batch-loading-panel');
+        const batchResultsPanel = document.getElementById('batch-results-panel');
+        const btnBatchFinish = document.getElementById('btn-batch-finish');
+        const batchCloseXBtn = document.getElementById('batch-close-x-btn');
+        
+        // Stats elements
+        const statBatchTotal = document.getElementById('stat-batch-total');
+        const statBatchSuccess = document.getElementById('stat-batch-success');
+        const statBatchAlready = document.getElementById('stat-batch-already');
+        const statBatchFailed = document.getElementById('stat-batch-failed');
+        const batchResultsTableBody = document.querySelector('#batch-results-table tbody');
+        
+        let batchFileToUpload = null;
+        let batchExecutionSuccess = false; // Flag para recarregar lista de membros se houve mudança
+
+        // Drag and Drop listeners
+        dragDropZone.addEventListener('click', () => batchFileInput.click());
+        
+        dragDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dragDropZone.classList.add('dragover');
+        });
+        
+        dragDropZone.addEventListener('dragleave', () => {
+            dragDropZone.classList.remove('dragover');
+        });
+        
+        dragDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragDropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleBatchFileSelected(e.dataTransfer.files[0]);
+            }
+        });
+        
+        batchFileInput.addEventListener('change', () => {
+            if (batchFileInput.files.length > 0) {
+                handleBatchFileSelected(batchFileInput.files[0]);
+            }
+        });
+        
+        function handleBatchFileSelected(file) {
+            const allowedExtensions = ['.txt', '.csv', '.xlsx'];
+            const fileName = file.name;
+            const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+            
+            if (!allowedExtensions.includes(fileExt)) {
+                showToast('Formato de arquivo inválido. Escolha apenas .txt, .csv ou .xlsx.', 'error');
+                batchFileToUpload = null;
+                selectedFileInfo.classList.add('d-none');
+                btnProcessBatchFile.disabled = true;
+                return;
+            }
+            
+            batchFileToUpload = file;
+            selectedFileName.textContent = `${fileName} (${(file.size / 1024).toFixed(1)} KB)`;
+            selectedFileInfo.classList.remove('d-none');
+            btnProcessBatchFile.disabled = false;
+        }
+        
+        // Processamento do arquivo via AJAX
+        btnProcessBatchFile.addEventListener('click', async () => {
+            if (!batchFileToUpload) return;
+            
+            const formData = new FormData();
+            formData.append('file', batchFileToUpload);
+            
+            // Altera estados de visualização do Modal
+            batchUploadPanel.classList.add('d-none');
+            batchLoadingPanel.classList.remove('d-none');
+            batchCloseXBtn.disabled = true; // Desabilita o X do modal durante processamento
+            
+            try {
+                const response = await fetch(`/api/batch_add_members/${groupName}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                batchLoadingPanel.classList.add('d-none');
+                batchCloseXBtn.disabled = false;
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Falha ao processar arquivo.');
+                }
+                
+                // Exibir Resultados
+                batchExecutionSuccess = result.stats.success > 0;
+                
+                statBatchTotal.textContent = result.stats.total;
+                statBatchSuccess.textContent = result.stats.success;
+                statBatchAlready.textContent = result.stats.already_member;
+                statBatchFailed.textContent = result.stats.failed;
+                
+                // Renderiza as linhas dos resultados individuais
+                batchResultsTableBody.innerHTML = '';
+                result.results.forEach(res => {
+                    let badgeClass = 'bg-danger';
+                    let statusLabel = 'Erro';
+                    
+                    if (res.status === 'success') {
+                        badgeClass = 'bg-success';
+                        statusLabel = 'Sucesso';
+                    } else if (res.status === 'already_member') {
+                        badgeClass = 'bg-warning text-dark';
+                        statusLabel = 'Aviso';
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><code class="text-dark fw-bold">${res.sam}</code></td>
+                        <td>${res.name}</td>
+                        <td><span class="badge ${badgeClass}">${statusLabel}</span></td>
+                        <td class="small text-muted">${res.message}</td>
+                    `;
+                    batchResultsTableBody.appendChild(tr);
+                });
+                
+                batchResultsPanel.classList.remove('d-none');
+                
+            } catch (error) {
+                batchLoadingPanel.classList.add('d-none');
+                batchUploadPanel.classList.remove('d-none');
+                batchCloseXBtn.disabled = false;
+                showToast(error.message, 'error');
+            }
+        });
+        
+        // Função para resetar e fechar modal
+        function resetBatchModalState() {
+            batchFileToUpload = null;
+            selectedFileInfo.classList.add('d-none');
+            btnProcessBatchFile.disabled = true;
+            batchFileInput.value = '';
+            
+            batchUploadPanel.classList.remove('d-none');
+            batchLoadingPanel.classList.add('d-none');
+            batchResultsPanel.classList.add('d-none');
+            
+            // Se houve alguma adição com sucesso, recarrega a tabela de membros atual
+            if (batchExecutionSuccess) {
+                batchExecutionSuccess = false;
+                memberListPage = 1; // Reseta para primeira página
+                loadGroupMembers(); // Função interna existente para recarregar membros do grupo
+            }
+        }
+        
+        btnBatchFinish.addEventListener('click', () => {
+            batchAddModal.hide();
+            resetBatchModalState();
+        });
+        
+        batchAddModalEl.addEventListener('hidden.bs.modal', resetBatchModalState);
     }
 });
 </script>

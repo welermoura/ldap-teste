@@ -6,19 +6,16 @@ def test_login_page_renders(client):
     assert b'Login' in response.data
 
 def test_login_success(client, mocker_ldap, mocker):
-    # Mocka a verificação de permissões do config.json
-    mocker.patch('routes.auth.get_user_permissions', return_value={
-        'can_create': True,
-        'can_disable': True,
-        'can_edit': True,
-        'can_manage_groups': True
-    })
+    # Mocka a verificação de acesso
+    mocker.patch('routes.auth.get_user_access_level', return_value='full')
+    mocker.patch('routes.auth.load_config', return_value={'AD_DOMAIN': 'comolatti.lan'})
     
     # Mocka get_user_by_samaccountname para simular dados retornados do AD
     mock_get_user = mocker.patch('routes.auth.get_user_by_samaccountname')
     mock_user = mocker.MagicMock()
     mock_user.displayName.value = "Usuário Teste"
     mock_get_user.return_value = mock_user
+
 
     response = client.post('/login', data={
         'username': 'usuario.teste',
