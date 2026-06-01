@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Sincronização ADP - Gestão AD{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2 class="mb-4"><i class="fas fa-sync-alt text-primary me-2"></i> Sincronização ADP (Férias)</h2>
+        <p class="text-muted">Integre o GEstão AD com o sistema da ADP para automatizar o bloqueio e desbloqueio de contas de usuários durante o período de férias.</p>
+
+        <!-- Configurações -->
+        <div class="card glass-card mb-4">
+            <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-cog me-2"></i> Configuração da API (ADP)</h5>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#configFormCollapse" aria-expanded="{% if not config.get('HR_API_URL') %}true{% else %}false{% endif %}">
+                    Expandir / Recolher
+                </button>
+            </div>
+            <div class="collapse {% if not config.get('HR_API_URL') %}show{% endif %}" id="configFormCollapse">
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin.admin_sync_hr') }}" class="row g-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="action" value="save_config">
+                        <div class="col-md-7">
+                            <label for="hr_api_url" class="form-label">URL da API ADP (Férias)</label>
+                            <input type="url" class="form-control" id="hr_api_url" name="hr_api_url" value="{{ config.get('HR_API_URL', '') }}" placeholder="Ex: http://localhost:5000/api/v1/mock_hr" required>
+                            <small class="text-muted">URL do endpoint de dados.</small>
+                        </div>
+                        <div class="col-md-5">
+                            <label for="hr_api_token" class="form-label">Token de Autorização Estático (Opcional)</label>
+                            <input type="password" class="form-control" id="hr_api_token" name="hr_api_token" value="{{ config.get('HR_API_TOKEN', '') }}" placeholder="Token Bearer JWT">
+                            <small class="text-muted">Se usar OAuth2 abaixo, deixe em branco.</small>
+                        </div>
+                        <hr class="mt-4 mb-2">
+                        <h6 class="text-primary mb-3">Autenticação OAuth2 Dinâmica (Client Credentials)</h6>
+                        <div class="col-md-12">
+                            <label for="adp_token_url" class="form-label">URL do Token ADP</label>
+                            <input type="url" class="form-control" id="adp_token_url" name="adp_token_url" value="{{ config.get('ADP_TOKEN_URL', 'https://accounts.eu.adp.com/auth/oauth/v2/token') }}" placeholder="https://accounts.eu.adp.com/auth/oauth/v2/token">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="adp_client_id" class="form-label">Client ID da ADP</label>
+                            <input type="text" class="form-control" id="adp_client_id" name="adp_client_id" value="{{ config.get('ADP_CLIENT_ID', '') }}" placeholder="Client ID">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="adp_client_secret" class="form-label">Client Secret da ADP</label>
+                            <input type="password" class="form-control" id="adp_client_secret" name="adp_client_secret" value="{{ config.get('ADP_CLIENT_SECRET', '') }}" placeholder="Client Secret">
+                        </div>
+                        <div class="col-12 text-end mt-4">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Salvar Credenciais</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ação Principal -->
+        <div class="card glass-card mb-4 border-primary">
+            <div class="card-body text-center py-5">
+                <h4>Forçar Sincronização Agora</h4>
+                <p class="mb-4">O robô do GEstão AD roda a sincronização de férias todos os dias automaticamente na madrugada. Se desejar puxar os dados mais recentes agora, clique no botão abaixo.</p>
+                <form method="POST" action="{{ url_for('admin.admin_sync_hr') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="fetch">
+                    <button type="submit" class="btn btn-lg btn-success" {% if not config.get('HR_API_URL') %}disabled{% endif %}>
+                        <i class="fas fa-cloud-download-alt me-2"></i> Sincronizar com a ADP
+                    </button>
+                    {% if not config.get('HR_API_URL') %}
+                    <div class="text-danger mt-2 small">Configure a URL da API acima primeiro.</div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <!-- Resumo dos Agendamentos -->
+        <h3 class="mb-3 border-bottom pb-2">Status dos Bloqueios Automáticos</h3>
+        
+        <div class="row">
+            <!-- Tabela de Desativações -->
+            <div class="col-md-6 mb-4">
+                <div class="card glass-card h-100 border-danger">
+                    <div class="card-header bg-transparent border-0 text-danger">
+                        <h5 class="mb-0"><i class="fas fa-user-lock me-2"></i>Início das Férias (Bloqueios)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Login (sAMAccountName)</th>
+                                        <th class="text-end">Data Agendada</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if disable_schedules %}
+                                        {% for sam, date in disable_schedules.items() %}
+                                        <tr>
+                                            <td class="align-middle fw-bold">{{ sam }}</td>
+                                            <td class="text-end align-middle"><span class="badge bg-danger">{{ date }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="2" class="text-center py-3 text-muted">Nenhum bloqueio agendado.</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Reativações -->
+            <div class="col-md-6 mb-4">
+                <div class="card glass-card h-100 border-success">
+                    <div class="card-header bg-transparent border-0 text-success">
+                        <h5 class="mb-0"><i class="fas fa-user-check me-2"></i>Retorno de Férias (Desbloqueios)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Login (sAMAccountName)</th>
+                                        <th class="text-end">Data Agendada</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if enable_schedules %}
+                                        {% for sam, date in enable_schedules.items() %}
+                                        <tr>
+                                            <td class="align-middle fw-bold">{{ sam }}</td>
+                                            <td class="text-end align-middle"><span class="badge bg-success">{{ date }}</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="2" class="text-center py-3 text-muted">Nenhum desbloqueio agendado.</td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -34,8 +34,29 @@ def group_management():
             search_base = config.get('AD_SEARCH_BASE')
             query = form.search_query.data
             search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
-            conn.search(search_base, search_filter, attributes=['cn', 'description', 'member'])
-            groups = conn.entries
+            conn.search(search_base, search_filter, attributes=['cn', 'description', 'member', 'groupType'])
+            
+            groups = []
+            for g in conn.entries:
+                g_type_val = g.groupType.value if 'groupType' in g and g.groupType.value else 0
+                
+                # Active Directory groupType bitmask parsing
+                is_security = (g_type_val & 2147483648) or (g_type_val < 0)
+                type_str = "Segurança" if is_security else "Distribuição"
+                
+                scope_str = "Desconhecido"
+                if g_type_val & 2:
+                    scope_str = "Global"
+                elif g_type_val & 4:
+                    scope_str = "Domínio Local"
+                elif g_type_val & 8:
+                    scope_str = "Universal"
+                    
+                groups.append({
+                    'cn': g.cn.value if 'cn' in g else 'Desconhecido',
+                    'member_count': len(g.member.values) if 'member' in g and g.member.values else 0,
+                    'type_scope': f"{type_str} - {scope_str}"
+                })
             if not groups:
                 flash(f"Nenhum grupo encontrado com o nome '{query}'.", "info")
         except Exception as e:
@@ -50,11 +71,26 @@ def view_group(group_name):
     form = FlaskForm()
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, attributes=['cn', 'description'])
+        group = get_group_by_name(conn, group_name, attributes=['cn', 'description', 'groupType', 'mail', 'proxyAddresses'])
         if not group:
             flash(f"Grupo '{group_name}' não encontrado.", 'error')
             return redirect(url_for('groups.group_management'))
-        return render_template('view_group.html', group=group, form=form)
+            
+        g_type_val = group.groupType.value if 'groupType' in group and group.groupType.value else 0
+        is_security = (g_type_val & 2147483648) or (g_type_val < 0)
+        
+        scope_val = 'domain_local' if (g_type_val & 4) else ('global' if (g_type_val & 2) else ('universal' if (g_type_val & 8) else 'unknown'))
+        
+        group_info = {
+            'cn': group.cn.value if 'cn' in group else group_name,
+            'description': group.description.value if 'description' in group else '',
+            'is_security': is_security,
+            'scope': scope_val,
+            'mail': group.mail.value if 'mail' in group else '',
+            'proxyAddresses': group.proxyAddresses.values if 'proxyAddresses' in group else []
+        }
+            
+        return render_template('view_group.html', group=group_info, form=form)
     except Exception as e:
         flash(f"Erro ao carregar a página do grupo: {e}", "error")
         logging.error(f"Erro ao carregar a view do grupo '{group_name}': {e}", exc_info=True)
@@ -418,3 +454,200 @@ def api_export_group_members(group_name):
     except Exception as e:
         logging.error(f"Erro ao exportar membros do grupo {group_name}: {e}")
         return f"Erro ao exportar: {str(e)}", 500
+
+@groups_bp.route('/api/update_group_settings', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_update_group_settings():
+    data = request.get_json()
+    group_name = data.get('group_name')
+    is_security = data.get('is_security', True)
+    scope = data.get('scope', 'global')
+    
+    if not group_name:
+        return jsonify({'error': 'Nome do grupo obrigatório'}), 400
+        
+    try:
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, ['distinguishedName', 'groupType'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        current_type = group.groupType.value if 'groupType' in group and group.groupType.value else 0
+        
+        # Limpar apenas bit de segurança (0x80000000)
+        new_type = current_type & ~2147483648
+        
+        # Adicionar bit de segurança se for o caso
+        if is_security:
+            new_type = new_type | 2147483648
+            
+        conn.modify(group.distinguishedName.value, {'groupType': [(ldap3.MODIFY_REPLACE, [new_type])]})
+        
+        if conn.result['description'] == 'success':
+            logging.info(f"Tipo do grupo '{group_name}' alterado por '{session.get('user_display_name')}'.")
+            return jsonify({'success': True, 'message': 'Configurações atualizadas'})
+        else:
+            return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
+            
+    except Exception as e:
+        logging.error(f"Erro ao atualizar configurações do grupo {group_name}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/group_exchange_info/<group_name>')
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_group_exchange_info(group_name):
+    try:
+        conn = get_read_connection()
+        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'mail'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        primary_email = group.mail.value if 'mail' in group else None
+        proxy_addresses = group.proxyAddresses.values if 'proxyAddresses' in group else []
+        
+        if not primary_email:
+            for p in proxy_addresses:
+                if str(p).startswith('SMTP:'):
+                    primary_email = str(p)[5:]
+                    break
+                    
+        return jsonify({
+            'primary_email': primary_email,
+            'proxy_addresses': [str(p) for p in proxy_addresses if str(p).lower().startswith('smtp:')]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/add_group_proxy_address', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_group_proxy_address():
+    data = request.get_json()
+    group_name = data.get('group_name')
+    new_proxy = data.get('proxy_address')
+    
+    if not group_name or not new_proxy:
+        return jsonify({'error': 'Grupo e alias são obrigatórios'}), 400
+        
+    try:
+        if not new_proxy.lower().startswith('smtp:'):
+            new_proxy = f"smtp:{new_proxy}"
+            
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'distinguishedName', 'mail'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        proxy_addresses = [str(p) for p in group.proxyAddresses.values] if 'proxyAddresses' in group else []
+        
+        if any(p.lower() == new_proxy.lower() for p in proxy_addresses):
+            return jsonify({'error': 'Alias já existe'}), 400
+            
+        proxy_addresses.append(new_proxy)
+        conn.modify(group.distinguishedName.value, {'proxyAddresses': [(ldap3.MODIFY_REPLACE, proxy_addresses)]})
+        
+        if conn.result['description'] == 'success':
+            logging.info(f"Alias '{new_proxy}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/remove_group_proxy_address', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_group_proxy_address():
+    data = request.get_json()
+    group_name = data.get('group_name')
+    target_proxy = data.get('proxy_address')
+    
+    if not group_name or not target_proxy:
+        return jsonify({'error': 'Grupo e alias são obrigatórios'}), 400
+        
+    try:
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'distinguishedName'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        proxy_addresses = [str(p) for p in group.proxyAddresses.values] if 'proxyAddresses' in group else []
+        
+        if target_proxy.lower().startswith('smtp:'):
+            alias_to_remove = target_proxy[5:]
+        else:
+            alias_to_remove = target_proxy
+            
+        if f"SMTP:{alias_to_remove.lower()}" in [p.upper() if p.startswith('SMTP:') else p.lower() for p in proxy_addresses]:
+            return jsonify({'error': 'Não é possível remover o endereço principal. Defina outro como principal primeiro.'}), 400
+            
+        new_proxies = [p for p in proxy_addresses if p.lower() != f"smtp:{alias_to_remove.lower()}" and p.lower() != f"smtp:{target_proxy.lower()}"]
+        
+        if len(new_proxies) == len(proxy_addresses):
+            return jsonify({'error': 'Alias não encontrado no grupo'}), 400
+            
+        conn.modify(group.distinguishedName.value, {'proxyAddresses': [(ldap3.MODIFY_REPLACE, new_proxies)]})
+        
+        if conn.result['description'] == 'success':
+            logging.info(f"Alias removido do grupo '{group_name}' por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/set_group_primary_email', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_set_group_primary_email():
+    data = request.get_json()
+    group_name = data.get('group_name')
+    new_primary = data.get('new_primary')
+    
+    if not group_name or not new_primary:
+        return jsonify({'error': 'Grupo e novo e-mail primário são obrigatórios'}), 400
+        
+    try:
+        if new_primary.lower().startswith('smtp:'):
+            new_primary = new_primary[5:]
+            
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'distinguishedName', 'mail'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        proxy_addresses = [str(p) for p in group.proxyAddresses.values] if 'proxyAddresses' in group else []
+        
+        new_proxies = []
+        for p in proxy_addresses:
+            if p.lower().startswith('smtp:'):
+                clean_p = p[5:]
+                if clean_p.lower() == new_primary.lower():
+                    new_proxies.append(f"SMTP:{clean_p}")
+                else:
+                    new_proxies.append(f"smtp:{clean_p}")
+            else:
+                new_proxies.append(p)
+                
+        if not any(p.startswith('SMTP:') for p in new_proxies):
+            new_proxies.append(f"SMTP:{new_primary}")
+            
+        modifications = {
+            'proxyAddresses': [(ldap3.MODIFY_REPLACE, new_proxies)],
+            'mail': [(ldap3.MODIFY_REPLACE, [new_primary])]
+        }
+        
+        conn.modify(group.distinguishedName.value, modifications)
+        
+        if conn.result['description'] == 'success':
+            logging.info(f"E-mail primário do grupo '{group_name}' alterado para '{new_primary}' por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

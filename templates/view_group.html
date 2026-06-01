@@ -1,41 +1,144 @@
 {% extends "base.html" %}
 {% from "_form_helpers.html" import render_field %}
 
-{% block title %}Gerenciar Grupo: {{ group.cn.value }}{% endblock %}
+{% block title %}Gerenciar Grupo: {{ group.cn }}{% endblock %}
 
 {% from "_macros.html" import render_page_header %}
 
 {% block content %}
-<!-- Card da Lista de Membros -->
-<div class="card glass-card">
-    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="mb-0 me-3">Membros Atuais</h5>
+{{ render_page_header('<i class="fas fa-users-cog me-2"></i>Gerenciar Grupo: ' ~ group.cn, back_url=url_for('groups.group_management')) }}
 
-        <div class="d-flex gap-2 flex-wrap">
-             <a href="{{ url_for('groups.api_export_group_members', group_name=group.cn.value) }}" class="btn btn-sm btn-secondary">
-                <i class="fas fa-file-csv me-1"></i> Exportar Membros
-            </a>
-            <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                <i class="fas fa-user-plus me-1"></i> Adicionar Usuário
-            </button>
-        </div>
+<ul class="nav nav-tabs mb-4" id="groupTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="members-tab" data-bs-toggle="tab" data-bs-target="#members-tab-pane" type="button" role="tab" aria-controls="members-tab-pane" aria-selected="true">
+            <i class="fas fa-users me-2"></i>Membros
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-tab-pane" type="button" role="tab" aria-controls="settings-tab-pane" aria-selected="false">
+            <i class="fas fa-cog me-2"></i>Configurações
+        </button>
+    </li>
+</ul>
 
-        <div class="ms-auto" style="min-width: 200px; max-width: 250px;">
-            <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros...">
-        </div>
-    </div>
-    <div class="card-body p-0">
-        <div class="table-responsive" id="members-table-container">
-            <div class="text-center p-5" id="loading-spinner">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2">Carregando membros...</p>
+<div class="tab-content" id="groupTabsContent">
+    <!-- ABA MEMBROS -->
+    <div class="tab-pane fade show active" id="members-tab-pane" role="tabpanel" aria-labelledby="members-tab" tabindex="0">
+        <!-- Card da Lista de Membros -->
+        <div class="card glass-card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 me-3">Membros Atuais</h5>
+
+                <div class="d-flex gap-2 flex-wrap">
+                     <a href="{{ url_for('groups.api_export_group_members', group_name=group.cn) }}" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-file-csv me-1"></i> Exportar Membros
+                    </a>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="fas fa-user-plus me-1"></i> Adicionar Usuário
+                    </button>
+                </div>
+
+                <div class="ms-auto" style="min-width: 200px; max-width: 250px;">
+                    <input type="text" id="member-search-input" class="form-control form-control-sm" placeholder="Filtrar membros...">
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" id="members-table-container">
+                    <div class="text-center p-5" id="loading-spinner">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Carregando membros...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <span id="member-count-badge" class="badge bg-secondary rounded-pill fs-6">Carregando...</span>
             </div>
         </div>
     </div>
-    <div class="card-footer text-center">
-        <span id="member-count-badge" class="badge bg-secondary rounded-pill fs-6">Carregando...</span>
+
+    <!-- ABA CONFIGURAÇÕES -->
+    <div class="tab-pane fade" id="settings-tab-pane" role="tabpanel" aria-labelledby="settings-tab" tabindex="0">
+        <div class="row">
+            <div class="col-md-auto mb-4">
+                <div class="card glass-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tipo e Escopo</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="group-settings-form">
+                            <h6 class="mb-3">Tipo do Grupo</h6>
+                            <div class="mb-4">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="group_type" id="type_security" value="security" {% if group.is_security %}checked{% endif %}>
+                                    <label class="form-check-label" for="type_security">Segurança</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="group_type" id="type_distribution" value="distribution" {% if not group.is_security %}checked{% endif %}>
+                                    <label class="form-check-label" for="type_distribution">Distribuição</label>
+                                </div>
+                            </div>
+                            
+                            <h6 class="mb-3">Escopo do Grupo <small class="text-muted">(Somente leitura)</small></h6>
+                            <div class="mb-4">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="group_scope" id="scope_domain_local" value="domain_local" {% if group.scope == 'domain_local' %}checked{% endif %} disabled>
+                                    <label class="form-check-label text-muted" for="scope_domain_local">Local de Domínio (Domain Local)</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="group_scope" id="scope_global" value="global" {% if group.scope == 'global' %}checked{% endif %} disabled>
+                                    <label class="form-check-label text-muted" for="scope_global">Global</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="group_scope" id="scope_universal" value="universal" {% if group.scope == 'universal' %}checked{% endif %} disabled>
+                                    <label class="form-check-label text-muted" for="scope_universal">Universal</label>
+                                </div>
+                            </div>
+                            
+                            <button type="button" id="save-group-settings-btn" class="btn btn-primary">Salvar Alteração de Tipo</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md mb-4 {% if group.is_security %}d-none{% endif %}" id="exchange-card-container">
+                <div class="card glass-card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">E-mail / Exchange (proxyAddresses)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <label class="form-label">E-mail Primário (reply-to)</label>
+                            <input type="email" class="form-control" id="group-primary-email" readonly value="{{ group.mail }}">
+                        </div>
+                        
+                        <h6 class="mb-3">Aliases (Proxy Addresses)</h6>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">smtp:</span>
+                            <input type="text" id="new-group-proxy-address" class="form-control" placeholder="alias@dominio.com">
+                            <button class="btn btn-success" type="button" id="add-group-proxy-btn">Adicionar</button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover glass-table mb-0" id="group-proxy-table">
+                                <thead>
+                                    <tr>
+                                        <th>Endereço</th>
+                                        <th>Tipo</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Preenchido via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
 
 <!-- ========================================================================== -->
 <!-- Modal de Adicionar Usuário                                                 -->
@@ -44,7 +147,7 @@
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="addUserModalLabel"><i class="fas fa-user-plus me-2"></i>Adicionar Usuário ao Grupo: {{ group.cn.value }}</h5>
+                <h5 class="modal-title" id="addUserModalLabel"><i class="fas fa-user-plus me-2"></i>Adicionar Usuário ao Grupo: {{ group.cn }}</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -119,7 +222,7 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const groupName = {{ group.cn.value|tojson }};
+    const groupName = {{ group.cn|tojson }};
     const csrfToken = "{{ form.csrf_token._value() }}";
     let memberListPage = 1;
     let memberListQuery = '';
@@ -437,6 +540,176 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial Load
     fetchMembers(memberListPage, memberListQuery);
+
+    // ==========================================
+    // Configurações - Tipo/Escopo
+    // ==========================================
+    const typeSecurityRadio = document.getElementById('type_security');
+    const typeDistributionRadio = document.getElementById('type_distribution');
+    const exchangeCardContainer = document.getElementById('exchange-card-container');
+
+    function toggleExchangeVisibility() {
+        if (typeDistributionRadio && typeDistributionRadio.checked) {
+            exchangeCardContainer.classList.remove('d-none');
+            exchangeCardContainer.style.display = ''; // fallback
+        } else {
+            exchangeCardContainer.classList.add('d-none');
+        }
+    }
+
+    if (typeSecurityRadio && typeDistributionRadio) {
+        typeSecurityRadio.addEventListener('change', toggleExchangeVisibility);
+        typeDistributionRadio.addEventListener('change', toggleExchangeVisibility);
+        
+        // Força a visibilidade correta ao carregar a página
+        toggleExchangeVisibility();
+    }
+
+    const saveGroupSettingsBtn = document.getElementById('save-group-settings-btn');
+    if (saveGroupSettingsBtn) {
+        saveGroupSettingsBtn.addEventListener('click', async () => {
+            const isSecurity = document.getElementById('type_security').checked;
+            let scope = 'global';
+            if (document.getElementById('scope_domain_local').checked) scope = 'domain_local';
+            if (document.getElementById('scope_universal').checked) scope = 'universal';
+            
+            saveGroupSettingsBtn.disabled = true;
+            saveGroupSettingsBtn.textContent = 'Salvando...';
+            
+            try {
+                const response = await fetch('/api/update_group_settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({
+                        group_name: groupName,
+                        is_security: isSecurity,
+                        scope: scope
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                showToast('Configurações atualizadas com sucesso.', 'success', 'Sucesso');
+            } catch (error) {
+                showToast(`Falha ao salvar configurações: ${error.message}`, 'error', 'Erro');
+            } finally {
+                saveGroupSettingsBtn.disabled = false;
+                saveGroupSettingsBtn.textContent = 'Salvar Alteração de Tipo';
+            }
+        });
+    }
+
+    // ==========================================
+    // E-mail / Exchange (ProxyAddresses)
+    // ==========================================
+    const proxyTableBody = document.querySelector('#group-proxy-table tbody');
+    const primaryEmailInput = document.getElementById('group-primary-email');
+    const newProxyInput = document.getElementById('new-group-proxy-address');
+    const addProxyBtn = document.getElementById('add-group-proxy-btn');
+
+    async function loadGroupExchangeInfo() {
+        try {
+            const response = await fetch(`/api/group_exchange_info/${encodeURIComponent(groupName)}`);
+            if (!response.ok) throw new Error('Falha ao carregar emails do grupo');
+            const data = await response.json();
+            
+            primaryEmailInput.value = data.primary_email || 'Nenhum E-mail Primário';
+            
+            proxyTableBody.innerHTML = '';
+            if (data.proxy_addresses && data.proxy_addresses.length > 0) {
+                data.proxy_addresses.forEach(addr => {
+                    if (!addr.toLowerCase().startsWith('smtp:')) return; // Filtro de segurança no frontend
+                    
+                    const isPrimary = addr.startsWith('SMTP:');
+                    const cleanAddr = addr.substring(5);
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>${cleanAddr}</td>
+                        <td>${isPrimary ? '<span class="badge bg-success">Primário (SMTP)</span>' : '<span class="badge bg-secondary">Alias (smtp)</span>'}</td>
+                        <td class="text-end">
+                            ${!isPrimary ? `<button class="btn btn-sm btn-outline-warning set-primary-btn me-1" data-proxy="${cleanAddr}" title="Tornar Primário"><i class="far fa-star"></i></button>` : ''}
+                            <button class="btn btn-sm btn-outline-danger remove-proxy-btn" data-proxy="${cleanAddr}" title="Remover"><i class="fas fa-trash"></i></button>
+                        </td>
+                    `;
+                    proxyTableBody.appendChild(row);
+                });
+            } else {
+                proxyTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Nenhum alias configurado</td></tr>';
+            }
+        } catch (error) {
+            console.error('Erro ao carregar exchange:', error);
+            proxyTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Erro ao carregar e-mails</td></tr>';
+        }
+    }
+
+    if (proxyTableBody) {
+        // Carrega inicialmente
+        loadGroupExchangeInfo();
+
+        // Adicionar novo alias
+        if (addProxyBtn) {
+            addProxyBtn.addEventListener('click', async () => {
+                const proxyValue = newProxyInput.value.trim();
+                if (!proxyValue) return;
+                
+                try {
+                    const response = await fetch('/api/add_group_proxy_address', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({ group_name: groupName, proxy_address: proxyValue })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                    showToast('E-mail adicionado com sucesso.', 'success');
+                    newProxyInput.value = '';
+                    loadGroupExchangeInfo();
+                } catch (error) {
+                    showToast(`Falha ao adicionar: ${error.message}`, 'error');
+                }
+            });
+        }
+
+        // Delegação de eventos na tabela (Remover ou Definir Principal)
+        proxyTableBody.addEventListener('click', async (e) => {
+            const removeBtn = e.target.closest('.remove-proxy-btn');
+            if (removeBtn) {
+                const proxyValue = removeBtn.dataset.proxy;
+                setupConfirmationModal('Remover E-mail', `Tem certeza que deseja remover ${proxyValue}?`, async () => {
+                    try {
+                        const response = await fetch('/api/remove_group_proxy_address', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                            body: JSON.stringify({ group_name: groupName, proxy_address: proxyValue })
+                        });
+                        const result = await response.json();
+                        if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                        showToast('E-mail removido com sucesso.', 'success');
+                        loadGroupExchangeInfo();
+                    } catch (error) {
+                        showToast(`Falha ao remover: ${error.message}`, 'error');
+                    }
+                });
+            }
+
+            const setPrimaryBtn = e.target.closest('.set-primary-btn');
+            if (setPrimaryBtn) {
+                const proxyValue = setPrimaryBtn.dataset.proxy;
+                try {
+                    const response = await fetch('/api/set_group_primary_email', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({ group_name: groupName, new_primary: proxyValue })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                    showToast('E-mail primário alterado com sucesso.', 'success');
+                    loadGroupExchangeInfo();
+                } catch (error) {
+                    showToast(`Falha ao alterar primário: ${error.message}`, 'error');
+                }
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

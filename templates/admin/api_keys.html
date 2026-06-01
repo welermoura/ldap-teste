@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Integrações - Gestão AD{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2 class="mb-4"><i class="fas fa-network-wired text-primary me-2"></i> Gerenciar Integrações (API Keys)</h2>
+        <p class="text-muted">Gere chaves de acesso para permitir que outros sistemas (como RH, ERPs ou automações) consumam o GEstão AD com segurança.</p>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4" id="apiTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="keys-tab" data-bs-toggle="tab" data-bs-target="#keys" type="button" role="tab" aria-controls="keys" aria-selected="true"><i class="fas fa-key me-2"></i>Chaves de Acesso</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="docs-tab" data-bs-toggle="tab" data-bs-target="#docs" type="button" role="tab" aria-controls="docs" aria-selected="false"><i class="fas fa-book me-2"></i>Como Integrar (Documentação)</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="apiTabsContent">
+            
+            <!-- Aba: Chaves -->
+            <div class="tab-pane fade show active" id="keys" role="tabpanel" aria-labelledby="keys-tab">
+                
+                {% if new_key_to_show %}
+                <div class="alert alert-success mt-3" role="alert">
+                    <h4 class="alert-heading"><i class="fas fa-check-circle me-2"></i>Chave Gerada com Sucesso!</h4>
+                    <p>Copie a chave abaixo. <strong>Ela não será exibida novamente</strong> por motivos de segurança.</p>
+                    <hr>
+                    <div class="d-flex align-items-center">
+                        <code class="fs-5 flex-grow-1 p-2 bg-light rounded border user-select-all" id="newApiKey">{{ new_key_to_show }}</code>
+                        <button class="btn btn-outline-success ms-2" onclick="navigator.clipboard.writeText(document.getElementById('newApiKey').innerText); this.innerHTML='<i class=\'fas fa-check\'></i> Copiado!'; setTimeout(()=>this.innerHTML='<i class=\'fas fa-copy\'></i> Copiar', 2000);">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card glass-card mb-4">
+                    <div class="card-header bg-transparent border-0 d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Gerar Nova Chave</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('admin.admin_api_keys') }}" class="row g-3 align-items-end">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="action" value="create">
+                            <div class="col-md-12">
+                                <label for="description" class="form-label">Nome/Descrição do Sistema</label>
+                                <input type="text" class="form-control" id="description" name="description" placeholder="Ex: Sistema do RH (TOTVS)" required>
+                            </div>
+                            <div class="col-md-9 mt-3">
+                                <label class="form-label d-block text-muted mb-2"><i class="fas fa-shield-alt me-1"></i> Permissões Concedidas a esta Chave:</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="perm_read" name="perm_read" checked>
+                                    <label class="form-check-label" for="perm_read">Apenas Leitura (Padrão)</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="perm_create" name="perm_create">
+                                    <label class="form-check-label text-warning" for="perm_create">Pode Criar Usuários</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="perm_edit" name="perm_edit">
+                                    <label class="form-check-label text-danger" for="perm_edit">Pode Alterar Usuários</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mt-3">
+                                <button type="submit" class="btn btn-primary w-100"><i class="fas fa-plus me-2"></i>Gerar Chave Seguro</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card glass-card">
+                    <div class="card-header bg-transparent border-0">
+                        <h5 class="mb-0">Chaves Ativas</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Descrição</th>
+                                        <th>Permissões</th>
+                                        <th>Data de Criação</th>
+                                        <th>Criada por</th>
+                                        <th>Prefixo da Chave</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if keys %}
+                                        {% for key, data in keys.items() %}
+                                        <tr>
+                                            <td class="align-middle fw-bold">{{ data.description }}</td>
+                                            <td class="align-middle">
+                                                {% set perms = data.permissions | default({'read': True}) %}
+                                                {% if perms.read %}<span class="badge bg-secondary me-1" title="Leitura"><i class="fas fa-eye"></i></span>{% endif %}
+                                                {% if perms.create %}<span class="badge bg-warning text-dark me-1" title="Pode Criar"><i class="fas fa-user-plus"></i></span>{% endif %}
+                                                {% if perms.edit %}<span class="badge bg-danger me-1" title="Pode Editar"><i class="fas fa-user-edit"></i></span>{% endif %}
+                                            </td>
+                                            <td class="align-middle">{{ data.created_at }}</td>
+                                            <td class="align-middle"><span class="badge bg-secondary">{{ data.created_by }}</span></td>
+                                            <td class="align-middle text-muted"><code>sk_***...***{{ key[-4:] }}</code></td>
+                                            <td class="text-end align-middle">
+                                                <form method="POST" action="{{ url_for('admin.admin_api_keys') }}" onsubmit="return confirm('Tem certeza que deseja REVOGAR esta chave? O sistema que a utiliza perderá o acesso imediatamente.');" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="action" value="revoke">
+                                                    <input type="hidden" name="key" value="{{ key }}">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Revogar Acesso"><i class="fas fa-trash-alt"></i> Revogar</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="5" class="text-center py-4 text-muted">
+                                                <i class="fas fa-info-circle fa-2x mb-2"></i><br>
+                                                Nenhuma chave de API gerada no momento.
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aba: Documentação -->
+            <div class="tab-pane fade" id="docs" role="tabpanel" aria-labelledby="docs-tab">
+                <div class="card glass-card">
+                    <div class="card-body">
+                        <h4>Guia de Integração para Desenvolvedores</h4>
+                        <p class="text-muted">Compartilhe esta página com a equipe técnica responsável pelo sistema de terceiros.</p>
+                        
+                        <hr>
+
+                        <h5 class="mt-4 text-primary">1. Autenticação</h5>
+                        <p>Todas as requisições para a API do GEstão AD devem incluir o cabeçalho HTTP <code>Authorization</code> contendo o token (API Key) gerado no padrão <strong>Bearer</strong>.</p>
+                        
+                        <div class="bg-dark text-light p-3 rounded mb-4">
+                            <code>Authorization: Bearer sk_exemplo1234567890abcdef...</code>
+                        </div>
+
+                        <h5 class="mt-4 text-primary">2. Endpoint de Teste (Validação)</h5>
+                        <p>Para verificar se sua chave está funcionando e se conectando corretamente à API Interna (v1).</p>
+                        <ul>
+                            <li><strong>URL:</strong> <code>GET /api/v1/integration/ping</code></li>
+                            <li><strong>Retorno 200 OK:</strong> O token é válido e a API está respondendo.</li>
+                            <li><strong>Retorno 401 Unauthorized:</strong> O token é inválido, não foi enviado ou foi revogado.</li>
+                        </ul>
+
+                        <h5 class="mt-4 text-primary">3. Exemplo Prático de Consumo (Python)</h5>
+                        <p>Abaixo, um exemplo simples utilizando a biblioteca <code>requests</code> do Python:</p>
+                        
+<pre class="bg-dark text-light p-3 rounded mb-4"><code>import requests
+
+url = "http://SERVIDOR_GESTAO_AD/api/v1/integration/ping"
+headers = {
+    "Authorization": "Bearer sk_SUA_CHAVE_AQUI"
+}
+
+response = requests.get(url, headers=headers)
+
+if response.status_code == 200:
+    print("Sucesso! Conectado à API do GEstão AD.")
+    print("Resposta:", response.json())
+else:
+    print(f"Erro {response.status_code}: {response.json().get('error')}")
+</code></pre>
+
+                        <h5 class="mt-4 text-primary">4. Exemplo Prático de Consumo (PowerShell)</h5>
+                        <p>Exemplo para integrações via scripts de infraestrutura em PowerShell:</p>
+
+<pre class="bg-dark text-light p-3 rounded mb-4"><code>$url = "http://SERVIDOR_GESTAO_AD/api/v1/integration/ping"
+$headers = @{
+    "Authorization" = "Bearer sk_SUA_CHAVE_AQUI"
+}
+
+$response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+Write-Output "Conectado com sucesso!"
+$response
+</code></pre>
+                        
+                        <div class="alert alert-info mt-4">
+                            <i class="fas fa-lightbulb me-2"></i> <strong>Nota sobre novos Endpoints:</strong> A fundação da API (v1) está pronta. Caso o sistema de RH precise de ações específicas (como criar ou desativar usuário enviando JSON), solicite ao administrador do GEstão AD para mapear um novo endpoint REST em <code>routes/api.py</code>.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
