@@ -78,11 +78,7 @@ def get_sql_server_uri():
 _cached_config = None
 
 def load_config(force_reload=False):
-    """Carrega, descriptografa e retorna os dados de configuração com cache simples."""
-    global _cached_config
-    if _cached_config is not None and not force_reload:
-        return _cached_config
-        
+    """Carrega, descriptografa e retorna os dados de configuração diretamente do disco para consistência total entre múltiplos workers."""
     try:
         if not os.path.exists(CONFIG_FILE):
             return {}
@@ -99,10 +95,10 @@ def load_config(force_reload=False):
                     config[k] = v
             else:
                 config[k] = v
-        _cached_config = config
         return config
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+
 
 def save_config(config):
     """Criptografa e salva os dados de configuração."""
@@ -116,10 +112,6 @@ def save_config(config):
 
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(encrypted_config, f, indent=4)
-    
-    # Invalida o cache após salvar
-    global _cached_config
-    _cached_config = None
 
 def get_ad_upn_suffixes(conn):
     """Busca automaticamente os sufixos UPN configurados no Active Directory."""
