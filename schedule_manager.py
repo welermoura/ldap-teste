@@ -203,21 +203,14 @@ def process_zimbra_group_syncs(conn, config):
             
         logging.info(f"Sincronizando grupo AD '{ad_group}' com lista Zimbra '{zimbra_email}'...")
         try:
-            ad_group_obj = get_group_by_name(conn, ad_group, ['member'])
+            ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
             if not ad_group_obj:
                 logging.error(f"Grupo do AD '{ad_group}' não foi encontrado para sincronização.")
                 continue
 
-            # Extrai e-mails dos membros do AD
-            ad_member_dns = ad_group_obj.member.values if 'member' in ad_group_obj and ad_group_obj.member.values else []
-            ad_emails = set()
-            
-            for dn in ad_member_dns:
-                user_entry = get_user_by_dn(conn, dn, ['mail', 'userPrincipalName'])
-                if user_entry:
-                    email = get_attr_value(user_entry, 'mail') or get_attr_value(user_entry, 'userPrincipalName')
-                    if email:
-                        ad_emails.add(email.strip().lower())
+            # Extrai e-mails dos membros do AD de forma recursiva e com filtro UAC
+            from common import get_group_members_emails
+            ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
 
             # Conecta no Zimbra
             try:
@@ -235,7 +228,8 @@ def process_zimbra_group_syncs(conn, config):
                     logging.error(f"Erro ao buscar membros da lista Zimbra '{zimbra_email}': {e}")
                     continue
 
-            zimbra_emails = set(dl_info['members'])
+            # Normalizar e-mails do Zimbra
+            zimbra_emails = {m.strip().lower() for m in dl_info['members']}
             zimbra_real_email = dl_info['email']
 
             # Diferenças

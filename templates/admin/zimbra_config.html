@@ -302,7 +302,7 @@
 <div class="modal fade" id="syncResultModal" tabindex="-1" aria-labelledby="syncResultModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header">
                 <h5 class="modal-title" id="syncResultModalLabel"><i class="fas fa-sync me-2"></i>Status da Sincronização</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -314,19 +314,19 @@
                 <!-- Grid Estatístico -->
                 <div class="row g-2 mb-4">
                     <div class="col-4">
-                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-success">
+                        <div class="card bg-light bg-opacity-10 border-0 text-center py-2 border-start border-4 border-success">
                             <span class="fs-4 fw-bold text-success" id="sync-stat-added">0</span>
                             <span class="text-muted small">Adicionados</span>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-danger">
+                        <div class="card bg-light bg-opacity-10 border-0 text-center py-2 border-start border-4 border-danger">
                             <span class="fs-4 fw-bold text-danger" id="sync-stat-removed">0</span>
                             <span class="text-muted small">Removidos</span>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="card bg-light border-0 text-center py-2 border-start border-4 border-warning">
+                        <div class="card bg-light bg-opacity-10 border-0 text-center py-2 border-start border-4 border-warning">
                             <span class="fs-4 fw-bold text-warning" id="sync-stat-failed">0</span>
                             <span class="text-muted small">Falhas</span>
                         </div>
@@ -337,7 +337,7 @@
                 <h6 class="border-bottom pb-2 mb-2">Relatório de Operações</h6>
                 <div class="table-responsive border rounded" style="max-height: 250px; overflow-y: auto;">
                     <table class="table table-sm table-hover mb-0" id="sync-details-table">
-                        <thead class="table-light sticky-top">
+                        <thead class="table-dark border-bottom border-secondary border-opacity-25 sticky-top">
                             <tr>
                                 <th>E-mail do Membro</th>
                                 <th>Ação</th>

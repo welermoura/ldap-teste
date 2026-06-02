@@ -881,3 +881,27 @@ def load_history():
         pass
     return []
 
+def get_group_members_emails(conn, group_dn):
+    """Busca direta e normalizada dos e-mails dos membros de um grupo do AD.
+    
+    Realiza apenas uma busca simples e direta no atributo 'member' do grupo,
+    sem recursão em grupos aninhados e sem filtro de contas desativadas.
+    """
+    emails = set()
+    try:
+        conn.search(group_dn, '(objectClass=*)', attributes=['member'])
+        if conn.entries:
+            group_entry = conn.entries[0]
+            member_dns = group_entry.member.values if 'member' in group_entry and group_entry.member.values else []
+            for dn in member_dns:
+                conn.search(dn, '(objectClass=*)', attributes=['mail', 'userPrincipalName'])
+                if conn.entries:
+                    entry = conn.entries[0]
+                    email = get_attr_value(entry, 'mail') or get_attr_value(entry, 'userPrincipalName')
+                    if email:
+                        emails.add(email.strip().lower())
+    except Exception as e:
+        logging.error(f"[LDAP] Erro ao buscar membros do grupo '{group_dn}': {e}")
+    return emails
+
+

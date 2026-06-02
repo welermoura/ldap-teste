@@ -70,19 +70,14 @@ def test_api_sync_group(authenticated_client, mocker):
         {'ad_group_name': 'Diretoria', 'zimbra_dl_email': 'diretoria@comolatti.com.br'}
     ])
     
-    # Mock AD calls
+    # Mock AD connection and group lookup
     mocker.patch('routes.zimbra.get_service_account_connection')
-    
     mock_group = MagicMock()
-    mock_group.__contains__.side_effect = lambda x: x == 'member'
-    mock_group.member.values = ['cn=admin,ou=users,dc=comolatti,dc=lan']
+    mock_group.distinguishedName.value = 'CN=Diretoria,OU=Groups,DC=comolatti,DC=lan'
     mocker.patch('routes.zimbra.get_group_by_name', return_value=mock_group)
 
-    
-    mock_user = MagicMock()
-    # Mocking get_attr_value
-    mocker.patch('routes.zimbra.get_attr_value', side_effect=lambda entry, attr: 'admin@comolatti.lan' if attr == 'mail' else None)
-    mocker.patch('routes.utils.get_user_by_dn', return_value=mock_user)
+    # Mock get_group_members_emails directly — returns one AD member email
+    mocker.patch('routes.zimbra.get_group_members_emails', return_value={'admin@comolatti.lan'})
     
     # Mock SOAP Client
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
@@ -101,6 +96,7 @@ def test_api_sync_group(authenticated_client, mocker):
     assert response.json['stats']['added'] == 1
     assert response.json['stats']['removed'] == 1
 
+
 def test_api_sync_group_auto_create(authenticated_client, mocker):
     # Mock config e mapping
     mocker.patch('routes.zimbra.load_config', return_value={
@@ -113,17 +109,14 @@ def test_api_sync_group_auto_create(authenticated_client, mocker):
         {'ad_group_name': 'Diretoria', 'zimbra_dl_email': 'diretoria@comolatti.com.br'}
     ])
     
-    # Mock AD calls
+    # Mock AD connection and group lookup
     mocker.patch('routes.zimbra.get_service_account_connection')
-    
     mock_group = MagicMock()
-    mock_group.__contains__.side_effect = lambda x: x == 'member'
-    mock_group.member.values = ['cn=admin,ou=users,dc=comolatti,dc=lan']
+    mock_group.distinguishedName.value = 'CN=Diretoria,OU=Groups,DC=comolatti,DC=lan'
     mocker.patch('routes.zimbra.get_group_by_name', return_value=mock_group)
-    
-    mock_user = MagicMock()
-    mocker.patch('routes.zimbra.get_attr_value', side_effect=lambda entry, attr: 'admin@comolatti.lan' if attr == 'mail' else None)
-    mocker.patch('routes.utils.get_user_by_dn', return_value=mock_user)
+
+    # Mock get_group_members_emails directly — returns one AD member email
+    mocker.patch('routes.zimbra.get_group_members_emails', return_value={'admin@comolatti.lan'})
     
     # Mock SOAP Client para levantar NO_SUCH_DISTRIBUTION_LIST na primeira chamada e funcionar na segunda
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')

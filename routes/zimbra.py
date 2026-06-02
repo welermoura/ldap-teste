@@ -3,7 +3,7 @@ import json
 import logging
 from flask import Blueprint, render_template, request, jsonify, session
 from routes.utils import require_auth, require_permission, get_read_connection
-from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value
+from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails
 from routes.zimbra_api import ZimbraSOAPClient
 
 zimbra_bp = Blueprint('zimbra', __name__)
@@ -272,22 +272,12 @@ def api_sync_group():
             
         # Conectar e sincronizar
         conn = get_service_account_connection()
-        ad_group_obj = get_group_by_name(conn, ad_group, ['member'])
+        ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
         if not ad_group_obj:
             return jsonify({'error': 'Grupo do AD não encontrado.'}), 404
             
-        # Extrai os e-mails dos membros do AD
-        ad_member_dns = ad_group_obj.member.values if 'member' in ad_group_obj and ad_group_obj.member.values else []
-        ad_emails = set()
-        
-        for dn in ad_member_dns:
-            # Busca e-mail de cada usuário do AD
-            from routes.utils import get_user_by_dn
-            user_entry = get_user_by_dn(conn, dn, ['mail', 'userPrincipalName'])
-            if user_entry:
-                email = get_attr_value(user_entry, 'mail') or get_attr_value(user_entry, 'userPrincipalName')
-                if email:
-                    ad_emails.add(email.strip().lower())
+        # Extrai os e-mails dos membros diretos do AD
+        ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
                     
         # Conecta no Zimbra
         client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
@@ -304,7 +294,9 @@ def api_sync_group():
                     raise Exception(f"A lista de distribuição '{zimbra_email}' não existe no Zimbra e não pôde ser criada automaticamente: {str(e_create)}")
             else:
                 raise e
-        zimbra_emails = set(dl_info['members'])
+                
+        # Normalizar e-mails do Zimbra
+        zimbra_emails = {m.strip().lower() for m in dl_info['members']}
         
         # Resolve se pesquisamos por apelido e o Zimbra retornou o e-mail real
         zimbra_real_email = dl_info['email']
@@ -352,6 +344,7 @@ def api_sync_group():
     except Exception as e:
         logging.error(f"Erro ao sincronizar grupo '{ad_group}' com o Zimbra: {e}", exc_info=True)
         return jsonify({'error': f"Erro interno de sincronização: {str(e)}"}), 500
+
 
 @zimbra_bp.route('/api/zimbra/ad_groups', methods=['GET'])
 @require_auth
