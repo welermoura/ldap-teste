@@ -7,7 +7,8 @@ from routes.utils import (
 from common import (
     load_config, save_config, load_permissions, save_permissions,
     get_user_by_samaccountname, HISTORY_FILE, load_schedules, load_disable_schedules,
-    get_service_account_connection, save_to_history, filetime_to_datetime
+    get_service_account_connection, save_to_history, filetime_to_datetime,
+    load_admin_users, save_admin_users, load_history
 )
 from forms.config import ConfigForm, AppearanceForm
 from forms.admin import LogSearchForm
@@ -23,16 +24,6 @@ from PIL import Image
 import ldap3
 from ldap3 import SUBTREE, MODIFY_REPLACE
 
-def load_history():
-    """Carrega o histórico de ações do arquivo JSON."""
-    import json, os
-    if not os.path.exists(HISTORY_FILE):
-        return []
-    try:
-        with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return []
 
 
 admin_bp = Blueprint('admin', __name__)
@@ -368,12 +359,7 @@ def admin_history():
 @require_auth
 @require_permission(action='can_edit_config')
 def admin_users():
-    data_dir = os.path.join(current_app.root_path, 'data')
-    users_file = os.path.join(data_dir, 'users.json')
-    users = {}
-    if os.path.exists(users_file):
-        with open(users_file, 'r') as f:
-            users = json.load(f)
+    users = load_admin_users()
     return render_template('admin/users.html', users=users)
 
 @admin_bp.route('/admin/users/add', methods=['GET', 'POST'])
@@ -384,12 +370,7 @@ def admin_add_user():
     if form.validate_on_submit():
         username = form.username.data
         password = form.password.data
-        data_dir = os.path.join(current_app.root_path, 'data')
-        users_file = os.path.join(data_dir, 'users.json')
-        users = {}
-        if os.path.exists(users_file):
-            with open(users_file, 'r') as f:
-                users = json.load(f)
+        users = load_admin_users()
         if username in users:
             flash('Usuário já existe.', 'error')
         else:
@@ -404,8 +385,7 @@ def admin_add_user():
                 users[username] = generate_password_hash(password)
                 flash('Administrador local adicionado com sucesso!', 'success')
             
-            with open(users_file, 'w') as f:
-                json.dump(users, f)
+            save_admin_users(users)
             return redirect(url_for('admin.admin_users'))
     return render_template('admin/add_user.html', form=form)
 
@@ -416,16 +396,11 @@ def admin_delete_user(username):
     if username == session.get('master_admin'):
         flash('Você não pode excluir a si mesmo.', 'error')
         return redirect(url_for('admin.admin_users'))
-    data_dir = os.path.join(current_app.root_path, 'data')
-    users_file = os.path.join(data_dir, 'users.json')
-    if os.path.exists(users_file):
-        with open(users_file, 'r') as f:
-            users = json.load(f)
-        if username in users:
-            del users[username]
-            with open(users_file, 'w') as f:
-                json.dump(users, f)
-            flash('Usuário excluído.', 'success')
+    users = load_admin_users()
+    if username in users:
+        del users[username]
+        save_admin_users(users)
+        flash('Usuário excluído.', 'success')
     return redirect(url_for('admin.admin_users'))
 
 # API ENDPOINTS — rota sem prefixo /admin para corresponder ao fetch() no dashboard.html
@@ -518,14 +493,12 @@ def api_dashboard_stats():
             day = (today - timedelta(days=i)).isoformat()
             trends[day] = 0
             
-        if os.path.exists(HISTORY_FILE):
-            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-                history = json.load(f)
-                for entry in history:
-                    if entry.get('action') == 'deactivation':
-                        log_day = entry['timestamp'][:10]
-                        if log_day in trends:
-                            trends[log_day] += 1
+        history = load_history()
+        for entry in history:
+            if entry.get('action') == 'deactivation':
+                log_day = entry['timestamp'][:10]
+                if log_day in trends:
+                    trends[log_day] += 1
         
         data['trends'] = [{'date': d, 'count': c} for d, c in sorted(trends.items())]
         

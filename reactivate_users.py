@@ -4,9 +4,12 @@ import json
 from datetime import date
 import logging
 from ldap3 import MODIFY_REPLACE
-from common import load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name, SCHEDULE_FILE, GROUP_SCHEDULE_FILE
-import json
-import os
+import ldap3
+from common import (
+    load_config, get_ldap_connection, get_user_by_samaccountname, get_group_by_name,
+    load_schedules, save_schedules, load_group_schedules, save_group_schedules
+)
+
 # ==============================================================================
 # Configuração Base
 # ==============================================================================
@@ -30,10 +33,9 @@ def process_user_reactivations(conn, search_base):
     """Processa a reativação de contas de usuário de forma robusta."""
     logging.info("Iniciando verificação de reativações de usuários.")
     try:
-        with open(SCHEDULE_FILE, 'r') as f:
-            schedules = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Nenhum arquivo de agendamento de usuários ('schedules.json') encontrado ou está vazio. Pulando.")
+        schedules = load_schedules()
+    except Exception as e:
+        logging.error(f"Erro ao carregar agendamentos de usuários: {e}")
         return
 
     today = date.today().isoformat()
@@ -61,18 +63,16 @@ def process_user_reactivations(conn, search_base):
             # A data de reativação é no futuro, então mantém o agendamento.
             schedules_to_keep[username] = reactivation_date
 
-    with open(SCHEDULE_FILE, 'w') as f:
-        json.dump(schedules_to_keep, f, indent=4)
+    save_schedules(schedules_to_keep)
     logging.info("Verificação de reativações de usuários concluída.")
 
 def process_group_membership_changes(conn, search_base):
     """Processa as alterações agendadas de associação a grupos de forma robusta."""
     logging.info("Iniciando verificação de alterações de associação a grupos.")
     try:
-        with open(GROUP_SCHEDULE_FILE, 'r') as f:
-            schedules = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        logging.info("Nenhum arquivo de agendamento de grupos ('group_schedules.json') encontrado ou está vazio. Pulando.")
+        schedules = load_group_schedules()
+    except Exception as e:
+        logging.error(f"Erro ao carregar agendamentos de grupos: {e}")
         return
 
     today = date.today().isoformat()
@@ -113,8 +113,7 @@ def process_group_membership_changes(conn, search_base):
         else:
             remaining_schedules.append(schedule)
 
-    with open(GROUP_SCHEDULE_FILE, 'w') as f:
-        json.dump(remaining_schedules, f, indent=4)
+    save_group_schedules(remaining_schedules)
     logging.info("Verificação de alterações de associação a grupos concluída.")
 
 
@@ -122,28 +121,33 @@ if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando script de tarefas agendadas do AD.")
 
-    config = load_config()
-    if not config:
-        logging.critical("Configuração não carregada. Abortando.")
-        exit(1)
-
-    conn = get_ldap_connection()
-    if not conn:
-        logging.critical("Não foi possível estabelecer conexão com o AD. Abortando.")
-        exit(1)
-
-    search_base = config.get('AD_SEARCH_BASE')
-    if not search_base:
-        logging.critical("AD_SEARCH_BASE não definido na configuração. Abortando.")
-        exit(1)
-
     try:
-        process_user_reactivations(conn, search_base)
-        process_group_membership_changes(conn, search_base)
+        from app import app
+        with app.app_context():
+            config = load_config()
+            if not config:
+                logging.critical("Configuração não carregada. Abortando.")
+                exit(1)
+
+            conn = get_ldap_connection()
+            if not conn:
+                logging.critical("Não foi possível estabelecer conexão com o AD. Abortando.")
+                exit(1)
+
+            search_base = config.get('AD_SEARCH_BASE')
+            if not search_base:
+                logging.critical("AD_SEARCH_BASE não definido na configuração. Abortando.")
+                exit(1)
+
+            try:
+                process_user_reactivations(conn, search_base)
+                process_group_membership_changes(conn, search_base)
+            except Exception as e:
+                logging.critical(f"Ocorreu um erro inesperado durante a execução do script: {e}", exc_info=True)
+            finally:
+                conn.unbind()
+                logging.info("Conexão com o AD encerrada.")
     except Exception as e:
-        logging.critical(f"Ocorreu um erro inesperado durante a execução do script: {e}", exc_info=True)
-    finally:
-        conn.unbind()
-        logging.info("Conexão com o AD encerrada.")
-        logging.info("Script de tarefas agendadas do AD finalizado.")
-        logging.info("=============================================\n")
+        logging.critical(f"Erro ao inicializar contexto do app: {e}", exc_info=True)
+    logging.info("Script de tarefas agendadas do AD finalizado.")
+    logging.info("=============================================\n")

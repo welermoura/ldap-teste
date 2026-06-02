@@ -169,22 +169,15 @@ def process_zimbra_group_syncs(conn, config):
         logging.error("Configurações do Zimbra incompletas ou ausentes. Pulando sincronização.")
         return
 
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    zimbra_mappings_file = os.path.join(basedir, 'data', 'zimbra_mappings.json')
-    
-    if not os.path.exists(zimbra_mappings_file):
-        logging.info("Nenhum arquivo de mapeamentos do Zimbra encontrado. Pulando sincronização.")
-        return
-
     try:
-        with open(zimbra_mappings_file, 'r', encoding='utf-8') as f:
-            mappings = json.load(f)
+        from routes.zimbra import load_zimbra_mappings
+        mappings = load_zimbra_mappings()
     except Exception as e:
-        logging.error(f"Erro ao ler o arquivo de mapeamentos do Zimbra: {e}")
+        logging.error(f"Erro ao carregar os mapeamentos do Zimbra: {e}")
         return
 
     if not mappings:
-        logging.info("Nenhum mapeamento de grupo do Zimbra ativo.")
+        logging.info("Nenhum mapeamento de grupo do Zimbra encontrado.")
         return
 
     from routes.zimbra_api import ZimbraSOAPClient
@@ -198,6 +191,10 @@ def process_zimbra_group_syncs(conn, config):
         return
 
     for mapping in mappings:
+        if not mapping.get('active', True):
+            logging.info(f"Mapeamento para grupo AD '{mapping.get('ad_group_name')}' está inativo. Pulando.")
+            continue
+
         ad_group = mapping.get('ad_group_name', '').strip()
         zimbra_email = mapping.get('zimbra_dl_email', '').strip()
         
