@@ -30,6 +30,7 @@
                 <thead>
                     <tr>
                         <th>Nome do Grupo</th>
+                        <th>E-mail</th>
                         <th>Tipo / Escopo</th>
                         <th class="text-center">Membros</th>
                         <th class="text-end">Ações</th>
@@ -39,6 +40,7 @@
                     {% for group in groups %}
                     <tr>
                         <td>{{ group.cn }}</td>
+                        <td>{{ group.mail if group.mail else '-' }}</td>
                         <td>
                             <span class="badge bg-secondary">{{ group.type_scope }}</span>
                         </td>

@@ -93,9 +93,9 @@ def group_management():
             conn = get_service_account_connection()
             config = load_config()
             search_base = config.get('AD_SEARCH_BASE')
-            query = form.search_query.data
-            search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
-            conn.search(search_base, search_filter, attributes=['cn', 'description', 'member', 'groupType'])
+            escaped_query = escape_filter_chars(query)
+            search_filter = f"(&(objectClass=group)(|(cn=*{escaped_query}*)(mail=*{escaped_query}*)(proxyAddresses=*{escaped_query}*)))"
+            conn.search(search_base, search_filter, attributes=['cn', 'description', 'member', 'groupType', 'mail', 'proxyAddresses'])
             
             groups = []
             for g in conn.entries:
@@ -113,13 +113,30 @@ def group_management():
                 elif g_type_val & 8:
                     scope_str = "Universal"
                     
+                mail_val = g.mail.value if 'mail' in g and g.mail.value else ''
+                if not mail_val and 'proxyAddresses' in g and g.proxyAddresses.values:
+                    for addr in g.proxyAddresses.values:
+                        addr_str = str(addr).strip()
+                        if addr_str.startswith('SMTP:'):
+                            mail_val = addr_str[5:]
+                            break
+                    if not mail_val:
+                        for addr in g.proxyAddresses.values:
+                            addr_str = str(addr).strip()
+                            if addr_str.lower().startswith('smtp:'):
+                                mail_val = addr_str[5:]
+                                break
+                    if not mail_val and g.proxyAddresses.values:
+                        mail_val = str(g.proxyAddresses.values[0])
+
                 groups.append({
                     'cn': g.cn.value if 'cn' in g else 'Desconhecido',
                     'member_count': len(g.member.values) if 'member' in g and g.member.values else 0,
-                    'type_scope': f"{type_str} - {scope_str}"
+                    'type_scope': f"{type_str} - {scope_str}",
+                    'mail': mail_val
                 })
             if not groups:
-                flash(f"Nenhum grupo encontrado com o nome '{query}'.", "info")
+                flash(f"Nenhum grupo encontrado com o critério '{query}'.", "info")
         except Exception as e:
             flash(f"Erro ao buscar grupos: {e}", "error")
             logging.error(f"Erro ao buscar grupos com a query '{form.search_query.data}': {e}", exc_info=True)
@@ -682,17 +699,35 @@ def api_search_users_for_group(group_name):
         group = get_group_by_name(conn, group_name, ['member'])
         current_members = set(group.member.values) if group and 'member' in group and group.member.values else set()
         
-        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{query}*)(sAMAccountName=*{query}*)))"
-        conn.search(search_base, search_filter, attributes=['displayName', 'sAMAccountName', 'distinguishedName', 'title', 'l'])
+        escaped_query = escape_filter_chars(query)
+        search_filter = f"(&(objectClass=user)(objectCategory=person)(|(displayName=*{escaped_query}*)(sAMAccountName=*{escaped_query}*)(mail=*{escaped_query}*)(proxyAddresses=*{escaped_query}*)))"
+        conn.search(search_base, search_filter, attributes=['displayName', 'sAMAccountName', 'distinguishedName', 'title', 'l', 'mail', 'proxyAddresses'])
         
         results = []
         for entry in conn.entries:
             if entry.distinguishedName.value not in current_members:
+                mail_val = entry.mail.value if 'mail' in entry and entry.mail.value else ''
+                if not mail_val and 'proxyAddresses' in entry and entry.proxyAddresses.values:
+                    for addr in entry.proxyAddresses.values:
+                        addr_str = str(addr).strip()
+                        if addr_str.startswith('SMTP:'):
+                            mail_val = addr_str[5:]
+                            break
+                    if not mail_val:
+                        for addr in entry.proxyAddresses.values:
+                            addr_str = str(addr).strip()
+                            if addr_str.lower().startswith('smtp:'):
+                                mail_val = addr_str[5:]
+                                break
+                    if not mail_val and entry.proxyAddresses.values:
+                        mail_val = str(entry.proxyAddresses.values[0])
+
                 results.append({
                     'displayName': entry.displayName.value or entry.sAMAccountName.value,
                     'sAMAccountName': entry.sAMAccountName.value,
                     'title': entry.title.value if 'title' in entry else 'N/A',
-                    'city': entry.l.value if 'l' in entry else 'N/A'
+                    'city': entry.l.value if 'l' in entry else 'N/A',
+                    'mail': mail_val
                 })
         return jsonify(results)
     except Exception as e:

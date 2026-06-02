@@ -592,13 +592,14 @@ document.addEventListener('DOMContentLoaded', function() {
             userSearchResultsContainer.innerHTML = `<div class="alert alert-info m-0">Nenhum usuário encontrado.</div>`;
             return;
         }
-        const table = createTable(['Nome', 'Login', 'Cargo', 'Cidade', 'Ações']);
+        const table = createTable(['Nome', 'Login', 'E-mail', 'Cargo', 'Cidade', 'Ações']);
         const tbody = table.querySelector('tbody');
         users.forEach(user => {
             const row = tbody.insertRow();
             row.innerHTML = `
                 <td>${user.displayName}</td>
                 <td>${user.sAMAccountName}</td>
+                <td>${user.mail || '-'}</td>
                 <td>${user.title || 'N/A'}</td>
                 <td>${user.city || 'N/A'}</td>
                 <td class="text-center">
