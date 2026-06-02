@@ -3,7 +3,7 @@ import json
 import logging
 from flask import Blueprint, render_template, request, jsonify, session
 from routes.utils import require_auth, require_permission, get_read_connection
-from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails
+from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails, save_to_history
 from routes.zimbra_api import ZimbraSOAPClient
 
 zimbra_bp = Blueprint('zimbra', __name__)
@@ -202,6 +202,7 @@ def api_save_mapping():
             if mapping['ad_group_name'] == ad_group:
                 mapping['zimbra_dl_email'] = zimbra_email
                 save_zimbra_mappings(mappings)
+                save_to_history('zimbra_mapping_save', ad_group, f"Mapeamento do grupo AD '{ad_group}' atualizado para '{zimbra_email}' por {session.get('ad_user', 'admin')}")
                 return jsonify({'success': True, 'message': 'Mapeamento de grupo atualizado com sucesso.'})
                 
         # Adiciona nova regra
@@ -211,6 +212,7 @@ def api_save_mapping():
         })
         
         save_zimbra_mappings(mappings)
+        save_to_history('zimbra_mapping_save', ad_group, f"Mapeamento do grupo AD '{ad_group}' criado para '{zimbra_email}' por {session.get('ad_user', 'admin')}")
         return jsonify({'success': True, 'message': 'Mapeamento de grupo criado com sucesso.'})
     except Exception as e:
         return jsonify({'error': f"Erro ao salvar mapeamento: {str(e)}"}), 500
@@ -232,6 +234,7 @@ def api_delete_mapping():
         
         if len(mappings) < original_length:
             save_zimbra_mappings(mappings)
+            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento do grupo AD '{ad_group}' removido por {session.get('ad_user', 'admin')}")
             return jsonify({'success': True, 'message': 'Mapeamento removido com sucesso.'})
         else:
             return jsonify({'error': 'Mapeamento não encontrado.'}), 404
@@ -335,6 +338,7 @@ def api_sync_group():
                 stats['failed'] += 1
                 details.append({'email': email, 'action': 'remove', 'status': 'error', 'message': str(e_rem)})
                 
+        save_to_history('zimbra_sync', ad_group, f"Sincronização manual do grupo '{ad_group}' para '{zimbra_real_email}' executada por {session.get('ad_user', 'admin')}: {stats['added']} adicionados, {stats['removed']} removidos.")
         return jsonify({
             'success': True,
             'stats': stats,
