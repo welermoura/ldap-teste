@@ -75,43 +75,105 @@ def get_sql_server_uri():
         pass
     return None
 
-_cached_config = None
+BOOTSTRAP_KEYS = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'SQL_SERVER_URI', 'USE_SQL_SERVER']
 
 def load_config(force_reload=False):
-    """Carrega, descriptografa e retorna os dados de configuração diretamente do disco para consistência total entre múltiplos workers."""
+    """Carrega, descriptografa e retorna os dados de configuração de forma híbrida (bootstrap local + banco SQL Server)."""
+    # 1. Carrega as configurações locais do config.json (Bootstrap)
+    local_config = {}
     try:
-        if not os.path.exists(CONFIG_FILE):
-            return {}
-            
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            encrypted_config = json.load(f)
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                encrypted_config = json.load(f)
+            for k, v in encrypted_config.items():
+                if k in SENSITIVE_KEYS and v:
+                    try:
+                        local_config[k] = cipher_suite.decrypt(v.encode()).decode()
+                    except Exception:
+                        local_config[k] = v
+                else:
+                    local_config[k] = v
+    except Exception:
+        pass
 
-        config = {}
-        for k, v in encrypted_config.items():
-            if k in SENSITIVE_KEYS and v:
-                try:
-                    config[k] = cipher_suite.decrypt(v.encode()).decode()
-                except Exception:
-                    config[k] = v
-            else:
-                config[k] = v
-        return config
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+    # 2. Se o SQL Server estiver ativo, carrega as configurações da tabela ConfigSetting
+    if local_config.get('USE_SQL_SERVER') and local_config.get('SQL_SERVER_URI'):
+        try:
+            from models import ConfigSetting, ensure_db_registered
+            ensure_db_registered()
+            db_settings = ConfigSetting.query.all()
+            db_config = {}
+            for s in db_settings:
+                k, v = s.key, s.value
+                if k in SENSITIVE_KEYS and v:
+                    try:
+                        db_config[k] = cipher_suite.decrypt(v.encode()).decode()
+                    except Exception:
+                        db_config[k] = v
+                else:
+                    db_config[k] = v
+            
+            # Mescla: as chaves locais de bootstrap têm prioridade, e as outras vêm do banco
+            merged_config = {**local_config}
+            for k, v in db_config.items():
+                if k not in BOOTSTRAP_KEYS:
+                    merged_config[k] = v
+            return merged_config
+        except Exception as e:
+            logging.error(f"[DB] Erro ao carregar configurações da tabela ConfigSetting: {e}")
+
+    return local_config
 
 
 def save_config(config):
-    """Criptografa e salva os dados de configuração."""
-    encrypted_config = {}
-    config_copy = config.copy()
-    for k, v in config_copy.items():
-        if k in SENSITIVE_KEYS and v:
-            encrypted_config[k] = cipher_suite.encrypt(v.encode()).decode()
+    """Criptografa e salva os dados de configuração de forma híbrida (disco local + SQL Server)."""
+    # 1. Separa as configurações locais de bootstrap e as demais
+    local_to_save = {}
+    db_to_save = {}
+    
+    for k, v in config.items():
+        if k in BOOTSTRAP_KEYS:
+            local_to_save[k] = v
         else:
-            encrypted_config[k] = v
+            local_to_save[k] = v  # Mantém no local por segurança/redundância e fallback
+            db_to_save[k] = v
 
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(encrypted_config, f, indent=4)
+    # 2. Grava no config.json local (criptografado)
+    encrypted_local = {}
+    for k, v in local_to_save.items():
+        if k in SENSITIVE_KEYS and v:
+            encrypted_local[k] = cipher_suite.encrypt(v.encode()).decode()
+        else:
+            encrypted_local[k] = v
+
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(encrypted_local, f, indent=4)
+    except Exception as e:
+        logging.error(f"Erro ao salvar arquivo config.json local: {e}")
+
+    # 3. Grava no SQL Server se ativo
+    if config.get('USE_SQL_SERVER') and config.get('SQL_SERVER_URI'):
+        try:
+            from models import db, ConfigSetting, ensure_db_registered
+            ensure_db_registered()
+            
+            for k, v in db_to_save.items():
+                v_str = str(v) if v is not None else ''
+                if k in SENSITIVE_KEYS and v_str:
+                    v_str = cipher_suite.encrypt(v_str.encode()).decode()
+                
+                setting = ConfigSetting.query.filter_by(key=k).first()
+                if setting:
+                    setting.value = v_str
+                else:
+                    setting = ConfigSetting(key=k, value=v_str)
+                    db.session.add(setting)
+            
+            db.session.commit()
+        except Exception as e:
+            logging.error(f"[DB] Erro ao salvar configurações na tabela ConfigSetting: {e}")
+            db.session.rollback()
 
 def get_ad_upn_suffixes(conn):
     """Busca automaticamente os sufixos UPN configurados no Active Directory."""

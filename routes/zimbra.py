@@ -11,6 +11,21 @@ zimbra_bp = Blueprint('zimbra', __name__)
 ZIMBRA_MAPPINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/zimbra_mappings.json')
 
 def load_zimbra_mappings():
+    from common import get_sql_server_uri
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import ZimbraMapping, ensure_db_registered
+            ensure_db_registered()
+            db_mappings = ZimbraMapping.query.all()
+            return [{
+                'ad_group_name': m.ad_group_name,
+                'zimbra_dl_email': m.zimbra_dl_email,
+                'active': m.active
+            } for m in db_mappings]
+        except Exception as e:
+            logging.error(f"[DB] Erro ao carregar mapeamentos do Zimbra: {e}")
+            
     try:
         if not os.path.exists(ZIMBRA_MAPPINGS_FILE):
             return []
@@ -20,6 +35,42 @@ def load_zimbra_mappings():
         return []
 
 def save_zimbra_mappings(mappings):
+    from common import get_sql_server_uri
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, ZimbraMapping, ensure_db_registered
+            ensure_db_registered()
+            existing_groups = {item.get('ad_group_name') for item in mappings}
+            
+            # Deleta mapeamentos que foram removidos
+            db_mappings = ZimbraMapping.query.all()
+            for db_m in db_mappings:
+                if db_m.ad_group_name not in existing_groups:
+                    db.session.delete(db_m)
+                    
+            # Adiciona ou atualiza os mapeamentos ativos
+            for item in mappings:
+                ad_group = item.get('ad_group_name')
+                mapping = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
+                if mapping:
+                    mapping.zimbra_dl_email = item.get('zimbra_dl_email')
+                    mapping.active = item.get('active', True)
+                else:
+                    mapping = ZimbraMapping(
+                        ad_group_name=ad_group,
+                        zimbra_dl_email=item.get('zimbra_dl_email'),
+                        active=item.get('active', True)
+                    )
+                    db.session.add(mapping)
+                    
+            db.session.commit()
+            return True
+        except Exception as e:
+            logging.error(f"[DB] Erro ao salvar mapeamentos do Zimbra: {e}")
+            db.session.rollback()
+            return False
+
     try:
         os.makedirs(os.path.dirname(ZIMBRA_MAPPINGS_FILE), exist_ok=True)
         with open(ZIMBRA_MAPPINGS_FILE, 'w', encoding='utf-8') as f:

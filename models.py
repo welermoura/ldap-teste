@@ -53,6 +53,13 @@ class HistoryLog(db.Model):
     user_sam = db.Column(db.String(150), nullable=False)
     details = db.Column(db.Text, nullable=True)
 
+class ZimbraMapping(db.Model):
+    __tablename__ = 'zimbra_mappings'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    ad_group_name = db.Column(db.String(250), unique=True, nullable=False)
+    zimbra_dl_email = db.Column(db.String(250), nullable=False)
+    active = db.Column(db.Boolean, default=True, nullable=False)
+
 def seed_database_from_json(database_instance):
     """Automatically seeds the SQL Server database from existing local JSON files if tables are empty."""
     basedir = os.path.abspath(os.path.dirname(__file__))
@@ -198,6 +205,27 @@ def seed_database_from_json(database_instance):
                 logging.info("[DB Migration] History logs seeded successfully.")
             except Exception as e:
                 logging.error(f"[DB Migration] Error seeding history logs: {e}")
+                database_instance.session.rollback()
+
+    # 8. Seed Zimbra mappings
+    if ZimbraMapping.query.count() == 0:
+        zimbra_mappings_path = os.path.join(data_dir, 'zimbra_mappings.json')
+        if os.path.exists(zimbra_mappings_path):
+            try:
+                with open(zimbra_mappings_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        for item in data:
+                            mapping = ZimbraMapping(
+                                ad_group_name=item.get('ad_group_name'),
+                                zimbra_dl_email=item.get('zimbra_dl_email'),
+                                active=item.get('active', True)
+                            )
+                            database_instance.session.add(mapping)
+                database_instance.session.commit()
+                logging.info("[DB Migration] Zimbra mappings seeded successfully.")
+            except Exception as e:
+                logging.error(f"[DB Migration] Error seeding Zimbra mappings: {e}")
                 database_instance.session.rollback()
 
 def ensure_db_registered():
