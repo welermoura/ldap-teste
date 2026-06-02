@@ -458,7 +458,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     tr.innerHTML = `
-                        <td><strong class="text-primary">${m.ad_group_name}</strong></td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <strong class="text-primary">${m.ad_group_name}</strong>
+                                <span class="text-muted small"><i class="fas fa-users me-1"></i>${m.ad_member_count} membros no AD</span>
+                            </div>
+                        </td>
                         <td>
                             <div class="d-flex flex-column gap-1">
                                 <span class="badge text-start px-2.5 py-1.5 font-monospace" style="background-color: rgba(13, 202, 240, 0.15) !important; color: #0dcaf0 !important; border: 1px solid rgba(13, 202, 240, 0.25) !important; max-width: fit-content; display: inline-flex; align-items: center;">
@@ -469,7 +474,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </span>
                             </div>
                         </td>
-                        <td><span class="theme-code-text fw-bold text-light">${m.zimbra_dl_email}</span></td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="theme-code-text fw-bold text-light">${m.zimbra_dl_email}</span>
+                                <span class="text-muted small"><i class="fas fa-users me-1"></i>${m.zimbra_member_count} membros no Zimbra</span>
+                            </div>
+                        </td>
                         <td class="text-end pe-3">${actionHtml}</td>
                     `;
                     autoMatchesTableBody.appendChild(tr);
@@ -498,7 +508,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     `).join('') : '<span class="text-muted small">Sem e-mail cadastrado</span>';
                     
                     tr.innerHTML = `
-                        <td><strong class="text-primary">${m.name}</strong></td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <strong class="text-primary">${m.name}</strong>
+                                <span class="text-muted small"><i class="fas fa-users me-1"></i>${m.member_count} membros no AD</span>
+                            </div>
+                        </td>
                         <td>${emailsListHtml}</td>
                     `;
                     onlyAdTableBody.appendChild(tr);
@@ -527,7 +542,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     `).join('') : '<span class="text-muted small">Sem apelidos</span>';
                     
                     tr.innerHTML = `
-                        <td><span class="theme-code-text fw-bold text-light">${m.name}</span></td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="theme-code-text fw-bold text-light">${m.name}</span>
+                                <span class="text-muted small"><i class="fas fa-users me-1"></i>${m.member_count} membros no Zimbra</span>
+                            </div>
+                        </td>
                         <td>${aliasesListHtml}</td>
                     `;
                     onlyZimbraTableBody.appendChild(tr);

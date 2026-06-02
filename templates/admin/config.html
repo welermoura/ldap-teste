@@ -7,56 +7,271 @@
 
 {% block content %}
 <div class="card glass-card">
-    <form method="POST" action="{{ url_for('admin.admin_config') }}">
-        {{ form.hidden_tag() }}
-        <div class="card-body">
-            <p class="card-text mb-4">Preencha as informações abaixo para que a aplicação possa conectar e interagir com seu Active Directory.</p>
+    <div class="card-header pb-0 border-bottom-0">
+        <ul class="nav nav-tabs card-header-tabs" id="configTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="ad-tab" data-bs-toggle="tab" data-bs-target="#ad-pane" type="button" role="tab" aria-controls="ad-pane" aria-selected="true">
+                    <i class="fas fa-network-wired me-1.5 text-primary"></i> Conexão AD & Padrões
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="db-tab" data-bs-toggle="tab" data-bs-target="#db-pane" type="button" role="tab" aria-controls="db-pane" aria-selected="false">
+                    <i class="fas fa-database me-1.5 text-info"></i> Banco de Dados (SQL Server)
+                </button>
+            </li>
+        </ul>
+    </div>
+    
+    <div class="tab-content" id="configTabsContent">
+        <!-- PANE 1: ACTIVE DIRECTORY -->
+        <div class="tab-pane fade show active p-3" id="ad-pane" role="tabpanel" aria-labelledby="ad-tab">
+            <form method="POST" action="{{ url_for('admin.admin_config') }}">
+                {{ form.hidden_tag() }}
+                <div class="card-body pt-2">
+                    <p class="card-text mb-4 text-muted">Preencha as informações abaixo para que a aplicação possa conectar e interagir com seu Active Directory.</p>
 
-            <fieldset>
-                <legend class="h5 mb-3">Conexão AD</legend>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        {{ render_field(form.ad_server) }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        {{ render_field(form.ad_domain, placeholder="ex: MEUDOMINIO") }}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    {{ render_field(form.ad_search_base, placeholder="ex: OU=Usuarios,DC=dominio,DC=local") }}
-                </div>
-                <div class="mb-3">
-                    {{ render_field(form.upn_suffixes, placeholder="ex: @dominio.com.br, @empresa.com") }}
-                    <div class="form-text text-muted">Defina os domínios disponíveis para novos usuários. O primeiro será o padrão.</div>
-                </div>
-                <div class="form-check form-switch mb-3">
-                    {{ form.use_ldaps(class="form-check-input") }}
-                    {{ form.use_ldaps.label(class="form-check-label") }}
-                </div>
-            </fieldset>
+                    <fieldset class="mb-4">
+                        <legend class="h5 mb-3 text-light"><i class="fas fa-server me-1.5 text-secondary"></i> Conexão AD</legend>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ render_field(form.ad_server) }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ render_field(form.ad_domain, placeholder="ex: MEUDOMINIO") }}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ render_field(form.ad_search_base, placeholder="ex: OU=Usuarios,DC=dominio,DC=local") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ render_field(form.upn_suffixes, placeholder="ex: @dominio.com.br, @empresa.com") }}
+                            <div class="form-text text-muted">Defina os domínios disponíveis para novos usuários. O primeiro será o padrão.</div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            {{ form.use_ldaps(class="form-check-input") }}
+                            {{ form.use_ldaps.label(class="form-check-label") }}
+                        </div>
+                    </fieldset>
 
-            <hr class="my-4">
+                    <hr class="my-4" style="border-top: 1px solid var(--glass-border-color);">
 
-            <fieldset>
-                <legend class="h5 mb-3">Credenciais e Padrões</legend>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        {{ render_field(form.service_account_user, placeholder="ex: DOMINIO\\usuario.servico") }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        {{ render_field(form.service_account_password, placeholder="Deixe em branco para não alterar") }}
-                    </div>
+                    <fieldset class="mb-2">
+                        <legend class="h5 mb-3 text-light"><i class="fas fa-user-shield me-1.5 text-secondary"></i> Credenciais e Padrões</legend>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ render_field(form.service_account_user, placeholder="ex: DOMINIO\\usuario.servico") }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ render_field(form.service_account_password, placeholder="Deixe em branco para não alterar") }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ render_field(form.default_password, placeholder="Deixe em branco para não alterar") }}
+                            </div>
+                        </div>
+                    </fieldset>
                 </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        {{ render_field(form.default_password, placeholder="Deixe em branco para não alterar") }}
-                    </div>
+                <div class="card-footer text-end border-top-0 pt-0">
+                    {{ form.submit(class="btn btn-primary btn-lg") }}
                 </div>
-            </fieldset>
+            </form>
         </div>
-        <div class="card-footer text-end">
-            {{ form.submit(class="btn btn-primary btn-lg") }}
+
+        <!-- PANE 2: SQL SERVER DATABASE CONFIGURATION -->
+        <div class="tab-pane fade p-3" id="db-pane" role="tabpanel" aria-labelledby="db-tab">
+            <div class="card-body pt-2">
+                <div id="db-banner" class="alert {% if db_config.use_sql_server %}alert-success{% else %}alert-info{% endif %} d-flex align-items-center mb-4 border-opacity-25" style="background-color: rgba(99, 102, 241, 0.08) !important; border: 1px solid rgba(99, 102, 241, 0.15) !important;">
+                    <div class="me-3">
+                        <i class="fas {% if db_config.use_sql_server %}fa-check-circle fa-2x text-success{% else %}fa-info-circle fa-2x text-info{% endif %}"></i>
+                    </div>
+                    <div>
+                        <h6 class="alert-heading mb-1 text-light fw-bold">Modo de Armazenamento Ativo</h6>
+                        <p class="mb-0 text-muted small" id="db-status-desc">
+                            {% if db_config.use_sql_server %}
+                                O portal está conectado e operando em produção com o servidor <strong>SQL Server ({{ db_config.db_host }})</strong>.
+                            {% else %}
+                                O portal está operando no modo de desenvolvimento leve usando <strong>arquivos JSON locais</strong>. Configure o SQL Server abaixo para migrar os dados de forma transparente.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <form id="db-config-form" onsubmit="return false;">
+                    <fieldset class="mb-4">
+                        <legend class="h5 mb-3 text-light"><i class="fas fa-server me-1.5 text-secondary"></i> Servidor SQL Server</legend>
+                        <div class="row">
+                            <div class="col-md-9 mb-3">
+                                <label for="db_host" class="form-label">Endereço do Servidor (IP ou Hostname)</label>
+                                <input type="text" class="form-control" id="db_host" value="{{ db_config.db_host }}" placeholder="ex: 10.10.1.220 ou sql.empresa.local">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="db_port" class="form-label">Porta</label>
+                                <input type="text" class="form-control" id="db_port" value="{{ db_config.db_port or '1433' }}">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="db_name" class="form-label">Nome do Banco de Dados</label>
+                            <input type="text" class="form-control" id="db_name" value="{{ db_config.db_name }}" placeholder="ex: gestao_ad_db">
+                        </div>
+                    </fieldset>
+
+                    <hr class="my-4" style="border-top: 1px solid var(--glass-border-color);">
+
+                    <fieldset class="mb-4">
+                        <legend class="h5 mb-3 text-light"><i class="fas fa-user-lock me-1.5 text-secondary"></i> Autenticação SQL Server</legend>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="db_user" class="form-label">Usuário</label>
+                                <input type="text" class="form-control" id="db_user" value="{{ db_config.db_user }}" placeholder="ex: sa ou admin_ad">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="db_password" class="form-label">Senha</label>
+                                <input type="password" class="form-control" id="db_password" value="{% if db_config.db_host %}********{% endif %}" placeholder="Insira a senha do banco de dados">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <hr class="my-4" style="border-top: 1px solid var(--glass-border-color);">
+
+                    <fieldset class="mb-2">
+                        <legend class="h5 mb-3 text-light"><i class="fas fa-toggle-on me-1.5 text-secondary"></i> Ativar Banco de Dados</legend>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="use_sql_server" {% if db_config.use_sql_server %}checked{% endif %}>
+                            <label class="form-check-label fw-bold text-light" for="use_sql_server">Utilizar SQL Server como Armazenamento Ativo</label>
+                            <div class="form-text text-muted small mt-1">
+                                Ao marcar essa opção, o sistema direcionará todos os históricos, permissões e agendamentos para o banco de dados SQL. Se desmarcar, o portal voltará a operar com os arquivos JSON locais.
+                            </div>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+            
+            <div class="card-footer d-flex border-top-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-lg" id="btn-test-db">
+                    <i class="fas fa-plug me-1.5"></i> Testar Conexão
+                </button>
+                <button type="button" class="btn btn-primary btn-lg ms-auto" id="btn-save-db">
+                    <i class="fas fa-save me-1.5"></i> Salvar & Migrar Dados Locais
+                </button>
+            </div>
         </div>
-    </form>
+    </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const btnTest = document.getElementById("btn-test-db");
+    const btnSave = document.getElementById("btn-save-db");
+    const useSqlServerCheckbox = document.getElementById("use_sql_server");
+    
+    // Test database connection
+    btnTest.addEventListener("click", async function() {
+        const payload = {
+            db_host: document.getElementById("db_host").value,
+            db_port: document.getElementById("db_port").value,
+            db_name: document.getElementById("db_name").value,
+            db_user: document.getElementById("db_user").value,
+            db_password: document.getElementById("db_password").value
+        };
+        
+        btnTest.disabled = true;
+        const originalContent = btnTest.innerHTML;
+        btnTest.innerHTML = '<i class="fas fa-spinner fa-spin me-1.5"></i> Testando...';
+        
+        try {
+            const response = await fetch('/api/admin/database/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast(result.message, 'success');
+            } else {
+                showToast(result.error || 'Erro ao conectar.', 'danger');
+            }
+        } catch (error) {
+            showToast('Erro ao enviar requisição de teste.', 'danger');
+        } finally {
+            btnTest.disabled = false;
+            btnTest.innerHTML = originalContent;
+        }
+    });
+    
+    // Save configurations and trigger migration
+    btnSave.addEventListener("click", async function() {
+        const useSqlServer = useSqlServerCheckbox.checked;
+        
+        // Confirmation alert
+        let confirmMsg = "Deseja salvar as configurações do SQL Server?";
+        if (useSqlServer) {
+            confirmMsg = "ATENÇÃO: Isso ativará o SQL Server como banco ativo e importará todos os seus históricos e agendamentos locais (JSON) para o banco de dados. Deseja continuar?";
+        }
+        
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+        
+        const payload = {
+            db_host: document.getElementById("db_host").value,
+            db_port: document.getElementById("db_port").value,
+            db_name: document.getElementById("db_name").value,
+            db_user: document.getElementById("db_user").value,
+            db_password: document.getElementById("db_password").value,
+            use_sql_server: useSqlServer
+        };
+        
+        btnSave.disabled = true;
+        const originalContent = btnSave.innerHTML;
+        btnSave.innerHTML = '<i class="fas fa-spinner fa-spin me-1.5"></i> Salvando & Migrando...';
+        
+        try {
+            const response = await fetch('/api/admin/database/migrate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showToast(result.message, 'success');
+                // Update active banner status dynamically
+                const banner = document.getElementById("db-banner");
+                const statusDesc = document.getElementById("db-status-desc");
+                const icon = banner.querySelector("i");
+                
+                if (useSqlServer) {
+                    banner.className = "alert alert-success d-flex align-items-center mb-4 border-opacity-25";
+                    icon.className = "fas fa-check-circle fa-2x text-success";
+                    statusDesc.innerHTML = `O portal está conectado e operando em produção com o servidor <strong>SQL Server (${payload.db_host})</strong>.`;
+                } else {
+                    banner.className = "alert alert-info d-flex align-items-center mb-4 border-opacity-25";
+                    icon.className = "fas fa-info-circle fa-2x text-info";
+                    statusDesc.innerHTML = `O portal está operando no modo de desenvolvimento leve usando <strong>arquivos JSON locais</strong>. Configure o SQL Server abaixo para migrar os dados de forma transparente.`;
+                }
+                
+                // Mask password field
+                if (payload.db_password && payload.db_password !== '********') {
+                    document.getElementById("db_password").value = '********';
+                }
+            } else {
+                showToast(result.error || 'Erro ao salvar e migrar.', 'danger');
+            }
+        } catch (error) {
+            showToast('Erro de rede ao salvar configurações.', 'danger');
+        } finally {
+            btnSave.disabled = false;
+            btnSave.innerHTML = originalContent;
+        }
+    });
+});
+</script>
 {% endblock %}

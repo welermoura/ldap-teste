@@ -50,22 +50,19 @@ def admin_logout():
 
 @admin_bp.route('/admin/register', methods=['GET', 'POST'])
 def admin_register():
-    data_dir = os.path.join(current_app.root_path, 'data')
-    users_file = os.path.join(data_dir, 'users.json')
+    from common import load_admin_users, save_admin_users
+    admins = load_admin_users()
     
     # Se já existir qualquer admin, redireciona para login
-    if os.path.exists(users_file):
-        with open(users_file, 'r') as f:
-            if json.load(f):
-                flash('O administrador já está registrado.', 'warning')
-                return redirect(url_for('admin.admin_login'))
+    if admins:
+        flash('O administrador já está registrado.', 'warning')
+        return redirect(url_for('admin.admin_login'))
     
     form = AdminRegistrationForm()
     if form.validate_on_submit():
         hashed_password = generate_password_hash(form.password.data)
         users = {form.username.data: hashed_password}
-        with open(users_file, 'w') as f:
-            json.dump(users, f)
+        save_admin_users(users)
         flash('Administrador registrado com sucesso! Agora você pode fazer login.', 'success')
         return redirect(url_for('admin.admin_login'))
     return render_template('admin/register.html', form=form)
@@ -86,21 +83,16 @@ def admin_change_password():
     form = AdminChangePasswordForm()
     if form.validate_on_submit():
         username = session['master_admin']
-        data_dir = os.path.join(current_app.root_path, 'data')
-        users_file = os.path.join(data_dir, 'users.json')
+        from common import load_admin_users, save_admin_users
+        users = load_admin_users()
         
-        if os.path.exists(users_file):
-            with open(users_file, 'r') as f:
-                users = json.load(f)
-            
-            if username in users and check_password_hash(users[username], form.current_password.data):
-                users[username] = generate_password_hash(form.new_password.data)
-                with open(users_file, 'w') as f:
-                    json.dump(users, f)
-                flash('Senha alterada com sucesso!', 'success')
-                return redirect(url_for('admin.dashboard'))
-            else:
-                flash('A senha atual está incorreta.', 'danger')
+        if username in users and check_password_hash(users[username], form.current_password.data):
+            users[username] = generate_password_hash(form.new_password.data)
+            save_admin_users(users)
+            flash('Senha alterada com sucesso!', 'success')
+            return redirect(url_for('admin.dashboard'))
+        else:
+            flash('A senha atual está incorreta.', 'danger')
     return render_template('admin/change_password.html', form=form)
 
 @admin_bp.route('/admin/config', methods=['GET', 'POST'])
@@ -136,7 +128,15 @@ def admin_config():
         return redirect(url_for('admin.admin_config'))
     elif request.method == 'POST':
         logging.warning(f"Falha na validação do formulário de configuração: {form.errors}")
-    return render_template('admin/config.html', form=form)
+        
+    db_config = {
+        'db_host': config.get('DB_HOST', ''),
+        'db_port': config.get('DB_PORT', '1433'),
+        'db_name': config.get('DB_NAME', ''),
+        'db_user': config.get('DB_USER', ''),
+        'use_sql_server': config.get('USE_SQL_SERVER', False)
+    }
+    return render_template('admin/config.html', form=form, db_config=db_config)
 
 @admin_bp.route('/admin/appearance', methods=['GET', 'POST'])
 @require_auth
@@ -268,7 +268,22 @@ def admin_permissions():
         query = search_query.lower()
         display_groups = [g for g in permissions.keys() if query in g.lower()]
         if search_query not in display_groups:
-            display_groups.append(search_query) # Permite adicionar um grupo novo
+            # Verifica se o grupo existe no Active Directory antes de permitir adicioná-lo
+            try:
+                from common import get_group_by_name
+                conn = get_read_connection()
+                group_entry = get_group_by_name(conn, search_query)
+                if group_entry:
+                    group_name = group_entry.cn.value if hasattr(group_entry, 'cn') else search_query
+                    # Evita duplicados em caso de diferença de maiúsculas/minúsculas
+                    if group_name not in display_groups:
+                        display_groups.append(group_name)
+                else:
+                    flash(f"O grupo '{search_query}' não foi encontrado no Active Directory.", 'warning')
+            except Exception as e:
+                logging.error(f"Erro ao verificar existência do grupo no AD: {e}")
+                # Fallback amigável de desenvolvimento offline
+                display_groups.append(search_query)
 
     from forms.groups import GroupSearchForm
     search_form = GroupSearchForm()
@@ -741,3 +756,118 @@ def get_paginated_user_details(conn, search_base, sam_account_names, page, per_p
                 'company': get_attr_value(user_entry, 'company')
             })
     return items, total_pages
+
+
+# ==============================================================================
+# APIs de Configuração e Migração do Banco de Dados
+# ==============================================================================
+@admin_bp.route('/api/admin/database/test', methods=['POST'])
+@require_auth
+@require_permission(action='can_edit_config')
+def api_test_db_connection():
+    try:
+        data = request.get_json() or {}
+        db_host = data.get('db_host', '').strip()
+        db_port = data.get('db_port', '1433').strip()
+        db_user = data.get('db_user', '').strip()
+        db_password = data.get('db_password', '').strip()
+        db_name = data.get('db_name', '').strip()
+        
+        if not db_host or not db_user or not db_password or not db_name:
+            return jsonify({'success': False, 'error': 'Preencha todos os campos obrigatórios (Host, Usuário, Senha e Nome do Banco).'}), 400
+            
+        # Se a senha for mascarada, recuperamos a senha salva
+        if db_password == '********':
+            from common import load_config
+            config = load_config()
+            db_password = config.get('DB_PASSWORD', '')
+
+        # Tenta conectar usando pymssql
+        uri = f"mssql+pymssql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        from sqlalchemy import create_engine
+        engine = create_engine(uri, connect_args={'login_timeout': 4})
+        with engine.connect() as connection:
+            pass
+            
+        return jsonify({'success': True, 'message': 'Conexão estabelecida com sucesso!'})
+    except Exception as e:
+        logging.error(f"[DB] Falha no teste de conexão com o SQL Server: {e}")
+        return jsonify({'success': False, 'error': f"Falha de Conexão: {str(e)}"}), 500
+
+@admin_bp.route('/api/admin/database/migrate', methods=['POST'])
+@require_auth
+@require_permission(action='can_edit_config')
+def api_migrate_to_db():
+    try:
+        data = request.get_json() or {}
+        db_host = data.get('db_host', '').strip()
+        db_port = data.get('db_port', '1433').strip()
+        db_user = data.get('db_user', '').strip()
+        db_password = data.get('db_password', '').strip()
+        db_name = data.get('db_name', '').strip()
+        use_sql_server = data.get('use_sql_server', False)
+        
+        if not db_host or not db_user or not db_password or not db_name:
+            return jsonify({'success': False, 'error': 'Preencha todos os campos para efetuar a migração.'}), 400
+            
+        # Carrega a configuração existente para tratar senha mascarada ou carregar credenciais criptografadas
+        from common import save_config, load_config, save_to_history
+        config = load_config()
+        
+        # Se a senha for mascarada, recuperamos a senha salva
+        if db_password == '********':
+            db_password = config.get('DB_PASSWORD', '')
+
+        uri = f"mssql+pymssql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        
+        # 1. Valida a conexão antes de salvar
+        from sqlalchemy import create_engine
+        engine = create_engine(uri, connect_args={'login_timeout': 4})
+        try:
+            with engine.connect() as connection:
+                pass
+        except Exception as e:
+            return jsonify({'success': False, 'error': f"Não foi possível conectar ao banco. Migração abortada. Detalhe: {str(e)}"}), 400
+            
+        # 2. Salva a configuração no arquivo config.json
+        config['DB_HOST'] = db_host
+        config['DB_PORT'] = db_port
+        config['DB_NAME'] = db_name
+        config['DB_USER'] = db_user
+        config['DB_PASSWORD'] = db_password
+        config['SQL_SERVER_URI'] = uri
+        config['USE_SQL_SERVER'] = use_sql_server
+        save_config(config)
+        
+        # 3. Se estiver ativo, reconfigura a app em runtime para usar o SQL Server,
+        # roda create_all e seed_database_from_json
+        if use_sql_server:
+            current_app.config['SQLALCHEMY_DATABASE_URI'] = uri
+            from models import db, seed_database_from_json
+            from sqlalchemy import create_engine
+            
+            app_obj = current_app._get_current_object()
+            
+            # Instancia o motor do SQL Server manualmente para fazer o "hot-plug" no cache do Flask-SQLAlchemy 3.x
+            engine_options = current_app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {})
+            new_engine = create_engine(uri, **engine_options)
+            
+            if app_obj not in db._app_engines:
+                db._app_engines[app_obj] = {}
+            else:
+                db._app_engines[app_obj].clear()
+            
+            # Substitui diretamente o motor padrão (chave None) no dicionário interno
+            db._app_engines[app_obj][None] = new_engine
+            
+            db.create_all()
+            seed_database_from_json(db)
+            
+            save_to_history('database_migration', session.get('ad_user', 'admin'), f"Migração de dados realizada com sucesso para o SQL Server {db_host}/{db_name}.")
+            logging.info(f"[DB] Migração e ativação do SQL Server concluídas para {db_host}/{db_name}.")
+            
+        return jsonify({'success': True, 'message': 'Configurações salvas e dados locais migrados com sucesso para o SQL Server!'})
+    except Exception as e:
+        logging.error(f"[DB] Erro durante a migração para o SQL Server: {e}")
+        return jsonify({'success': False, 'error': f"Ocorreu um erro interno durante a migração: {str(e)}"}), 500
+

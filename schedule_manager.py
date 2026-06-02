@@ -153,26 +153,151 @@ def process_group_membership_changes(conn, search_base):
     logging.info("Verificação de alterações de associação a grupos concluída.")
 
 
+def process_zimbra_group_syncs(conn, config):
+    """Sincroniza todos os grupos do AD mapeados com o Zimbra de forma agendada."""
+    logging.info("Iniciando sincronização automática de grupos com o Zimbra.")
+    
+    if not config.get('ZIMBRA_ENABLED', False):
+        logging.info("A integração com o Zimbra está desativada nas configurações.")
+        return
+
+    zimbra_url = config.get('ZIMBRA_API_URL')
+    zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+    zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+    
+    if not zimbra_url or not zimbra_user or not zimbra_password:
+        logging.error("Configurações do Zimbra incompletas ou ausentes. Pulando sincronização.")
+        return
+
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    zimbra_mappings_file = os.path.join(basedir, 'data', 'zimbra_mappings.json')
+    
+    if not os.path.exists(zimbra_mappings_file):
+        logging.info("Nenhum arquivo de mapeamentos do Zimbra encontrado. Pulando sincronização.")
+        return
+
+    try:
+        with open(zimbra_mappings_file, 'r', encoding='utf-8') as f:
+            mappings = json.load(f)
+    except Exception as e:
+        logging.error(f"Erro ao ler o arquivo de mapeamentos do Zimbra: {e}")
+        return
+
+    if not mappings:
+        logging.info("Nenhum mapeamento de grupo do Zimbra ativo.")
+        return
+
+    from routes.zimbra_api import ZimbraSOAPClient
+    from routes.utils import get_user_by_dn
+    from common import get_attr_value, get_group_by_name
+
+    try:
+        client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+    except Exception as e:
+        logging.error(f"Erro ao inicializar o cliente SOAP do Zimbra: {e}")
+        return
+
+    for mapping in mappings:
+        ad_group = mapping.get('ad_group_name', '').strip()
+        zimbra_email = mapping.get('zimbra_dl_email', '').strip()
+        
+        if not ad_group or not zimbra_email:
+            continue
+            
+        logging.info(f"Sincronizando grupo AD '{ad_group}' com lista Zimbra '{zimbra_email}'...")
+        try:
+            ad_group_obj = get_group_by_name(conn, ad_group, ['member'])
+            if not ad_group_obj:
+                logging.error(f"Grupo do AD '{ad_group}' não foi encontrado para sincronização.")
+                continue
+
+            # Extrai e-mails dos membros do AD
+            ad_member_dns = ad_group_obj.member.values if 'member' in ad_group_obj and ad_group_obj.member.values else []
+            ad_emails = set()
+            
+            for dn in ad_member_dns:
+                user_entry = get_user_by_dn(conn, dn, ['mail', 'userPrincipalName'])
+                if user_entry:
+                    email = get_attr_value(user_entry, 'mail') or get_attr_value(user_entry, 'userPrincipalName')
+                    if email:
+                        ad_emails.add(email.strip().lower())
+
+            # Conecta no Zimbra
+            try:
+                dl_info = client.get_dl_members(zimbra_email)
+            except Exception as e:
+                if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
+                    logging.info(f"Lista '{zimbra_email}' não existe no Zimbra. Tentando criar automaticamente...")
+                    try:
+                        client.create_dl(zimbra_email)
+                        dl_info = client.get_dl_members(zimbra_email)
+                    except Exception as e_create:
+                        logging.error(f"Erro ao criar lista '{zimbra_email}' no Zimbra: {e_create}")
+                        continue
+                else:
+                    logging.error(f"Erro ao buscar membros da lista Zimbra '{zimbra_email}': {e}")
+                    continue
+
+            zimbra_emails = set(dl_info['members'])
+            zimbra_real_email = dl_info['email']
+
+            # Diferenças
+            to_add = ad_emails - zimbra_emails
+            to_remove = zimbra_emails - ad_emails
+
+            added_count = 0
+            for email in to_add:
+                try:
+                    client.add_dl_member(zimbra_real_email, email)
+                    added_count += 1
+                except Exception as e_add:
+                    logging.error(f"Falha ao adicionar membro '{email}' à lista '{zimbra_real_email}': {e_add}")
+
+            removed_count = 0
+            for email in to_remove:
+                try:
+                    client.remove_dl_member(zimbra_real_email, email)
+                    removed_count += 1
+                except Exception as e_rem:
+                    logging.error(f"Falha ao remover membro '{email}' da lista '{zimbra_real_email}': {e_rem}")
+
+            if added_count > 0 or removed_count > 0:
+                logging.info(f"Sucesso na sincronização do grupo '{ad_group}' -> '{zimbra_real_email}': {added_count} adicionados, {removed_count} removidos.")
+                save_to_history('zimbra_sync', 'scheduler', f"Sincronização automática para '{zimbra_real_email}': {added_count} adicionados, {removed_count} removidos.")
+            else:
+                logging.info(f"Grupo '{zimbra_real_email}' já está 100% sincronizado (sem alterações).")
+
+        except Exception as e:
+            logging.error(f"Erro ao processar sincronização automática para o grupo '{ad_group}': {e}")
+
+    logging.info("Sincronização automática de grupos com o Zimbra concluída.")
+
+
 if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando Gerenciador de Agendamentos do AD.")
     try:
-        config = load_config()
-        conn = get_ldap_connection()
+        from app import app
+        with app.app_context():
+            config = load_config()
+            conn = get_ldap_connection()
 
-        if conn:
-            search_base = config.get('AD_SEARCH_BASE')
-            if search_base:
-                process_user_deactivations(conn, search_base)
-                process_user_reactivations(conn, search_base)
-                process_group_membership_changes(conn, search_base)
+            if conn:
+                search_base = config.get('AD_SEARCH_BASE')
+                if search_base:
+                    process_user_deactivations(conn, search_base)
+                    process_user_reactivations(conn, search_base)
+                    process_group_membership_changes(conn, search_base)
+                    # Sincronização de grupos do Zimbra
+                    process_zimbra_group_syncs(conn, config)
+                else:
+                    logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
+                conn.unbind()
             else:
-                logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
-            conn.unbind()
-        else:
-            logging.error("Não foi possível conectar ao AD.")
+                logging.error("Não foi possível conectar ao AD.")
     except Exception as e:
         logging.critical(f"Erro inesperado durante o processamento: {e}", exc_info=True)
     
     logging.info("Gerenciador de Agendamentos do AD finalizado.")
     logging.info("=============================================\n")
+

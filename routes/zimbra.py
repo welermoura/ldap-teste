@@ -415,7 +415,7 @@ def api_get_auto_matches():
             search_base=search_base,
             search_filter=search_filter,
             search_scope=SUBTREE,
-            attributes=['cn', 'groupType', 'mail', 'proxyAddresses'],
+            attributes=['cn', 'groupType', 'mail', 'proxyAddresses', 'member'],
             paged_size=1000,
             generator=True
         )
@@ -455,9 +455,13 @@ def api_get_auto_matches():
             # Inclui apenas se o grupo possuir e-mail cadastrado (em mail ou proxyAddresses)
             if emails:
                 cn_val = attrs.get('cn')[0] if isinstance(attrs.get('cn'), list) else attrs.get('cn')
+                member_vals = attrs.get('member', [])
+                if not isinstance(member_vals, list):
+                    member_vals = [member_vals] if member_vals else []
                 ad_groups.append({
                     'name': cn_val,
-                    'emails': emails
+                    'emails': emails,
+                    'member_count': len(member_vals)
                 })
                 
         # 3. Conecta ao Zimbra e busca todas as listas de distribuição com apelidos
@@ -470,6 +474,23 @@ def api_get_auto_matches():
             
         client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
         zimbra_dls = client.get_all_dls() # retorna [{'name': name, 'id': id, 'aliases': [...]}]
+        
+        # Busca o número de membros de cada DL do Zimbra de forma paralela (muito mais rápido!)
+        dl_member_counts = {}
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def fetch_dl_member_count(dl):
+            try:
+                dl_info = client.get_dl_members(dl['name'])
+                return dl['name'], len(dl_info.get('members', []))
+            except Exception as e:
+                logging.error(f"Erro ao carregar membros da DL '{dl['name']}': {e}")
+                return dl['name'], 0
+                
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            results = executor.map(fetch_dl_member_count, zimbra_dls)
+            for name, count in results:
+                dl_member_counts[name] = count
         
         # 4. Executa a engine de auto-cruzamento (Auto-Match)
         matches = []
@@ -501,8 +522,10 @@ def api_get_auto_matches():
                     matches.append({
                         'ad_group_name': group['name'],
                         'ad_matching_email': match_evidence_ad,
+                        'ad_member_count': group.get('member_count', 0),
                         'zimbra_dl_email': dl['name'],
                         'zimbra_matching_email': match_evidence_zimbra,
+                        'zimbra_member_count': dl_member_counts.get(dl['name'], 0),
                         'already_mapped': group['name'] in mapped_ad_groups
                     })
                     matched_ad_groups.add(group['name'])
@@ -517,6 +540,7 @@ def api_get_auto_matches():
                 only_in_ad.append({
                     'name': group['name'],
                     'emails': group['emails'],
+                    'member_count': group.get('member_count', 0),
                     'already_mapped': already_mapped
                 })
                 
@@ -528,6 +552,7 @@ def api_get_auto_matches():
                 only_in_zimbra.append({
                     'name': dl['name'],
                     'aliases': dl.get('aliases', []),
+                    'member_count': dl_member_counts.get(dl['name'], 0),
                     'already_mapped': already_mapped
                 })
 

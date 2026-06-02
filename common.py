@@ -59,7 +59,21 @@ def get_flask_secret_key():
 key = load_key()
 cipher_suite = Fernet(key)
 
-SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD', 'ZIMBRA_ADMIN_PASSWORD']
+SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD', 'ZIMBRA_ADMIN_PASSWORD', 'DB_PASSWORD', 'SQL_SERVER_URI']
+
+def get_sql_server_uri():
+    # Priority 1: Environment variable
+    env_uri = os.environ.get('SQL_SERVER_URI')
+    if env_uri:
+        return env_uri
+    # Priority 2: Config file (config.json)
+    try:
+        config = load_config(force_reload=True)
+        if config.get('USE_SQL_SERVER') and config.get('SQL_SERVER_URI'):
+            return config.get('SQL_SERVER_URI')
+    except Exception:
+        pass
+    return None
 
 _cached_config = None
 
@@ -161,6 +175,23 @@ def get_ad_upn_suffixes(conn):
 # Funções de Dados (JSON)
 # ==============================================================================
 def load_permissions():
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import Permission, ensure_db_registered
+            ensure_db_registered()
+            perms = Permission.query.all()
+            result = {}
+            for p in perms:
+                result[p.group_name] = {
+                    'type': p.type,
+                    'allowed_ous': json.loads(p.allowed_ous) if p.allowed_ous else [],
+                    'actions': json.loads(p.actions) if p.actions else []
+                }
+            return result
+        except Exception as e:
+            logging.error(f"[DB] Error loading permissions: {e}")
+            
     try:
         with open(PERMISSIONS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -168,6 +199,38 @@ def load_permissions():
         return {}
 
 def save_permissions(permissions):
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, Permission, ensure_db_registered
+            ensure_db_registered()
+            existing_names = set(permissions.keys())
+            db_perms = Permission.query.all()
+            for db_p in db_perms:
+                if db_p.group_name not in existing_names:
+                    db.session.delete(db_p)
+            for k, v in permissions.items():
+                allowed_ous_str = json.dumps(v.get('allowed_ous', []))
+                actions_str = json.dumps(v.get('actions', []))
+                perm = Permission.query.filter_by(group_name=k).first()
+                if perm:
+                    perm.type = v.get('type', 'none')
+                    perm.allowed_ous = allowed_ous_str
+                    perm.actions = actions_str
+                else:
+                    perm = Permission(
+                        group_name=k,
+                        type=v.get('type', 'none'),
+                        allowed_ous=allowed_ous_str,
+                        actions=actions_str
+                    )
+                    db.session.add(perm)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving permissions: {e}")
+            db.session.rollback()
+
     with open(PERMISSIONS_FILE, 'w', encoding='utf-8') as f:
         json.dump(permissions, f, indent=4)
 
@@ -185,6 +248,16 @@ def save_user(users):
         json.dump(users, f, indent=4)
 
 def load_schedules():
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import Schedule, ensure_db_registered
+            ensure_db_registered()
+            scheds = Schedule.query.all()
+            return {s.username: s.reactivation_date for s in scheds}
+        except Exception as e:
+            logging.error(f"[DB] Error loading schedules: {e}")
+            
     try:
         with open(SCHEDULE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -192,10 +265,43 @@ def load_schedules():
         return {}
 
 def save_schedules(schedules):
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, Schedule, ensure_db_registered
+            ensure_db_registered()
+            existing_usernames = set(schedules.keys())
+            db_scheds = Schedule.query.all()
+            for db_s in db_scheds:
+                if db_s.username not in existing_usernames:
+                    db.session.delete(db_s)
+            for username, reactivation_date in schedules.items():
+                sched = Schedule.query.filter_by(username=username).first()
+                if sched:
+                    sched.reactivation_date = reactivation_date
+                else:
+                    sched = Schedule(username=username, reactivation_date=reactivation_date)
+                    db.session.add(sched)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving schedules: {e}")
+            db.session.rollback()
+
     with open(SCHEDULE_FILE, 'w', encoding='utf-8') as f:
         json.dump(schedules, f, indent=4)
 
 def load_disable_schedules():
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import DisableSchedule, ensure_db_registered
+            ensure_db_registered()
+            scheds = DisableSchedule.query.all()
+            return {s.username: s.deactivation_date for s in scheds}
+        except Exception as e:
+            logging.error(f"[DB] Error loading disable schedules: {e}")
+            
     try:
         with open(DISABLE_SCHEDULE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -203,10 +309,48 @@ def load_disable_schedules():
         return {}
 
 def save_disable_schedules(schedules):
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, DisableSchedule, ensure_db_registered
+            ensure_db_registered()
+            existing_usernames = set(schedules.keys())
+            db_scheds = DisableSchedule.query.all()
+            for db_s in db_scheds:
+                if db_s.username not in existing_usernames:
+                    db.session.delete(db_s)
+            for username, deactivation_date in schedules.items():
+                sched = DisableSchedule.query.filter_by(username=username).first()
+                if sched:
+                    sched.deactivation_date = deactivation_date
+                else:
+                    sched = DisableSchedule(username=username, deactivation_date=deactivation_date)
+                    db.session.add(sched)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving disable schedules: {e}")
+            db.session.rollback()
+
     with open(DISABLE_SCHEDULE_FILE, 'w', encoding='utf-8') as f:
         json.dump(schedules, f, indent=4)
 
 def load_group_schedules():
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import GroupSchedule, ensure_db_registered
+            ensure_db_registered()
+            scheds = GroupSchedule.query.all()
+            return [{
+                'group_dn': s.group_dn,
+                'target_mail': s.target_mail,
+                'sync_type': s.sync_type,
+                'active': s.active
+            } for s in scheds]
+        except Exception as e:
+            logging.error(f"[DB] Error loading group schedules: {e}")
+            
     try:
         with open(GROUP_SCHEDULE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -214,8 +358,107 @@ def load_group_schedules():
         return []
 
 def save_group_schedules(schedules):
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, GroupSchedule, ensure_db_registered
+            ensure_db_registered()
+            existing_group_dns = {item.get('group_dn') for item in schedules}
+            db_scheds = GroupSchedule.query.all()
+            for db_s in db_scheds:
+                if db_s.group_dn not in existing_group_dns:
+                    db.session.delete(db_s)
+            for item in schedules:
+                group_dn = item.get('group_dn')
+                sched = GroupSchedule.query.filter_by(group_dn=group_dn).first()
+                if sched:
+                    sched.target_mail = item.get('target_mail')
+                    sched.sync_type = item.get('sync_type', 'zimbra')
+                    sched.active = item.get('active', True)
+                else:
+                    sched = GroupSchedule(
+                        group_dn=group_dn,
+                        target_mail=item.get('target_mail'),
+                        sync_type=item.get('sync_type', 'zimbra'),
+                        active=item.get('active', True)
+                    )
+                    db.session.add(sched)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving group schedules: {e}")
+            db.session.rollback()
+
     with open(GROUP_SCHEDULE_FILE, 'w', encoding='utf-8') as f:
         json.dump(schedules, f, indent=4)
+
+def load_admin_users():
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import AdminUser, ensure_db_registered
+            ensure_db_registered()
+            users = AdminUser.query.filter_by(active=True).all()
+            return {u.username: u.password_hash for u in users}
+        except Exception as e:
+            logging.error(f"[DB] Error loading admin users: {e}")
+            
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    data_dir = os.path.join(basedir, 'data')
+    users_file = os.path.join(data_dir, 'users.json')
+    admins = {}
+    if os.path.exists(users_file):
+        try:
+            with open(users_file, 'r') as f:
+                admins = json.load(f)
+        except Exception:
+            pass
+    if not admins:
+        old_admin = load_user()
+        if old_admin:
+            admins[old_admin['username']] = old_admin['password_hash']
+            try:
+                with open(users_file, 'w') as f:
+                    json.dump(admins, f)
+            except Exception:
+                pass
+    return admins
+
+def save_admin_users(admins):
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, AdminUser, ensure_db_registered
+            ensure_db_registered()
+            existing_usernames = set(admins.keys())
+            db_users = AdminUser.query.all()
+            for db_u in db_users:
+                if db_u.username not in existing_usernames:
+                    db.session.delete(db_u)
+            for username, password_hash in admins.items():
+                admin_user = AdminUser.query.filter_by(username=username).first()
+                if admin_user:
+                    admin_user.password_hash = password_hash
+                    admin_user.active = True
+                else:
+                    admin_user = AdminUser(
+                        username=username,
+                        password_hash=password_hash,
+                        display_name=username.capitalize(),
+                        active=True
+                    )
+                    db.session.add(admin_user)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving admin users: {e}")
+            db.session.rollback()
+
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    data_dir = os.path.join(basedir, 'data')
+    users_file = os.path.join(data_dir, 'users.json')
+    with open(users_file, 'w') as f:
+        json.dump(admins, f, indent=4)
 
 # ==============================================================================
 # Utilitários de AD e Acesso
@@ -518,7 +761,25 @@ def get_group_by_name(conn, group_name, attributes=None):
     return None
 
 def save_to_history(action, user_sam, details=""):
-    """Salva uma ação executada no arquivo de histórico."""
+    """Salva uma ação executada no histórico (SQL ou JSON)."""
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import db, HistoryLog, ensure_db_registered
+            ensure_db_registered()
+            log = HistoryLog(
+                timestamp=datetime.now(),
+                action=action,
+                user_sam=user_sam,
+                details=details
+            )
+            db.session.add(log)
+            db.session.commit()
+            return
+        except Exception as e:
+            logging.error(f"[DB] Error saving history log: {e}")
+            db.session.rollback()
+
     try:
         history = []
         if os.path.exists(HISTORY_FILE):
@@ -533,7 +794,6 @@ def save_to_history(action, user_sam, details=""):
         }
         history.append(entry)
         
-        # Mantém apenas os últimos 1000 registros
         if len(history) > 1000:
             history = history[-1000:]
             
@@ -541,3 +801,29 @@ def save_to_history(action, user_sam, details=""):
             json.dump(history, f, indent=4)
     except Exception as e:
         logging.error(f"Erro ao salvar histórico: {e}")
+
+def load_history():
+    """Carrega o histórico de ações (SQL ou JSON)."""
+    sql_server_uri = get_sql_server_uri()
+    if sql_server_uri:
+        try:
+            from models import HistoryLog, ensure_db_registered
+            ensure_db_registered()
+            logs = HistoryLog.query.order_by(HistoryLog.timestamp.desc()).limit(1000).all()
+            return [{
+                'timestamp': l.timestamp.isoformat(),
+                'action': l.action,
+                'user_sam': l.user_sam,
+                'details': l.details
+            } for l in logs]
+        except Exception as e:
+            logging.error(f"[DB] Error loading history logs: {e}")
+            
+    try:
+        if os.path.exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        pass
+    return []
+

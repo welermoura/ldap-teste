@@ -10,6 +10,7 @@ from routes.groups import groups_bp
 from routes.admin import admin_bp
 from routes.zimbra import zimbra_bp
 from common import load_config, get_flask_secret_key
+from models import db, seed_database_from_json
 
 # ==============================================================================
 # Configuração de Logs
@@ -33,12 +34,38 @@ logging.basicConfig(
 app = Flask(__name__)
 app.secret_key = get_flask_secret_key()
 
+# ==============================================================================
+# Inicialização do Banco de Dados (SQL Server / Fallback JSON)
+# ==============================================================================
+from common import get_sql_server_uri
+active_db_uri = get_sql_server_uri() or 'sqlite:///:memory:'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = active_db_uri
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 1800,
+    'pool_pre_ping': True
+}
+db.init_app(app)
+
+with app.app_context():
+    try:
+        if active_db_uri != 'sqlite:///:memory:':
+            db.create_all()
+            seed_database_from_json(db)
+            logging.info("[DB] Banco de dados SQL Server conectado e tabelas sincronizadas na inicialização.")
+        else:
+            logging.info("[DB] Banco de dados em modo Fallback JSON (SQLite em memória registrado).")
+    except Exception as e:
+        logging.error(f"[DB] Erro ao sincronizar tabelas com o SQL Server na inicialização: {e}")
+
 from flask_wtf.csrf import CSRFProtect
 app.config['WTF_CSRF_ENABLED'] = True
 csrf = CSRFProtect(app)
 
 # Configuração do Limiter
 limiter.init_app(app)
+
 
 # ==============================================================================
 # Registro de Blueprints

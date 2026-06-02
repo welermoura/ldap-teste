@@ -27,21 +27,8 @@ def login():
         password = form.password.data
         
         # 1. Carrega a lista de administradores (Locais e AD)
-        data_dir = os.path.join(current_app.root_path, 'data')
-        users_file = os.path.join(data_dir, 'users.json')
-        admins = {}
-        if os.path.exists(users_file):
-            with open(users_file, 'r') as f:
-                admins = json.load(f)
-        
-        # Fallback para migração do usuário master antigo
-        if not admins or username.lower() == 'admin':
-            from common import load_user
-            old_admin = load_user()
-            if old_admin and old_admin['username'].lower() == username.lower():
-                admins[old_admin['username']] = old_admin['password_hash']
-                with open(users_file, 'w') as f:
-                    json.dump(admins, f)
+        from common import load_admin_users
+        admins = load_admin_users()
         
         # 2. Busca o usuário na lista de admins (case-insensitive)
         admin_key = next((k for k in admins if k.lower() == username.lower()), None)

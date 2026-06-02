@@ -18,6 +18,9 @@ openpyxl==3.1.5
 requests==2.31.0
 pytest==8.0.0
 pytest-mock==3.12.0
+Flask-SQLAlchemy==3.1.1
+pymssql==2.3.2
+
 
 # Para habilitar o Single Sign-On (SSO) com Kerberos, descomente a linha abaixo.
 # Nota: Requer a instalação de bibliotecas de desenvolvimento Kerberos no sistema
