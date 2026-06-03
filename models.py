@@ -35,7 +35,8 @@ class Permission(db.Model):
     group_name = db.Column(db.String(250), primary_key=True)
     type = db.Column(db.String(50), nullable=False)
     allowed_ous = db.Column(db.Text, nullable=True) # JSON array encoded as string
-    actions = db.Column(db.Text, nullable=True) # JSON array encoded as string
+    actions = db.Column(db.Text, nullable=True) # JSON object/array encoded as string
+    views = db.Column(db.Text, nullable=True) # JSON object encoded as string
 
 class AdminUser(db.Model):
     __tablename__ = 'admin_users'
@@ -65,6 +66,21 @@ def seed_database_from_json(database_instance):
     basedir = os.path.abspath(os.path.dirname(__file__))
     data_dir = os.path.join(basedir, 'data')
     
+    # Executa verificação e migração simples para a coluna 'views' na tabela 'permissions'
+    try:
+        from sqlalchemy import inspect
+        inspector = inspect(database_instance.engine)
+        if 'permissions' in inspector.get_table_names():
+            columns = [c['name'] for c in inspector.get_columns('permissions')]
+            if 'views' not in columns:
+                logging.info("[DB Migration] Column 'views' is missing from 'permissions' table. Adding it now...")
+                # Usando execute direto no db
+                database_instance.session.execute(db.text("ALTER TABLE permissions ADD views VARCHAR(MAX) NULL"))
+                database_instance.session.commit()
+                logging.info("[DB Migration] Column 'views' added successfully to 'permissions' table.")
+    except Exception as e:
+        logging.error(f"[DB Migration] Error checking/adding 'views' column: {e}")
+
     # 1. Seed general config
     if ConfigSetting.query.count() == 0:
         config_path = os.path.join(data_dir, 'config.json')
@@ -145,12 +161,14 @@ def seed_database_from_json(database_instance):
                     data = json.load(f)
                     for k, v in data.items():
                         allowed_ous_str = json.dumps(v.get('allowed_ous', []))
-                        actions_str = json.dumps(v.get('actions', []))
+                        actions_str = json.dumps(v.get('actions', {}))
+                        views_str = json.dumps(v.get('views', {}))
                         perm = Permission(
                             group_name=k,
                             type=v.get('type', 'none'),
                             allowed_ous=allowed_ous_str,
-                            actions=actions_str
+                            actions=actions_str,
+                            views=views_str
                         )
                         database_instance.session.add(perm)
                 database_instance.session.commit()

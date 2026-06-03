@@ -237,10 +237,20 @@ def load_permissions():
             perms = Permission.query.all()
             result = {}
             for p in perms:
+                # Normaliza para garantir que actions e views sejam sempre dicionários
+                # mesmo que tenham sido gravados ou seedados como listas vazias []
+                loaded_actions = json.loads(p.actions) if p.actions else {}
+                if isinstance(loaded_actions, list):
+                    loaded_actions = {}
+                loaded_views = json.loads(p.views) if hasattr(p, 'views') and p.views else {}
+                if isinstance(loaded_views, list):
+                    loaded_views = {}
+
                 result[p.group_name] = {
                     'type': p.type,
                     'allowed_ous': json.loads(p.allowed_ous) if p.allowed_ous else [],
-                    'actions': json.loads(p.actions) if p.actions else []
+                    'actions': loaded_actions,
+                    'views': loaded_views
                 }
             return result
         except Exception as e:
@@ -248,7 +258,14 @@ def load_permissions():
             
     try:
         with open(PERMISSIONS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+            # Normaliza fallback local JSON
+            for k, v in data.items():
+                if 'actions' not in v or isinstance(v['actions'], list):
+                    v['actions'] = {}
+                if 'views' not in v or isinstance(v['views'], list):
+                    v['views'] = {}
+            return data
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
@@ -265,18 +282,21 @@ def save_permissions(permissions):
                     db.session.delete(db_p)
             for k, v in permissions.items():
                 allowed_ous_str = json.dumps(v.get('allowed_ous', []))
-                actions_str = json.dumps(v.get('actions', []))
+                actions_str = json.dumps(v.get('actions', {}))
+                views_str = json.dumps(v.get('views', {}))
                 perm = Permission.query.filter_by(group_name=k).first()
                 if perm:
                     perm.type = v.get('type', 'none')
                     perm.allowed_ous = allowed_ous_str
                     perm.actions = actions_str
+                    perm.views = views_str
                 else:
                     perm = Permission(
                         group_name=k,
                         type=v.get('type', 'none'),
                         allowed_ous=allowed_ous_str,
-                        actions=actions_str
+                        actions=actions_str,
+                        views=views_str
                     )
                     db.session.add(perm)
             db.session.commit()
