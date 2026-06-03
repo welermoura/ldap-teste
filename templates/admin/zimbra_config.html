@@ -249,8 +249,16 @@
             <!-- Listagem de Mapeamentos Ativos -->
             <div class="col-12 mb-4">
                 <div class="card glass-card">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center py-2 px-3 flex-wrap gap-2">
                         <h5 class="mb-0">Regras de Sincronização Ativas</h5>
+                        <div style="max-width: 280px; width: 100%;">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-light bg-opacity-10 border-secondary border-opacity-25 text-muted">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" id="search-active-rules" class="form-control bg-light bg-opacity-10 border-secondary border-opacity-25 text-light" placeholder="Filtrar regras..." autocomplete="off">
+                            </div>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
@@ -784,6 +792,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 const zimMatch = zimCountText.match(/\d+/);
                 if (adMatch) adCount = adMatch[0];
                 if (zimMatch) zimCount = zimMatch[0];
+                
+                // Remove row from matches table
+                row.remove();
+                
+                // Decrement matches badge count
+                const currentCount = parseInt(countMatches.innerText) || 0;
+                countMatches.innerText = Math.max(0, currentCount - 1);
+                
+                // If table is now empty, show empty message
+                if (autoMatchesTableBody.querySelectorAll('tr').length === 0) {
+                    autoMatchesTableBody.innerHTML = `
+                        <tr id="auto-matches-empty-row">
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                <i class="fas fa-magic fa-3x mb-3 text-secondary"></i>
+                                <p>Todos os matches sugeridos foram ativados!</p>
+                            </td>
+                        </tr>
+                    `;
+                }
             }
             addOrUpdateActiveMapping(adGroup, dlEmail, adCount, zimCount);
             
@@ -1068,6 +1095,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // === LÓGICA DE FILTRAGEM DE REGRAS ATIVAS ===
+    const searchActiveRules = document.getElementById('search-active-rules');
+    if (searchActiveRules) {
+        searchActiveRules.addEventListener('input', function() {
+            const query = searchActiveRules.value.toLowerCase().trim();
+            const tbody = document.querySelector('#mappings-table tbody');
+            if (!tbody) return;
+            
+            // Remove existing no-results row if any
+            const existingNoResults = tbody.querySelector('.active-rules-no-results');
+            if (existingNoResults) existingNoResults.remove();
+            
+            const emptyRow = document.getElementById('mappings-empty-row');
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => {
+                return row.id !== 'mappings-empty-row' && !row.classList.contains('active-rules-no-results');
+            });
+            
+            if (rows.length === 0) {
+                if (emptyRow) emptyRow.classList.remove('d-none');
+                return;
+            }
+            
+            let visibleCount = 0;
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(query)) {
+                    row.classList.remove('d-none');
+                    visibleCount++;
+                } else {
+                    row.classList.add('d-none');
+                }
+            });
+            
+            if (emptyRow) {
+                emptyRow.classList.add('d-none');
+            }
+            
+            if (visibleCount === 0 && query !== "") {
+                const tr = document.createElement('tr');
+                tr.className = 'active-rules-no-results';
+                tr.innerHTML = `
+                    <td colspan="4" class="text-center py-4 text-muted">
+                        <i class="fas fa-search-minus fa-2x mb-2 text-secondary"></i>
+                        <p class="mb-0">Nenhuma regra ativa correspondente a "${searchActiveRules.value}".</p>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
