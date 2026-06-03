@@ -876,7 +876,9 @@ def load_history():
     try:
         if os.path.exists(HISTORY_FILE):
             with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                history = json.load(f)
+                history.reverse()
+                return history
     except (json.JSONDecodeError, IOError):
         pass
     return []

@@ -32,7 +32,7 @@
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="active-rules-tab" data-bs-toggle="tab" data-bs-target="#active-rules-tab-pane" type="button" role="tab" aria-controls="active-rules-tab-pane" aria-selected="false">
-            <i class="fas fa-list-ul me-2"></i>Regras de Sincronização Ativas
+            <i class="fas fa-list-ul me-2"></i>Regras Ativas <span class="badge bg-secondary ms-1.5 rounded-pill" id="count-active-rules">{{ mappings|length }}</span>
         </button>
     </li>
 </ul>
@@ -267,14 +267,24 @@
                                     {% if mappings %}
                                         {% for m in mappings %}
                                             <tr data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}">
-                                                <td><strong class="text-primary">{{ m.ad_group_name or m['ad_group_name'] or m }}</strong></td>
+                                                <td>
+                                                    <div class="d-flex flex-column">
+                                                        <strong class="text-primary">{{ m.ad_group_name or m['ad_group_name'] }}</strong>
+                                                        <span class="text-muted small"><i class="fas fa-users me-1"></i>{{ m.ad_member_count if m.ad_member_count is defined else '-' }} membros no AD</span>
+                                                    </div>
+                                                </td>
                                                 <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
-                                                <td><span class="theme-code-text">{{ m.zimbra_dl_email or m['zimbra_dl_email'] or m }}</span></td>
+                                                <td>
+                                                    <div class="d-flex flex-column">
+                                                        <span class="theme-code-text fw-bold text-light">{{ m.zimbra_dl_email or m['zimbra_dl_email'] }}</span>
+                                                        <span class="text-muted small"><i class="fas fa-users me-1"></i>{{ m.zimbra_member_count if m.zimbra_member_count is defined else '-' }} membros no Zimbra</span>
+                                                    </div>
+                                                </td>
                                                 <td class="text-end pe-3">
-                                                    <button class="btn btn-sm btn-outline-primary btn-sync-mapping me-1 animate-hover" data-ad-group="{{ m.ad_group_name }}" title="Sincronizar agora">
+                                                    <button class="btn btn-sm btn-outline-primary btn-sync-mapping me-1 animate-hover" data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}" title="Sincronizar agora">
                                                         <i class="fas fa-sync"></i> Sync
                                                     </button>
-                                                    <button class="btn btn-sm btn-outline-danger btn-delete-mapping animate-hover" data-ad-group="{{ m.ad_group_name }}" title="Excluir regra">
+                                                    <button class="btn btn-sm btn-outline-danger btn-delete-mapping animate-hover" data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}" title="Excluir regra">
                                                         <i class="fas fa-trash-alt"></i>
                                                     </button>
                                                 </td>
@@ -683,10 +693,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Função interna para atualizar a tabela de mapeamentos ativos
-    function addOrUpdateActiveMapping(adGroup, dlEmail) {
+    function addOrUpdateActiveMapping(adGroup, dlEmail, adCount = '-', zimCount = '-') {
         let existingRow = document.querySelector(`tr[data-ad-group="${adGroup}"]`);
         if (existingRow) {
-            existingRow.cells[2].innerHTML = `<span class="theme-code-text">${dlEmail}</span>`;
+            existingRow.cells[2].innerHTML = `
+                <div class="d-flex flex-column">
+                    <span class="theme-code-text fw-bold text-light">${dlEmail}</span>
+                    <span class="text-muted small"><i class="fas fa-users me-1"></i>${zimCount} membros no Zimbra</span>
+                </div>
+            `;
         } else {
             const emptyRow = document.getElementById('mappings-empty-row');
             if (emptyRow) emptyRow.remove();
@@ -694,9 +709,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const tr = document.createElement('tr');
             tr.setAttribute('data-ad-group', adGroup);
             tr.innerHTML = `
-                <td><strong class="text-primary">${adGroup}</strong></td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <strong class="text-primary">${adGroup}</strong>
+                        <span class="text-muted small"><i class="fas fa-users me-1"></i>${adCount} membros no AD</span>
+                    </div>
+                </td>
                 <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
-                <td><span class="theme-code-text">${dlEmail}</span></td>
+                <td>
+                    <div class="d-flex flex-column">
+                        <span class="theme-code-text fw-bold text-light">${dlEmail}</span>
+                        <span class="text-muted small"><i class="fas fa-users me-1"></i>${zimCount} membros no Zimbra</span>
+                    </div>
+                </td>
                 <td class="text-end pe-3">
                     <button class="btn btn-sm btn-outline-primary btn-sync-mapping me-1 animate-hover" data-ad-group="${adGroup}" title="Sincronizar agora">
                         <i class="fas fa-sync"></i> Sync
@@ -707,6 +732,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td>
             `;
             mappingsTableBody.appendChild(tr);
+            
+            // Incrementa o contador de regras ativas
+            const countBadge = document.getElementById('count-active-rules');
+            if (countBadge) {
+                const currentCount = parseInt(countBadge.innerText) || 0;
+                countBadge.innerText = currentCount + 1;
+            }
         }
     }
 
@@ -740,11 +772,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showToast(result.message, 'success');
             
-            // Atualiza o botão na tabela de matches para "[✓ Ativo]"
-            const cell = activateBtn.parentElement;
-            cell.innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle py-1.5 px-3"><i class="fas fa-check me-1"></i> Ativo</span>';
-            
-            addOrUpdateActiveMapping(adGroup, dlEmail);
+            const row = activateBtn.closest('tr');
+            let adCount = '-';
+            let zimCount = '-';
+            if (row) {
+                const adCountText = row.querySelector('span[class*="text-muted"]')?.innerText || '';
+                // The second .text-muted span has the Zimbra count
+                const textSpans = row.querySelectorAll('span[class*="text-muted"]');
+                const zimCountText = textSpans.length > 1 ? textSpans[1].innerText : '';
+                const adMatch = adCountText.match(/\d+/);
+                const zimMatch = zimCountText.match(/\d+/);
+                if (adMatch) adCount = adMatch[0];
+                if (zimMatch) zimCount = zimMatch[0];
+            }
+            addOrUpdateActiveMapping(adGroup, dlEmail, adCount, zimCount);
             
         } catch (error) {
             activateBtn.innerHTML = originalContent;
@@ -936,6 +977,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Remove linha da tabela
                     const row = document.querySelector(`tr[data-ad-group="${adGroup}"]`);
                     if (row) row.remove();
+                    
+                    // Decrementa o contador de regras ativas
+                    const countBadge = document.getElementById('count-active-rules');
+                    if (countBadge) {
+                        const currentCount = parseInt(countBadge.innerText) || 0;
+                        countBadge.innerText = Math.max(0, currentCount - 1);
+                    }
                     
                     // Se a tabela ficou vazia, mostra empty row
                     if (mappingsTableBody.children.length === 0) {

@@ -7,7 +7,7 @@ from routes.utils import (
 from common import (
     load_config, get_user_by_samaccountname, get_group_by_name,
     get_service_account_connection, search_groups_for_user_addition,
-    load_group_schedules, save_group_schedules
+    load_group_schedules, save_group_schedules, save_to_history
 )
 from forms.groups import GroupSearchForm, CreateScheduleForm, ManageMemberForm
 from flask_wtf import FlaskForm
@@ -93,6 +93,7 @@ def group_management():
             conn = get_service_account_connection()
             config = load_config()
             search_base = config.get('AD_SEARCH_BASE')
+            query = form.search_query.data
             escaped_query = escape_filter_chars(query)
             search_filter = f"(&(objectClass=group)(|(cn=*{escaped_query}*)(mail=*{escaped_query}*)(proxyAddresses=*{escaped_query}*)))"
             conn.search(search_base, search_filter, attributes=['cn', 'description', 'member', 'groupType', 'mail', 'proxyAddresses'])
@@ -191,6 +192,7 @@ def add_member(group_name):
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' adicionado ao grupo '{group_name}' com sucesso.", 'success')
                 logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('ad_user')}'.")
+                save_to_history('alteration', user_sam, f"Adicionado permanentemente ao grupo '{group_name}' por '{session.get('ad_user')}'")
                 sync_zimbra_member_realtime(group_name, user_sam, 'add')
                 try:
                     schedules = load_group_schedules()
@@ -222,6 +224,7 @@ def remove_member(group_name, user_sam):
             if conn.result['description'] == 'success':
                 flash(f"Usuário '{user_sam}' removido do grupo '{group_name}' com sucesso.", 'success')
                 logging.info(f"[ALTERAÇÃO] Usuário '{user_sam}' removido permanentemente do grupo '{group_name}' por '{session.get('ad_user')}'.")
+                save_to_history('alteration', user_sam, f"Removido permanentemente do grupo '{group_name}' por '{session.get('ad_user')}'")
                 sync_zimbra_member_realtime(group_name, user_sam, 'remove')
                 try:
                     schedules = load_group_schedules()
@@ -414,6 +417,7 @@ def api_batch_add_members(group_name):
                     })
                     stats['success'] += 1
                     logging.info(f"[LOTE-ALTERAÇÃO] Usuário '{sam_real}' (pesquisado por '{sam}') adicionado ao grupo '{group_name}' em lote por '{session.get('user_display_name')}'.")
+                    save_to_history('alteration', sam_real, f"Adicionado ao grupo '{group_name}' em lote por '{session.get('user_display_name')}'")
                     sync_zimbra_member_realtime(group_name, sam_real, 'add')
                     
                     # Tenta remover de agendamentos pendentes se houver
@@ -507,6 +511,7 @@ def api_add_user_to_group():
         conn.extend.microsoft.add_members_to_groups([user.distinguishedName.value], group.distinguishedName.value)
         if conn.result['description'] == 'success':
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' adicionado permanentemente ao grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Adicionado permanentemente ao grupo '{group_name}' via API por '{session.get('user_display_name')}'")
             sync_zimbra_member_realtime(group_name, username, 'add')
             try:
                 schedules = load_group_schedules()
@@ -539,6 +544,7 @@ def api_remove_user_from_group():
         conn.extend.microsoft.remove_members_from_groups([user.distinguishedName.value], group.distinguishedName.value)
         if conn.result['description'] == 'success':
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' removido permanentemente do grupo '{group_name}' por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Removido permanentemente do grupo '{group_name}' via API por '{session.get('user_display_name')}'")
             sync_zimbra_member_realtime(group_name, username, 'remove')
             try:
                 schedules = load_group_schedules()
@@ -589,6 +595,7 @@ def api_remove_users_from_group():
                     results.append({'sam': username, 'status': 'success', 'message': 'Removido com sucesso'})
                     stats['success'] += 1
                     logging.info(f"[LOTE-REMOÇÃO] Usuário '{username}' removido do grupo '{group_name}' em lote por '{session.get('user_display_name')}'.")
+                    save_to_history('alteration', username, f"Removido do grupo '{group_name}' em lote por '{session.get('user_display_name')}'")
                     sync_zimbra_member_realtime(group_name, username, 'remove')
                     
                     # Limpar agendamentos se houver
@@ -811,6 +818,7 @@ def api_update_group_settings():
         
         if conn.result['description'] == 'success':
             logging.info(f"Tipo do grupo '{group_name}' alterado por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', group_name, f"Tipo do grupo alterado por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Configurações atualizadas'})
         else:
             return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
@@ -875,6 +883,7 @@ def api_add_group_proxy_address():
         
         if conn.result['description'] == 'success':
             logging.info(f"Alias '{new_proxy}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'")
+            save_to_history('alteration', group_name, f"Alias '{new_proxy}' adicionado ao grupo por '{session.get('user_display_name')}'")
             return jsonify({'success': True})
         else:
             return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
@@ -918,6 +927,7 @@ def api_remove_group_proxy_address():
         
         if conn.result['description'] == 'success':
             logging.info(f"Alias removido do grupo '{group_name}' por '{session.get('user_display_name')}'")
+            save_to_history('alteration', group_name, f"Alias '{alias_to_remove}' removido do grupo por '{session.get('user_display_name')}'")
             return jsonify({'success': True})
         else:
             return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
@@ -970,6 +980,7 @@ def api_set_group_primary_email():
         
         if conn.result['description'] == 'success':
             logging.info(f"E-mail primário do grupo '{group_name}' alterado para '{new_primary}' por '{session.get('user_display_name')}'")
+            save_to_history('alteration', group_name, f"E-mail primário alterado para '{new_primary}' por '{session.get('user_display_name')}'")
             return jsonify({'success': True})
         else:
             return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400

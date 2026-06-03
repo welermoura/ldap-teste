@@ -103,6 +103,41 @@ def config_page():
             client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
             domains = client.get_domains()
             connection_ok = True
+            
+            # Se a conexão estiver OK, carregamos a quantidade de membros de cada regra
+            if mappings:
+                from concurrent.futures import ThreadPoolExecutor
+                conn = get_service_account_connection()
+                
+                def fetch_mapping_counts(m_item):
+                    ad_group = m_item.get('ad_group_name')
+                    dl_email = m_item.get('zimbra_dl_email')
+                    ad_count = '-'
+                    zim_count = '-'
+                    
+                    if ad_group:
+                        try:
+                            ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
+                            if ad_group_obj:
+                                ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
+                                ad_count = len(ad_emails)
+                        except Exception as e_ad:
+                            logging.error(f"Erro ao contar membros do AD para o grupo '{ad_group}': {e_ad}")
+                            
+                    if dl_email:
+                        try:
+                            dl_info = client.get_dl_members(dl_email)
+                            zim_count = len(dl_info.get('members', []))
+                        except Exception as e_zim:
+                            logging.error(f"Erro ao contar membros do Zimbra para a lista '{dl_email}': {e_zim}")
+                            
+                    m_item['ad_member_count'] = ad_count
+                    m_item['zimbra_member_count'] = zim_count
+                    return m_item
+                
+                with ThreadPoolExecutor(max_workers=20) as executor:
+                    mappings = list(executor.map(fetch_mapping_counts, mappings))
+                    
         except Exception as e:
             error_message = str(e)
             

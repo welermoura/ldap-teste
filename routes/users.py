@@ -343,6 +343,7 @@ def edit_user(username):
                     log_details = "; ".join(changes_to_log)
                     log_message = f"[ALTERAÇÃO] Usuário '{username}' atualizado por '{session.get('user_display_name', session.get('ad_user'))}'. Detalhes: {log_details}"
                     logging.info(log_message)
+                    save_to_history('alteration', username, f"Atualizado: {log_details}")
                 else:
                     flash(f"Erro ao atualizar usuário: {service_conn.result['message']}", 'error')
             else:
@@ -535,7 +536,8 @@ def api_edit_user(username):
         if conn.result['description'] == 'success':
             log_details = "; ".join(changes_to_log)
             logging.info(f"[ALTERAÇÃO] Usuário '{username}' atualizado via API por '{session.get('user_display_name')}'. Detalhes: {log_details}")
-            return jsonify({'success': True, 'message': 'Usuário atualizado com sucesso!'})
+            save_to_history('alteration', username, f"Atualizado via API por '{session.get('user_display_name')}': {log_details}")
+            return jsonify({'success': True, 'message': 'Usuário updated successfully!'})
         else:
             raise Exception(f"Falha do LDAP: {conn.result['message']}")
     except Exception as e:
@@ -560,6 +562,7 @@ def api_reset_password(username):
         if conn.result['description'] == 'success':
             conn.modify(user.distinguishedName.value, {'pwdLastSet': [(MODIFY_REPLACE, [0])]})
             logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Senha resetada via API por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Senha resetada com sucesso.'})
         else:
             error_message = get_password_reset_error_message(conn, conn.result['message'])
@@ -589,6 +592,7 @@ def api_disable_user_temp(username):
         schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(schedules)
         logging.info(f"[ALTERAÇÃO] Conta de '{username}' desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
+        save_to_history('deactivation', username, f"Conta desativada por {days} dias via API por '{session.get('user_display_name')}'. Reativação agendada para {reactivation_date.isoformat()}.")
         return jsonify({'success': True, 'message': f"Usuário desativado. Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."})
     except Exception as e:
         logging.error(f"Erro em api_disable_user_temp para '{username}': {e}", exc_info=True)
@@ -628,11 +632,13 @@ def api_schedule_absence(username):
             disable_schedules[username.lower()] = deactivation_date.isoformat()
             save_disable_schedules(disable_schedules)
             logging.info(f"[AGENDAMENTO] Desativação de '{username}' agendada para {deactivation_date_str} por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Desativação de ausência agendada para {deactivation_date_str} por '{session.get('user_display_name')}'")
             message = f"Desativação agendada para {deactivation_date.strftime('%d-%m-%Y')}. "
         reactivation_schedules = load_schedules()
         reactivation_schedules[username.lower()] = reactivation_date.isoformat()
         save_schedules(reactivation_schedules)
         logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', username, f"Reativação de ausência agendada para {reactivation_date_str} por '{session.get('user_display_name')}'")
         message += f"Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."
         return jsonify({'success': True, 'message': message})
     except ValueError:
@@ -685,6 +691,7 @@ def api_schedule_reactivation(username):
             schedules[username.lower()] = reactivation_date.isoformat()
             save_schedules(schedules)
             logging.info(f"[AGENDAMENTO] Reativação de '{username}' agendada para {reactivation_date_str} por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Reativação agendada para {reactivation_date_str} por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': f"Reativação agendada para {reactivation_date.strftime('%d-%m-%Y')}."})
             
     except ValueError:
@@ -710,6 +717,7 @@ def api_cancel_absence(username):
             del disable_schedules[username_lower]
             save_disable_schedules(disable_schedules)
             logging.info(f"[AGENDAMENTO CANCELADO] A desativação futura de '{username}' foi cancelada por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Agendamento de desativação cancelado por '{session.get('user_display_name')}'")
             message += "Agendamento de desativação cancelado. "
         if reactivation_scheduled:
             del reactivation_schedules[username_lower]
@@ -721,6 +729,7 @@ def api_cancel_absence(username):
                 if uac & 2:
                     conn.modify(user.distinguishedName.value, {'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(uac - 2)])]})
                     logging.info(f"[ALTERAÇÃO] Conta de '{username}' foi reativada imediatamente devido ao cancelamento da ausência por '{session.get('user_display_name')}'.")
+                    save_to_history('activation', username, f"Conta reativada (ausência cancelada) por '{session.get('user_display_name')}'")
                     message += "Usuário foi reativado. "
                 else:
                     message += "Agendamento de reativação removido (usuário já estava ativo). "
@@ -753,6 +762,7 @@ def api_upload_photo(username):
         conn.modify(user.distinguishedName.value, {'thumbnailPhoto': [(ldap3.MODIFY_REPLACE, [jpeg_bytes])]})
         if conn.result['description'] == 'success':
             logging.info(f"[FOTO] Foto do usuário '{username}' atualizada por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Foto atualizada por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Foto atualizada com sucesso!'})
         else:
             raise Exception(f"Erro no LDAP: {conn.result['description']}")
@@ -784,6 +794,7 @@ def api_remove_photo(username):
         conn.modify(user.distinguishedName.value, {'thumbnailPhoto': [(ldap3.MODIFY_REPLACE, [])]})
         if conn.result['description'] == 'success':
             logging.info(f"[FOTO] Foto do usuário '{username}' removida por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', username, f"Foto removida por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Foto removida com sucesso!'})
         else:
             raise Exception(f"Erro no LDAP: {conn.result['description']}")
@@ -1046,6 +1057,8 @@ def api_move_object():
         
         if conn.result['description'] == 'success':
             logging.info(f"[MOVIMENTAÇÃO] Objeto '{object_dn}' movido para '{target_ou_dn}' por '{session.get('user_display_name')}'.")
+            name_val = rdn.split('=')[1] if '=' in rdn else rdn
+            save_to_history('movement', name_val, f"Objeto movido de '{object_dn}' para '{target_ou_dn}' por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Objeto movido com sucesso.'})
         else:
             return jsonify({'success': False, 'error': conn.result['description']}), 500
@@ -1075,6 +1088,7 @@ def api_toggle_object_status():
         
         if conn.result['description'] == 'success':
             logging.info(f"[ALTERAÇÃO] Conta '{sam or dn}' foi {action_message} por '{session.get('user_display_name')}'.")
+            save_to_history('deactivation' if action_message == 'desativada' else 'activation', sam or dn, f"Conta {action_message} via toggle por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': f"Conta {action_message} com sucesso."})
         else:
             return jsonify({'success': False, 'error': conn.result['description']}), 500
@@ -1106,7 +1120,7 @@ def api_restore_object():
         # Para restaurar, modificamos o isDeleted para FALSE e movemos para o lastKnownParent
         # Isso geralmente requer controles específicos e permissões elevadas.
         conn.modify(dn, {'isDeleted': [(MODIFY_REPLACE, [])]}, controls=[('1.2.840.113556.1.4.417', True)])
-        
+        save_to_history('activation', dn, f"Objeto restaurado da lixeira por '{session.get('user_display_name')}'")
         return jsonify({'success': True, 'message': 'Comando de restauração enviado.'})
     except Exception as e:
         logging.error(f"Erro ao restaurar objeto: {e}")
@@ -1129,6 +1143,7 @@ def api_delete_object():
         
         if conn.result['description'] == 'success':
             logging.info(f"[EXCLUSÃO] Objeto '{name or dn}' excluído por '{session.get('user_display_name')}'.")
+            save_to_history('exclusion', name or dn, f"Objeto excluído via API por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
         else:
             return jsonify({'success': False, 'error': conn.result['description']}), 500
@@ -1166,6 +1181,7 @@ def api_set_manager():
             return jsonify({'error': service_conn.result['description']}), 500
             
         logging.info(f"Gerente de '{user_sam}' definido como '{manager_sam}' por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', user_sam, f"Gerente definido como '{manager_sam}' por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Gerente atualizado com sucesso.'})
     except Exception as e:
         logging.error(f"Erro ao definir gerente: {e}")
@@ -1199,6 +1215,7 @@ def api_add_subordinate():
             return jsonify({'error': service_conn.result['description']}), 500
             
         logging.info(f"'{subordinate_sam}' definido como subordinado de '{manager_sam}' por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', subordinate_sam, f"Gerente definido como '{manager_sam}' (subordinado adicionado) por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Subordinado adicionado com sucesso.'})
     except Exception as e:
         logging.error(f"Erro ao adicionar subordinado: {e}")
@@ -1230,6 +1247,7 @@ def api_remove_subordinate():
             return jsonify({'error': service_conn.result['description']}), 500
             
         logging.info(f"Gerente de '{subordinate_sam}' removido por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', subordinate_sam, f"Gerente removido por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Subordinado removido com sucesso.'})
     except Exception as e:
         logging.error(f"Erro ao remover subordinado: {e}")
@@ -1297,6 +1315,7 @@ def api_add_alias(username):
             return jsonify({'error': conn.result['description']}), 500
             
         logging.info(f"[EXCHANGE] Alias '{new_alias}' adicionado para '{username}' por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', username, f"Alias '{new_alias}' adicionado para o usuário por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Alias adicionado com sucesso.'})
     except Exception as e:
         logging.error(f"Erro em api_add_alias: {e}")
@@ -1334,6 +1353,7 @@ def api_remove_alias(username):
             return jsonify({'error': conn.result['description']}), 500
             
         logging.info(f"[EXCHANGE] Alias '{alias_to_remove}' removido de '{username}' por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', username, f"Alias '{alias_to_remove}' removido por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Alias removido com sucesso.'})
     except Exception as e:
         logging.error(f"Erro em api_remove_alias: {e}")
@@ -1387,6 +1407,7 @@ def api_set_primary_alias(username):
             return jsonify({'error': conn.result['description']}), 500
             
         logging.info(f"[EXCHANGE] Email principal de '{username}' alterado para '{new_primary}' por '{session.get('user_display_name')}'.")
+        save_to_history('alteration', username, f"Email principal alterado para '{new_primary}' por '{session.get('user_display_name')}'")
         return jsonify({'message': 'Email principal alterado com sucesso.'})
     except Exception as e:
         logging.error(f"Erro em api_set_primary_alias: {e}")

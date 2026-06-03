@@ -352,7 +352,6 @@ def admin_logs():
 @require_permission(action='can_view_logs')
 def admin_history():
     history = load_history()
-    history.reverse()
     return render_template('admin/history.html', history=history[:500])
 
 @admin_bp.route('/admin/users')
