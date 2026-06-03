@@ -415,133 +415,136 @@ def api_dashboard_stats():
         'deactivated_last_week': 0,
         'pending_reactivations': 0,
         'pending_deactivations': 0,
-        'trends': []
+        'trends': [],
+        'expiring_passwords': []
     }
     try:
         conn = get_read_connection()
         config = load_config()
         search_base = config.get('AD_SEARCH_BASE')
         
-        # Estatísticas básicas com paginação (para lidar com ADs > 1000 usuários)
-        active_count = 0
-        disabled_count = 0
-        user_generator = conn.extend.standard.paged_search(
-            search_base=search_base,
-            search_filter='(&(objectClass=user)(objectCategory=person)(userPrincipalName=*))',
-            attributes=['userAccountControl'],
-            paged_size=1000,
-            generator=True
-        )
-        for entry in user_generator:
-            if 'attributes' in entry and 'userAccountControl' in entry['attributes']:
-                uac = entry['attributes']['userAccountControl']
-                if uac & 2:
-                    disabled_count += 1
-                else:
-                    active_count += 1
-
-        data['total_users'] = active_count + disabled_count
-        data['active_users'] = active_count
-        data['disabled_users'] = disabled_count
-        
-        group_count = 0
-        group_generator = conn.extend.standard.paged_search(
-            search_base=search_base,
-            search_filter='(objectClass=group)',
-            attributes=['cn'],
-            paged_size=1000,
-            generator=True
-        )
-        for _ in group_generator:
-            group_count += 1
-        data['total_groups'] = group_count
-
-        # Desativações na última semana
-        seven_days_ago = date.today() - timedelta(days=7)
-        # Tentativa via AD (filtro approximate)
-        ad_date_str = seven_days_ago.strftime('%Y%m%d%H%M%S.0Z')
-        search_filter = f"(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=2)(whenChanged>={ad_date_str}))"
-        conn.search(search_base, search_filter, attributes=['cn'])
-        data['deactivated_last_week'] = len(conn.entries)
-
-        # Agendamentos (Próximos 7 dias)
-        today = date.today()
-        limit_date = today + timedelta(days=7)
-        
-        reactivations_count = 0
-        for username, date_str in load_schedules().items():
-            try:
-                sch_date = date.fromisoformat(date_str)
-                if today <= sch_date < limit_date:
-                    reactivations_count += 1
-            except (ValueError, TypeError): continue
-        data['pending_reactivations'] = reactivations_count
-
-        deactivations_count = 0
-        for username, date_str in load_disable_schedules().items():
-            try:
-                sch_date = date.fromisoformat(date_str)
-                if today <= sch_date < limit_date:
-                    deactivations_count += 1
-            except (ValueError, TypeError): continue
-        data['pending_deactivations'] = deactivations_count
-
-        # Tendências (30 dias)
-        trends = {}
-        for i in range(30):
-            day = (today - timedelta(days=i)).isoformat()
-            trends[day] = 0
-            
-        history = load_history()
-        for entry in history:
-            if entry.get('action') == 'deactivation':
-                log_day = entry['timestamp'][:10]
-                if log_day in trends:
-                    trends[log_day] += 1
-        
-        data['trends'] = [{'date': d, 'count': c} for d, c in sorted(trends.items())]
-        
-        # Senhas expirando (próximos 15 dias)
-        expiring_list = []
-        try:
-            # Busca usuários ativos com msDS-UserPasswordExpiryTimeComputed
-            user_exp_generator = conn.extend.standard.paged_search(
-                search_base=search_base, 
-                search_filter='(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))', 
-                attributes=['cn', 'sAMAccountName', 'title', 'department', 'msDS-UserPasswordExpiryTimeComputed'],
+        # 1. Estatísticas básicas (can_view_user_stats)
+        if check_permission(view='can_view_user_stats'):
+            active_count = 0
+            disabled_count = 0
+            user_generator = conn.extend.standard.paged_search(
+                search_base=search_base,
+                search_filter='(&(objectClass=user)(objectCategory=person)(userPrincipalName=*))',
+                attributes=['userAccountControl'],
                 paged_size=1000,
                 generator=True
             )
+            for entry in user_generator:
+                if 'attributes' in entry and 'userAccountControl' in entry['attributes']:
+                    uac = entry['attributes']['userAccountControl']
+                    if uac & 2:
+                        disabled_count += 1
+                    else:
+                        active_count += 1
+
+            data['total_users'] = active_count + disabled_count
+            data['active_users'] = active_count
+            data['disabled_users'] = disabled_count
             
-            from datetime import datetime, timezone
-            now = datetime.now(timezone.utc)
-            
-            for entry in user_exp_generator:
-                attrs = entry.get('attributes', {})
-                if not attrs: continue
+            group_count = 0
+            group_generator = conn.extend.standard.paged_search(
+                search_base=search_base,
+                search_filter='(objectClass=group)',
+                attributes=['cn'],
+                paged_size=1000,
+                generator=True
+            )
+            for _ in group_generator:
+                group_count += 1
+            data['total_groups'] = group_count
+
+        # 2. Desativações na última semana e tendências (can_view_deactivated_last_week)
+        if check_permission(view='can_view_deactivated_last_week'):
+            seven_days_ago = date.today() - timedelta(days=7)
+            ad_date_str = seven_days_ago.strftime('%Y%m%d%H%M%S.0Z')
+            search_filter = f"(&(objectClass=user)(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=2)(whenChanged>={ad_date_str}))"
+            conn.search(search_base, search_filter, attributes=['cn'])
+            data['deactivated_last_week'] = len(conn.entries)
+
+            # Tendências (30 dias)
+            trends = {}
+            today = date.today()
+            for i in range(30):
+                day = (today - timedelta(days=i)).isoformat()
+                trends[day] = 0
                 
-                expiry_ft = attrs.get('msDS-UserPasswordExpiryTimeComputed')
-                if expiry_ft and expiry_ft > 0 and expiry_ft != 9223372036854775807:
-                    expiry_dt = filetime_to_datetime(expiry_ft)
-                    if expiry_dt:
-                        diff = expiry_dt - now
-                        days = diff.days
-                        if 0 <= days <= 15:
-                            expiring_list.append({
-                                'cn': attrs.get('cn') if attrs.get('cn') else attrs.get('sAMAccountName'),
-                                'sam': attrs.get('sAMAccountName'),
-                                'title': attrs.get('title') if attrs.get('title') else '',
-                                'department': attrs.get('department') if attrs.get('department') else '',
-                                'expires_in_days': max(0, days)
-                            })
+            history = load_history()
+            for entry in history:
+                if entry.get('action') == 'deactivation':
+                    log_day = entry['timestamp'][:10]
+                    if log_day in trends:
+                        trends[log_day] += 1
             
-            # Ordena por urgência
-            expiring_list.sort(key=lambda x: x['expires_in_days'])
-            data['expiring_passwords'] = expiring_list
-            
-        except Exception as e:
-            logging.error(f"Erro ao buscar senhas expirando: {e}", exc_info=True)
-            data['expiring_passwords'] = []
+            data['trends'] = [{'date': d, 'count': c} for d, c in sorted(trends.items())]
+
+        # 3. Agendamentos de reativação (can_view_pending_reactivations)
+        today = date.today()
+        limit_date = today + timedelta(days=7)
+        if check_permission(view='can_view_pending_reactivations'):
+            reactivations_count = 0
+            for username, date_str in load_schedules().items():
+                try:
+                    sch_date = date.fromisoformat(date_str)
+                    if today <= sch_date < limit_date:
+                        reactivations_count += 1
+                except (ValueError, TypeError): continue
+            data['pending_reactivations'] = reactivations_count
+
+        # 4. Agendamentos de desativação (can_view_pending_deactivations)
+        if check_permission(view='can_view_pending_deactivations'):
+            deactivations_count = 0
+            for username, date_str in load_disable_schedules().items():
+                try:
+                    sch_date = date.fromisoformat(date_str)
+                    if today <= sch_date < limit_date:
+                        deactivations_count += 1
+                except (ValueError, TypeError): continue
+            data['pending_deactivations'] = deactivations_count
+
+        # 5. Senhas expirando (can_view_expiring_passwords)
+        if check_permission(view='can_view_expiring_passwords'):
+            expiring_list = []
+            try:
+                user_exp_generator = conn.extend.standard.paged_search(
+                    search_base=search_base, 
+                    search_filter='(&(objectClass=user)(objectCategory=person)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))', 
+                    attributes=['cn', 'sAMAccountName', 'title', 'department', 'msDS-UserPasswordExpiryTimeComputed'],
+                    paged_size=1000,
+                    generator=True
+                )
+                
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc)
+                
+                for entry in user_exp_generator:
+                    attrs = entry.get('attributes', {})
+                    if not attrs: continue
+                    
+                    expiry_ft = attrs.get('msDS-UserPasswordExpiryTimeComputed')
+                    if expiry_ft and expiry_ft > 0 and expiry_ft != 9223372036854775807:
+                        expiry_dt = filetime_to_datetime(expiry_ft)
+                        if expiry_dt:
+                            diff = expiry_dt - now
+                            days = diff.days
+                            if 0 <= days <= 15:
+                                expiring_list.append({
+                                    'cn': attrs.get('cn') if attrs.get('cn') else attrs.get('sAMAccountName'),
+                                    'sam': attrs.get('sAMAccountName'),
+                                    'title': attrs.get('title') if attrs.get('title') else '',
+                                    'department': attrs.get('department') if attrs.get('department') else '',
+                                    'expires_in_days': max(0, days)
+                                })
+                
+                expiring_list.sort(key=lambda x: x['expires_in_days'])
+                data['expiring_passwords'] = expiring_list
+            except Exception as e:
+                logging.error(f"Erro ao buscar senhas expirando: {e}", exc_info=True)
+                data['expiring_passwords'] = []
 
         return jsonify(data)
     except Exception as e:

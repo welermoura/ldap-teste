@@ -16,6 +16,7 @@
 </form>
 
 <!-- Dashboard Analytics Section -->
+{% if check_permission(view='can_view_user_stats') %}
 <div class="row g-4 mb-4 animate-in" style="animation-delay: 0.1s;">
     <div class="col-lg-8">
         <div class="card glass-card h-100 collapsible-widget" id="widget-contas">
@@ -54,8 +55,10 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Trend Chart Row -->
+{% if check_permission(view='can_view_deactivated_last_week') %}
 <div class="row mb-4 animate-in" style="animation-delay: 0.15s;">
     <div class="col-12">
         <div class="card glass-card collapsible-widget" id="widget-tendencia">
@@ -76,6 +79,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="row row-cols-1 row-cols-md-2 row-cols-lg-5 g-4 justify-content-center mb-4 animate-in" style="animation-delay: 0.2s;">
     {% if check_permission(view='can_view_user_stats') %}
@@ -439,89 +443,94 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredData = [];
 
     function initCharts(data) {
-        const ctxMain = document.getElementById('mainStatsChart').getContext('2d');
-        const ctxDoughnut = document.getElementById('statusDoughnutChart').getContext('2d');
-        
         const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
         const textColor = isDark ? '#94a3b8' : '#64748b';
         const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
         // Gráfico de Barras Principal
-        mainChart = new Chart(ctxMain, {
-            type: 'bar',
-            data: {
-                labels: ['Ativas', 'Desativadas', 'Desat. Semana', 'Reat. Pendentes', 'Desat. Pendentes'],
-                datasets: [{
-                    label: 'Quantidade de Contas',
-                    data: [
-                        data.active_users, 
-                        data.disabled_users, 
-                        data.deactivated_last_week, 
-                        data.pending_reactivations, 
-                        data.pending_deactivations
-                    ],
-                    backgroundColor: [
-                        '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#64748b'
-                    ],
-                    borderRadius: 8,
-                    barThickness: 40
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        padding: 12,
-                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
-                        titleColor: isDark ? '#ffffff' : '#0f172a',
-                        bodyColor: isDark ? '#94a3b8' : '#64748b',
-                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                        borderWidth: 1
-                    }
+        const canvasMain = document.getElementById('mainStatsChart');
+        if (canvasMain) {
+            const ctxMain = canvasMain.getContext('2d');
+            mainChart = new Chart(ctxMain, {
+                type: 'bar',
+                data: {
+                    labels: ['Ativas', 'Desativadas', 'Desat. Semana', 'Reat. Pendentes', 'Desat. Pendentes'],
+                    datasets: [{
+                        label: 'Quantidade de Contas',
+                        data: [
+                            data.active_users, 
+                            data.disabled_users, 
+                            data.deactivated_last_week, 
+                            data.pending_reactivations, 
+                            data.pending_deactivations
+                        ],
+                        backgroundColor: [
+                            '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#64748b'
+                        ],
+                        borderRadius: 8,
+                        barThickness: 40
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: gridColor },
-                        ticks: { color: textColor }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            padding: 12,
+                            backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                            titleColor: isDark ? '#ffffff' : '#0f172a',
+                            bodyColor: isDark ? '#94a3b8' : '#64748b',
+                            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                            borderWidth: 1
+                        }
                     },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: textColor }
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: gridColor },
+                            ticks: { color: textColor }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
 
         // Gráfico de Rosca (Status Global)
-        doughnutChart = new Chart(ctxDoughnut, {
-            type: 'doughnut',
-            data: {
-                labels: ['Ativas', 'Desativadas'],
-                datasets: [{
-                    data: [data.active_users, data.disabled_users],
-                    backgroundColor: ['#10b981', '#f59e0b'],
-                    borderWidth: 0,
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%',
-                plugins: {
-                    legend: { display: false }
+        const canvasDoughnut = document.getElementById('statusDoughnutChart');
+        if (canvasDoughnut) {
+            const ctxDoughnut = canvasDoughnut.getContext('2d');
+            doughnutChart = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ativas', 'Desativadas'],
+                    datasets: [{
+                        data: [data.active_users, data.disabled_users],
+                        backgroundColor: ['#10b981', '#f59e0b'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false }
+                    }
                 }
-            }
-        });
+            });
+        }
 
         // Legenda customizada
         const legendContainer = document.getElementById('chart-legend');
-        const total = data.active_users + data.disabled_users;
-        const activePercent = total > 0 ? Math.round((data.active_users / total) * 100) : 0;
         if (legendContainer) {
+            const total = data.active_users + data.disabled_users;
+            const activePercent = total > 0 ? Math.round((data.active_users / total) * 100) : 0;
             legendContainer.innerHTML = `
                 <div class="d-flex justify-content-center gap-3">
                     <span><i class="fas fa-circle text-success me-1"></i> Ativas (${activePercent}%)</span>
@@ -531,8 +540,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Gráfico de Tendência (Novo)
-        if (data.trends && data.trends.length > 0) {
-            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+        const canvasTrend = document.getElementById('trendChart');
+        if (canvasTrend && data.trends && data.trends.length > 0) {
+            const ctxTrend = canvasTrend.getContext('2d');
             const trendChart = new Chart(ctxTrend, {
                 type: 'line',
                 data: {

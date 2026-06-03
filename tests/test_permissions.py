@@ -62,3 +62,41 @@ def test_load_permissions_normalization(mocker):
     assert result["GroupNone"]["actions"] == {}
     assert isinstance(result["GroupNone"]["views"], dict)
     assert result["GroupNone"]["views"] == {}
+
+def test_api_dashboard_stats_permissions(client, mocker):
+    # Mock AD/DB helpers so we don't hit external services
+    mocker.patch('routes.admin.get_read_connection')
+    mocker.patch('routes.admin.load_config', return_value={})
+    
+    # Mock paged search generator to return dummy data for active/disabled users
+    mock_conn = mocker.patch('routes.admin.get_read_connection').return_value
+    mock_conn.extend.standard.paged_search.return_value = [
+        {'attributes': {'userAccountControl': 512}}, # active
+        {'attributes': {'userAccountControl': 514}}  # disabled
+    ]
+    
+    # We set session variables for authentication
+    with client.session_transaction() as sess:
+        sess['ad_user'] = 'test_user'
+        sess['access_level'] = 'custom'
+        sess['user_groups'] = ['TestGroup']
+
+    # Scenario 1: User has 'can_view_user_stats' but NOT 'can_view_deactivated_last_week'
+    def mock_check_permission(action=None, field=None, view=None):
+        if view == 'can_view_user_stats':
+            return True
+        return False
+        
+    mocker.patch('routes.admin.check_permission', side_effect=mock_check_permission)
+    
+    response = client.get('/api/dashboard/stats')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    
+    # Verify user stats are present
+    assert data['active_users'] == 1
+    assert data['disabled_users'] == 1
+    
+    # Verify deactivated last week and trends are empty/0 because we lack permission
+    assert data['deactivated_last_week'] == 0
+    assert data['trends'] == []
