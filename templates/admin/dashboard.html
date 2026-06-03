@@ -9,7 +9,7 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_config') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-server fa-3x mb-3"></i>
+                <i class="fas fa-server fa-3x mb-3 text-info"></i>
                 <h5 class="card-title">Configurações Gerais</h5>
                 <p class="card-text text-muted">Configurar servidor AD, domínio, conta de serviço e outras opções.</p>
             </div>
@@ -18,7 +18,7 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_permissions') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-user-shield fa-3x mb-3"></i>
+                <i class="fas fa-user-shield fa-3x mb-3 text-success"></i>
                 <h5 class="card-title">Permissões de Grupo</h5>
                 <p class="card-text text-muted">Definir quais ações os grupos de operadores podem acessar.</p>
             </div>
@@ -27,16 +27,16 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_logs') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-terminal fa-3x mb-3"></i>
+                <i class="fas fa-terminal fa-3x mb-3 text-danger"></i>
                 <h5 class="card-title">Logs do Sistema</h5>
-                <p class="card-text text-muted">Acompanhe os logs técnicos do servidor em tempo real.</p>
+                <p class="card-text text-muted">Acompanhe os logs técnicos do server em tempo real.</p>
             </div>
         </a>
     </div>
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_history') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-history fa-3x mb-3"></i>
+                <i class="fas fa-history fa-3x mb-3 text-primary"></i>
                 <h5 class="card-title">Histórico de Ações</h5>
                 <p class="card-text text-muted">Histórico simplificado de criações e alterações de usuários.</p>
             </div>
@@ -45,7 +45,7 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_change_password') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-key fa-3x mb-3"></i>
+                <i class="fas fa-key fa-3x mb-3 icon-purple"></i>
                 <h5 class="card-title">Alterar Senha do Admin</h5>
                 <p class="card-text text-muted">Altere a senha de acesso a este painel de administração.</p>
             </div>
@@ -54,7 +54,7 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_appearance') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-paint-brush fa-3x mb-3"></i>
+                <i class="fas fa-paint-brush fa-3x mb-3 icon-pink"></i>
                 <h5 class="card-title">Aparência Organograma</h5>
                 <p class="card-text text-muted">Personalize cores, logo e imagem de fundo do organograma público.</p>
             </div>
@@ -63,7 +63,7 @@
     <div class="col-md-6 mb-4">
         <a href="{{ url_for('admin.admin_users') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
             <div class="card-body text-center">
-                <i class="fas fa-users-cog fa-3x mb-3"></i>
+                <i class="fas fa-users-cog fa-3x mb-3 icon-teal"></i>
                 <h5 class="card-title">Administradores Locais</h5>
                 <p class="card-text text-muted">Gerencie quem pode acessar este painel de administração.</p>
             </div>
@@ -81,8 +81,29 @@
 </div>
 {% block styles %}
 <style>
+    .dashboard-card i.text-info {
+        color: var(--info-color) !important;
+    }
+    .dashboard-card i.text-success {
+        color: var(--success-color) !important;
+    }
+    .dashboard-card i.text-danger {
+        color: var(--danger-color) !important;
+    }
+    .dashboard-card i.text-primary {
+        color: var(--primary-color) !important;
+    }
     .dashboard-card i.text-warning {
-        color: #f59e0b !important;
+        color: var(--warning-color) !important;
+    }
+    .dashboard-card i.icon-purple {
+        color: #a855f7 !important;
+    }
+    .dashboard-card i.icon-pink {
+        color: #ec4899 !important;
+    }
+    .dashboard-card i.icon-teal {
+        color: #14b8a6 !important;
     }
 </style>
 {% endblock %}
