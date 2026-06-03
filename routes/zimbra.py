@@ -1,12 +1,18 @@
 import os
 import json
 import logging
-from flask import Blueprint, render_template, request, jsonify, session
+from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for
 from routes.utils import require_auth, require_permission, get_read_connection
 from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails, save_to_history
 from routes.zimbra_api import ZimbraSOAPClient
 
 zimbra_bp = Blueprint('zimbra', __name__)
+
+@zimbra_bp.before_request
+def restrict_zimbra_blueprint():
+    if not session.get('is_admin'):
+        flash('Acesso negado. Apenas administradores podem acessar a Integração Zimbra.', 'error')
+        return redirect(url_for('main.dashboard'))
 
 ZIMBRA_MAPPINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/zimbra_mappings.json')
 

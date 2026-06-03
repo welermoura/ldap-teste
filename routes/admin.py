@@ -28,6 +28,23 @@ from ldap3 import SUBTREE, MODIFY_REPLACE
 
 admin_bp = Blueprint('admin', __name__)
 
+@admin_bp.before_request
+def restrict_admin_blueprint():
+    exempt_endpoints = [
+        'admin.admin_login', 
+        'admin.admin_logout', 
+        'admin.admin_register',
+        'admin.api_dashboard_stats',
+        'admin.api_dashboard_list',
+        'admin.api_ous'
+    ]
+    if request.endpoint in exempt_endpoints:
+        return
+        
+    if not session.get('is_admin'):
+        flash('Acesso negado. Apenas administradores cadastrados podem acessar o Painel Admin.', 'error')
+        return redirect(url_for('main.dashboard'))
+
 @admin_bp.route('/admin/login')
 def admin_login():
     # Redireciona para o login único do sistema
@@ -230,7 +247,7 @@ def admin_permissions():
 
                 if perm_type == 'custom':
                     # Ações
-                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange', 'can_manage_schedules', 'can_manage_zimbra']
+                    actions = ['can_create', 'can_edit', 'can_disable', 'can_reset_password', 'can_manage_groups', 'can_move_user', 'can_delete_user', 'can_manage_exchange', 'can_manage_schedules']
                     for action in actions:
                         new_permissions[group]["actions"][action] = (request.form.get(f"{group}_{action}") == 'on')
                     

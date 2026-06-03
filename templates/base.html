@@ -50,7 +50,7 @@
             </a>
 
             {# Seção de Administração Unificada #}
-            {% if session.get('is_admin') or check_permission(action='can_edit') or check_permission(action='can_disable') or check_permission(action='can_create') or check_permission(action='can_manage_groups') or check_permission(action='can_manage_zimbra') %}
+            {% if session.get('is_admin') or check_permission(action='can_edit') or check_permission(action='can_disable') or check_permission(action='can_create') or check_permission(action='can_manage_groups') %}
             <div class="sidebar-divider mt-4 mb-2"></div>
             <div class="sidebar-header small text-uppercase opacity-50 px-3 mb-2">Administração</div>
             
@@ -75,11 +75,6 @@
             {% if check_permission(action='can_manage_groups') %}
             <a href="{{ url_for('groups.group_management') }}" class="sidebar-link {% if request.endpoint == 'groups.group_management' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Gerenciar Grupos">
                 <i class="fas fa-layer-group"></i><span class="nav-label">Gerenciar Grupos</span>
-            </a>
-            {% endif %}
-            {% if check_permission(action='can_manage_zimbra') %}
-            <a href="{{ url_for('zimbra.config_page') }}" class="sidebar-link {% if request.endpoint == 'zimbra.config_page' %}active-page{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Integração Zimbra">
-                <i class="fas fa-envelope-open-text"></i><span class="nav-label">Integração Zimbra</span>
             </a>
             {% endif %}
             {% endif %}

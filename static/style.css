@@ -626,3 +626,18 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-avatar {
     font-size: 14px !important; /* Fix sidebar avatar too */
 }
+
+/* Table Header and Table Dark Mode Theming */
+[data-bs-theme="dark"] .table-light {
+    --bs-table-bg: rgba(255, 255, 255, 0.04) !important;
+    --bs-table-color: var(--text-color) !important;
+    border-color: var(--glass-border-color) !important;
+}
+
+[data-bs-theme="dark"] .table {
+    --bs-table-color: var(--text-color) !important;
+    --bs-table-hover-color: var(--text-color) !important;
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.02) !important;
+    border-color: var(--glass-border-color) !important;
+}
+

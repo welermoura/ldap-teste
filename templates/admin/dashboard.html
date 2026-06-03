@@ -69,5 +69,21 @@
             </div>
         </a>
     </div>
+    <div class="col-md-6 mb-4">
+        <a href="{{ url_for('zimbra.config_page') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+            <div class="card-body text-center">
+                <i class="fas fa-envelope-open-text fa-3x mb-3 text-warning"></i>
+                <h5 class="card-title">Integração Zimbra</h5>
+                <p class="card-text text-muted">Mapeamento de grupos de distribuição e sincronização com o Zimbra.</p>
+            </div>
+        </a>
+    </div>
 </div>
+{% block styles %}
+<style>
+    .dashboard-card i.text-warning {
+        color: #f59e0b !important;
+    }
+</style>
+{% endblock %}
 {% endblock %}
