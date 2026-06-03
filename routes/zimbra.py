@@ -580,11 +580,16 @@ def api_get_auto_matches():
         matched_ad_groups = set()
         matched_zimbra_dls = set()
         
-        for group in ad_groups:
+        # Filtra grupos e DLs que já possuem mapeamento ativo para que não poluam os matches e discrepâncias
+        ad_groups_unmapped = [g for g in ad_groups if g['name'] not in mapped_ad_groups]
+        mapped_zimbra_dls_in_rules = {m['zimbra_dl_email'] for m in mappings}
+        zimbra_dls_unmapped = [dl for dl in zimbra_dls if dl['name'] not in mapped_zimbra_dls_in_rules]
+        
+        for group in ad_groups_unmapped:
             if not group['emails']:
                 continue
                 
-            for dl in zimbra_dls:
+            for dl in zimbra_dls_unmapped:
                 # E-mails da DL: o e-mail principal + todos os apelidos (aliases)
                 dl_emails = [dl['name'].lower()] + [a.lower() for a in dl.get('aliases', [])]
                 
@@ -609,7 +614,7 @@ def api_get_auto_matches():
                         'zimbra_dl_email': dl['name'],
                         'zimbra_matching_email': match_evidence_zimbra,
                         'zimbra_member_count': dl_member_counts.get(dl['name'], 0),
-                        'already_mapped': group['name'] in mapped_ad_groups
+                        'already_mapped': False
                     })
                     matched_ad_groups.add(group['name'])
                     matched_zimbra_dls.add(dl['name'])
@@ -617,26 +622,23 @@ def api_get_auto_matches():
                     
         # 5. Calcula discrepâncias (apenas AD / apenas Zimbra)
         only_in_ad = []
-        for group in ad_groups:
+        for group in ad_groups_unmapped:
             if group['name'] not in matched_ad_groups:
-                already_mapped = group['name'] in mapped_ad_groups
                 only_in_ad.append({
                     'name': group['name'],
                     'emails': group['emails'],
                     'member_count': group.get('member_count', 0),
-                    'already_mapped': already_mapped
+                    'already_mapped': False
                 })
                 
         only_in_zimbra = []
-        mapped_zimbra_dls_in_rules = {m['zimbra_dl_email'] for m in mappings}
-        for dl in zimbra_dls:
+        for dl in zimbra_dls_unmapped:
             if dl['name'] not in matched_zimbra_dls:
-                already_mapped = dl['name'] in mapped_zimbra_dls_in_rules
                 only_in_zimbra.append({
                     'name': dl['name'],
                     'aliases': dl.get('aliases', []),
                     'member_count': dl_member_counts.get(dl['name'], 0),
-                    'already_mapped': already_mapped
+                    'already_mapped': False
                 })
 
         # Ordenações
