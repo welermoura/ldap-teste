@@ -278,14 +278,14 @@
                                                 <td>
                                                     <div class="d-flex flex-column">
                                                         <strong class="text-primary">{{ m.ad_group_name or m['ad_group_name'] }}</strong>
-                                                        <span class="text-muted small"><i class="fas fa-users me-1"></i>{{ m.ad_member_count if m.ad_member_count is defined else '-' }} membros no AD</span>
+                                                        <span class="text-muted small ad-count-label" data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}"><i class="fas fa-users me-1"></i><span class="count-val"><i class="fas fa-spinner fa-spin text-muted opacity-50 small"></i></span> membros no AD</span>
                                                     </div>
                                                 </td>
                                                 <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
                                                 <td>
                                                     <div class="d-flex flex-column">
                                                         <span class="theme-code-text fw-bold text-light">{{ m.zimbra_dl_email or m['zimbra_dl_email'] }}</span>
-                                                        <span class="text-muted small"><i class="fas fa-users me-1"></i>{{ m.zimbra_member_count if m.zimbra_member_count is defined else '-' }} membros no Zimbra</span>
+                                                        <span class="text-muted small zimbra-count-label" data-ad-group="{{ m.ad_group_name or m['ad_group_name'] }}"><i class="fas fa-users me-1"></i><span class="count-val"><i class="fas fa-spinner fa-spin text-muted opacity-50 small"></i></span> membros no Zimbra</span>
                                                     </div>
                                                 </td>
                                                 <td class="text-end pe-3">
@@ -707,7 +707,7 @@ document.addEventListener('DOMContentLoaded', function() {
             existingRow.cells[2].innerHTML = `
                 <div class="d-flex flex-column">
                     <span class="theme-code-text fw-bold text-light">${dlEmail}</span>
-                    <span class="text-muted small"><i class="fas fa-users me-1"></i>${zimCount} membros no Zimbra</span>
+                    <span class="text-muted small zimbra-count-label" data-ad-group="${adGroup}"><i class="fas fa-users me-1"></i><span class="count-val">${zimCount}</span> membros no Zimbra</span>
                 </div>
             `;
         } else {
@@ -720,14 +720,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>
                     <div class="d-flex flex-column">
                         <strong class="text-primary">${adGroup}</strong>
-                        <span class="text-muted small"><i class="fas fa-users me-1"></i>${adCount} membros no AD</span>
+                        <span class="text-muted small ad-count-label" data-ad-group="${adGroup}"><i class="fas fa-users me-1"></i><span class="count-val">${adCount}</span> membros no AD</span>
                     </div>
                 </td>
                 <td class="text-muted text-center"><i class="fas fa-arrow-right"></i></td>
                 <td>
                     <div class="d-flex flex-column">
                         <span class="theme-code-text fw-bold text-light">${dlEmail}</span>
-                        <span class="text-muted small"><i class="fas fa-users me-1"></i>${zimCount} membros no Zimbra</span>
+                        <span class="text-muted small zimbra-count-label" data-ad-group="${adGroup}"><i class="fas fa-users me-1"></i><span class="count-val">${zimCount}</span> membros no Zimbra</span>
                     </div>
                 </td>
                 <td class="text-end pe-3">
@@ -1091,14 +1091,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualiza dinamicamente os contadores na linha correspondente da tabela
                 const row = syncBtn.closest('tr');
                 if (row && result.ad_member_count !== undefined && result.zimbra_member_count !== undefined) {
-                    const adSpan = row.querySelector('td:first-child span.text-muted');
-                    if (adSpan) {
-                        adSpan.innerHTML = `<i class="fas fa-users me-1"></i>${result.ad_member_count} membros no AD`;
-                    }
-                    const zimbraSpan = row.querySelector('td:nth-child(3) span.text-muted');
-                    if (zimbraSpan) {
-                        zimbraSpan.innerHTML = `<i class="fas fa-users me-1"></i>${result.zimbra_member_count} membros no Zimbra`;
-                    }
+                    const adCountVal = row.querySelector('.ad-count-label .count-val');
+                    if (adCountVal) adCountVal.textContent = result.ad_member_count;
+                    const zimbraCountVal = row.querySelector('.zimbra-count-label .count-val');
+                    if (zimbraCountVal) zimbraCountVal.textContent = result.zimbra_member_count;
                 }
                 
             } catch (error) {
@@ -1159,6 +1155,34 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Carrega contagens de membros de forma assíncrona após abrir a página
+    async function loadMappingCounts() {
+        try {
+            const response = await fetch('/api/zimbra/mapping_counts');
+            if (!response.ok) throw new Error('Erro ao carregar contagens');
+            const data = await response.json();
+            if (data.success && data.counts) {
+                Object.keys(data.counts).forEach(adGroup => {
+                    const info = data.counts[adGroup];
+                    const adLabel = document.querySelector(`.ad-count-label[data-ad-group="${adGroup}"] .count-val`);
+                    if (adLabel) adLabel.textContent = info.ad_member_count;
+                    const zimLabel = document.querySelector(`.zimbra-count-label[data-ad-group="${adGroup}"] .count-val`);
+                    if (zimLabel) zimLabel.textContent = info.zimbra_member_count;
+                });
+            }
+        } catch (error) {
+            console.error('Erro ao carregar contagens de membros:', error);
+            // Fallback para '-' caso falhe a chamada
+            document.querySelectorAll('.ad-count-label .count-val').forEach(el => {
+                if (el.innerHTML.includes('fa-spinner')) el.textContent = '-';
+            });
+            document.querySelectorAll('.zimbra-count-label .count-val').forEach(el => {
+                if (el.innerHTML.includes('fa-spinner')) el.textContent = '-';
+            });
+        }
+    }
+    loadMappingCounts();
 });
 </script>
 {% endblock %}

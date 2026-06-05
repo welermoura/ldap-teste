@@ -109,41 +109,9 @@ def config_page():
             client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
             domains = client.get_domains()
             connection_ok = True
+                  # As contagens de membros agora são carregadas de forma assíncrona via AJAX
+            pass
             
-            # Se a conexão estiver OK, carregamos a quantidade de membros de cada regra
-            if mappings:
-                from concurrent.futures import ThreadPoolExecutor
-                conn = get_service_account_connection()
-                
-                def fetch_mapping_counts(m_item):
-                    ad_group = m_item.get('ad_group_name')
-                    dl_email = m_item.get('zimbra_dl_email')
-                    ad_count = '-'
-                    zim_count = '-'
-                    
-                    if ad_group:
-                        try:
-                            ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
-                            if ad_group_obj:
-                                ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
-                                ad_count = len(ad_emails)
-                        except Exception as e_ad:
-                            logging.error(f"Erro ao contar membros do AD para o grupo '{ad_group}': {e_ad}")
-                            
-                    if dl_email:
-                        try:
-                            dl_info = client.get_dl_members(dl_email)
-                            zim_count = len(dl_info.get('members', []))
-                        except Exception as e_zim:
-                            logging.error(f"Erro ao contar membros do Zimbra para a lista '{dl_email}': {e_zim}")
-                            
-                    m_item['ad_member_count'] = ad_count
-                    m_item['zimbra_member_count'] = zim_count
-                    return m_item
-                
-                with ThreadPoolExecutor(max_workers=20) as executor:
-                    mappings = list(executor.map(fetch_mapping_counts, mappings))
-                    
         except Exception as e:
             error_message = str(e)
             
@@ -158,7 +126,64 @@ def config_page():
         error_message=error_message
     )
 
-@zimbra_bp.route('/api/zimbra/save_config', methods=['POST'])
+
+@zimbra_bp.route('/api/zimbra/mapping_counts', methods=['GET'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_get_mapping_counts():
+    try:
+        config = load_config()
+        mappings = load_zimbra_mappings()
+        
+        zimbra_url = config.get('ZIMBRA_API_URL', '')
+        zimbra_user = config.get('ZIMBRA_ADMIN_USER', '')
+        zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD', '')
+        
+        counts = {}
+        if zimbra_url and zimbra_user and mappings:
+            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+            conn = get_service_account_connection()
+            
+            def fetch_counts(m_item):
+                ad_group = m_item.get('ad_group_name')
+                dl_email = m_item.get('zimbra_dl_email')
+                ad_count = '-'
+                zim_count = '-'
+                
+                if ad_group:
+                    try:
+                        ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
+                        if ad_group_obj:
+                            ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
+                            ad_count = len(ad_emails)
+                    except Exception as e_ad:
+                        logging.error(f"Erro ao contar membros do AD para o grupo '{ad_group}': {e_ad}")
+                        
+                if dl_email:
+                    try:
+                        dl_info = client.get_dl_members(dl_email)
+                        zim_count = len(dl_info.get('members', []))
+                    except Exception as e_zim:
+                        logging.error(f"Erro ao contar membros do Zimbra para a lista '{dl_email}': {e_zim}")
+                        
+                return ad_group, ad_count, zim_count
+                
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=30) as executor:
+                results = executor.map(fetch_counts, mappings)
+                for ad_group, ad_count, zim_count in results:
+                    counts[ad_group] = {
+                        'ad_member_count': ad_count,
+                        'zimbra_member_count': zim_count
+                    }
+                    
+        return jsonify({'success': True, 'counts': counts})
+    except Exception as e:
+        logging.error(f"Erro ao carregar contagens de mapeamento: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@zimbra_bp.route('/api/zimbra/save_config', methods=['POST'])'POST'])
 @require_auth
 @require_permission(action='can_manage_zimbra')
 def api_save_config():
@@ -603,23 +628,6 @@ def api_get_auto_matches():
         client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
         zimbra_dls = client.get_all_dls() # retorna [{'name': name, 'id': id, 'aliases': [...]}]
         
-        # Busca o número de membros de cada DL do Zimbra de forma paralela (muito mais rápido!)
-        dl_member_counts = {}
-        from concurrent.futures import ThreadPoolExecutor
-        
-        def fetch_dl_member_count(dl):
-            try:
-                dl_info = client.get_dl_members(dl['name'])
-                return dl['name'], len(dl_info.get('members', []))
-            except Exception as e:
-                logging.error(f"Erro ao carregar membros da DL '{dl['name']}': {e}")
-                return dl['name'], 0
-                
-        with ThreadPoolExecutor(max_workers=50) as executor:
-            results = executor.map(fetch_dl_member_count, zimbra_dls)
-            for name, count in results:
-                dl_member_counts[name] = count
-        
         # 4. Executa a engine de auto-cruzamento (Auto-Match)
         matches = []
         matched_ad_groups = set()
@@ -658,7 +666,7 @@ def api_get_auto_matches():
                         'ad_member_count': group.get('member_count', 0),
                         'zimbra_dl_email': dl['name'],
                         'zimbra_matching_email': match_evidence_zimbra,
-                        'zimbra_member_count': dl_member_counts.get(dl['name'], 0),
+                        'zimbra_member_count': 0,  # será atualizado
                         'already_mapped': False
                     })
                     matched_ad_groups.add(group['name'])
@@ -682,9 +690,39 @@ def api_get_auto_matches():
                 only_in_zimbra.append({
                     'name': dl['name'],
                     'aliases': dl.get('aliases', []),
-                    'member_count': dl_member_counts.get(dl['name'], 0),
+                    'member_count': 0,  # será atualizado
                     'already_mapped': False
                 })
+
+        # 6. Busca o número de membros APENAS das DLs que estão nos matches ou apenas no Zimbra
+        dls_needing_counts = set()
+        for m in matches:
+            dls_needing_counts.add(m['zimbra_dl_email'])
+        for o in only_in_zimbra:
+            dls_needing_counts.add(o['name'])
+            
+        dl_member_counts = {}
+        if dls_needing_counts:
+            from concurrent.futures import ThreadPoolExecutor
+            
+            def fetch_dl_member_count(dl_name):
+                try:
+                    dl_info = client.get_dl_members(dl_name)
+                    return dl_name, len(dl_info.get('members', []))
+                except Exception as e:
+                    logging.error(f"Erro ao carregar membros da DL '{dl_name}': {e}")
+                    return dl_name, 0
+                    
+            with ThreadPoolExecutor(max_workers=30) as executor:
+                results = executor.map(fetch_dl_member_count, dls_needing_counts)
+                for name, count in results:
+                    dl_member_counts[name] = count
+                    
+        # 7. Atualiza as contagens nas listas finais
+        for m in matches:
+            m['zimbra_member_count'] = dl_member_counts.get(m['zimbra_dl_email'], 0)
+        for o in only_in_zimbra:
+            o['member_count'] = dl_member_counts.get(o['name'], 0)
 
         # Ordenações
         matches_sorted = sorted(matches, key=lambda m: m['ad_group_name'].lower())
