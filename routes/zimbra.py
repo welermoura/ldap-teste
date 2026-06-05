@@ -3,7 +3,7 @@ import json
 import logging
 from flask import Blueprint, render_template, request, jsonify, session, flash, redirect, url_for
 from routes.utils import require_auth, require_permission, get_read_connection
-from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails, save_to_history
+from common import load_config, save_config, get_service_account_connection, get_group_by_name, get_attr_value, get_group_members_emails, save_to_history, get_group_members_identities
 from routes.zimbra_api import ZimbraSOAPClient
 
 zimbra_bp = Blueprint('zimbra', __name__)
@@ -320,8 +320,8 @@ def api_sync_group():
         if not ad_group_obj:
             return jsonify({'error': 'Grupo do AD não encontrado.'}), 404
             
-        # Extrai os e-mails dos membros diretos do AD
-        ad_emails = get_group_members_emails(conn, ad_group_obj.distinguishedName.value)
+        # Extrai as identidades dos membros diretos do AD (e-mail principal e aliases)
+        ad_members = get_group_members_identities(conn, ad_group_obj.distinguishedName.value)
                     
         # Conecta no Zimbra
         client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
@@ -345,9 +345,46 @@ def api_sync_group():
         # Resolve se pesquisamos por apelido e o Zimbra retornou o e-mail real
         zimbra_real_email = dl_info['email']
         
-        # Calcula diferenças
-        to_add = ad_emails - zimbra_emails
-        to_remove = zimbra_emails - ad_emails
+        # Carrega as identidades completas (e-mail principal + apelidos/aliases) para cada membro do Zimbra em paralelo
+        zimbra_member_identities = {}
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def fetch_zimbra_identity(z_email):
+            acc_info = client.get_account_info(z_email)
+            if acc_info:
+                identities = {acc_info['email']} | set(acc_info['aliases'])
+            else:
+                identities = {z_email}
+            return z_email, identities
+            
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            results = executor.map(fetch_zimbra_identity, zimbra_emails)
+            for z_email, identities in results:
+                zimbra_member_identities[z_email] = identities
+                
+        # Calcula diferenças considerando todos os aliases de ambos os lados (AD e Zimbra)
+        to_add = set()
+        for member in ad_members:
+            # Verifica se o membro do AD já está representado no Zimbra sob qualquer e-mail/apelido
+            is_represented = False
+            for z_identities in zimbra_member_identities.values():
+                if member['all_emails'] & z_identities:
+                    is_represented = True
+                    break
+            if not is_represented:
+                if member['primary_email']:
+                    to_add.add(member['primary_email'])
+                    
+        to_remove = set()
+        # Junta todas as identidades (e-mails e aliases) de todos os membros do AD
+        all_ad_emails = set()
+        for member in ad_members:
+            all_ad_emails.update(member['all_emails'])
+            
+        for z_email, z_identities in zimbra_member_identities.items():
+            # Se o membro do Zimbra (sob nenhum de seus apelidos/e-mail principal) não coincide com nenhuma identidade no AD, remove
+            if not (z_identities & all_ad_emails):
+                to_remove.add(z_email)
         
         stats = {
             'added': 0,

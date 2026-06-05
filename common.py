@@ -946,3 +946,53 @@ def get_group_members_emails(conn, group_dn):
     return emails
 
 
+def get_group_members_identities(conn, group_dn):
+    """Busca os membros de um grupo do AD e retorna suas identidades completas.
+    
+    Retorna uma lista de dicionários contendo:
+    - 'dn': distinguishedName
+    - 'primary_email': E-mail principal (mail ou userPrincipalName, normalizado)
+    - 'all_emails': Conjunto contendo mail, UPN e proxyAddresses (normalizados)
+    """
+    members = []
+    try:
+        conn.search(group_dn, '(objectClass=*)', attributes=['member'])
+        if conn.entries:
+            group_entry = conn.entries[0]
+            member_dns = group_entry.member.values if 'member' in group_entry and group_entry.member.values else []
+            for dn in member_dns:
+                conn.search(dn, '(objectClass=*)', attributes=['mail', 'userPrincipalName', 'proxyAddresses'])
+                if conn.entries:
+                    entry = conn.entries[0]
+                    primary_email = get_attr_value(entry, 'mail') or get_attr_value(entry, 'userPrincipalName')
+                    primary_normalized = normalize_email(primary_email) if primary_email else None
+                    
+                    all_emails = set()
+                    if primary_normalized:
+                        all_emails.add(primary_normalized)
+                    
+                    upn = get_attr_value(entry, 'userPrincipalName')
+                    upn_normalized = normalize_email(upn) if upn else None
+                    if upn_normalized:
+                        all_emails.add(upn_normalized)
+                        
+                    proxy_vals = entry.proxyAddresses.values if 'proxyAddresses' in entry and entry.proxyAddresses.values else []
+                    for addr in proxy_vals:
+                        addr_str = str(addr).strip().lower()
+                        if addr_str.startswith('smtp:'):
+                            addr_str = addr_str[5:]
+                        normalized_proxy = normalize_email(addr_str)
+                        if normalized_proxy:
+                            all_emails.add(normalized_proxy)
+                            
+                    members.append({
+                        'dn': dn,
+                        'primary_email': primary_normalized,
+                        'all_emails': all_emails
+                    })
+    except Exception as e:
+        logging.error(f"[LDAP] Erro ao buscar identidades dos membros do grupo '{group_dn}': {e}")
+    return members
+
+
+

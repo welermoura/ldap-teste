@@ -282,3 +282,46 @@ class ZimbraSOAPClient:
                         
         return sorted(dls, key=lambda d: d["name"].lower())
 
+    def get_account_info(self, account_email):
+        """
+        Obtém as informações de uma conta (mailbox) no Zimbra pelo e-mail ou alias.
+        Retorna um dicionário contendo:
+        - 'email': E-mail principal da conta
+        - 'aliases': Lista de aliases (apelidos) da conta
+        - 'status': Status da conta
+        """
+        if not self.auth_token:
+            self.authenticate()
+            
+        body_xml = f"""
+        <GetAccountRequest xmlns="urn:zimbraAdmin">
+            <account by="name">{escape(account_email)}</account>
+        </GetAccountRequest>
+        """
+        try:
+            root = self._send_soap_request(body_xml)
+            body = root.find("{http://www.w3.org/2003/05/soap-envelope}Body")
+            if body is not None:
+                resp = body.find("{urn:zimbraAdmin}GetAccountResponse")
+                if resp is not None:
+                    acc_el = resp.find("{urn:zimbraAdmin}account")
+                    if acc_el is not None:
+                        name = acc_el.attrib.get("name")
+                        aliases = []
+                        status = "active"
+                        for a_el in acc_el.findall("{urn:zimbraAdmin}a"):
+                            n_attr = a_el.attrib.get("n")
+                            if n_attr == "zimbraMailAlias" and a_el.text:
+                                aliases.append(a_el.text.strip().lower())
+                            elif n_attr == "zimbraAccountStatus" and a_el.text:
+                                status = a_el.text.strip().lower()
+                        return {
+                            "email": name.strip().lower() if name else account_email.strip().lower(),
+                            "aliases": aliases,
+                            "status": status
+                        }
+        except Exception as e:
+            logging.error(f"[ZIMBRA-API] Erro ao buscar conta '{account_email}': {e}")
+        return None
+
+

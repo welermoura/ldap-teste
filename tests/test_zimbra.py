@@ -76,8 +76,14 @@ def test_api_sync_group(authenticated_client, mocker):
     mock_group.distinguishedName.value = 'CN=Diretoria,OU=Groups,DC=comolatti,DC=lan'
     mocker.patch('routes.zimbra.get_group_by_name', return_value=mock_group)
 
-    # Mock get_group_members_emails directly — returns one AD member email
-    mocker.patch('routes.zimbra.get_group_members_emails', return_value={'admin@comolatti.lan'})
+    # Mock get_group_members_identities directly
+    mocker.patch('routes.zimbra.get_group_members_identities', return_value=[
+        {
+            'dn': 'CN=admin,OU=Users,DC=comolatti,DC=lan',
+            'primary_email': 'admin@comolatti.lan',
+            'all_emails': {'admin@comolatti.lan'}
+        }
+    ])
     
     # Mock SOAP Client
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
@@ -85,6 +91,11 @@ def test_api_sync_group(authenticated_client, mocker):
         'id': 'dl-123',
         'email': 'diretoria@comolatti.com.br',
         'members': ['old_member@comolatti.lan'] # will be removed
+    }
+    mock_client.return_value.get_account_info.return_value = {
+        'email': 'old_member@comolatti.lan',
+        'aliases': [],
+        'status': 'active'
     }
     
     response = authenticated_client.post('/api/zimbra/sync_group', json={
@@ -115,11 +126,18 @@ def test_api_sync_group_auto_create(authenticated_client, mocker):
     mock_group.distinguishedName.value = 'CN=Diretoria,OU=Groups,DC=comolatti,DC=lan'
     mocker.patch('routes.zimbra.get_group_by_name', return_value=mock_group)
 
-    # Mock get_group_members_emails directly — returns one AD member email
-    mocker.patch('routes.zimbra.get_group_members_emails', return_value={'admin@comolatti.lan'})
+    # Mock get_group_members_identities directly
+    mocker.patch('routes.zimbra.get_group_members_identities', return_value=[
+        {
+            'dn': 'CN=admin,OU=Users,DC=comolatti,DC=lan',
+            'primary_email': 'admin@comolatti.lan',
+            'all_emails': {'admin@comolatti.lan'}
+        }
+    ])
     
     # Mock SOAP Client para levantar NO_SUCH_DISTRIBUTION_LIST na primeira chamada e funcionar na segunda
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.get_account_info.return_value = None
     mock_client.return_value.get_dl_members.side_effect = [
         Exception("[account.NO_SUCH_DISTRIBUTION_LIST] no such distribution list"),
         {
