@@ -1088,6 +1088,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 syncResultModal.show();
                 
+                // Atualiza dinamicamente os contadores na linha correspondente da tabela
+                const row = syncBtn.closest('tr');
+                if (row && result.ad_member_count !== undefined && result.zimbra_member_count !== undefined) {
+                    const adSpan = row.querySelector('td:first-child span.text-muted');
+                    if (adSpan) {
+                        adSpan.innerHTML = `<i class="fas fa-users me-1"></i>${result.ad_member_count} membros no AD`;
+                    }
+                    const zimbraSpan = row.querySelector('td:nth-child(3) span.text-muted');
+                    if (zimbraSpan) {
+                        zimbraSpan.innerHTML = `<i class="fas fa-users me-1"></i>${result.zimbra_member_count} membros no Zimbra`;
+                    }
+                }
+                
             } catch (error) {
                 syncBtn.innerHTML = originalContent;
                 syncBtn.disabled = false;

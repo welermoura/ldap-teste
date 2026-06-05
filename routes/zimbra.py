@@ -421,7 +421,9 @@ def api_sync_group():
             'success': True,
             'stats': stats,
             'details': details,
-            'zimbra_email': zimbra_real_email
+            'zimbra_email': zimbra_real_email,
+            'ad_member_count': len(ad_members),
+            'zimbra_member_count': len(zimbra_emails) + stats['added'] - stats['removed']
         })
     except Exception as e:
         logging.error(f"Erro ao sincronizar grupo '{ad_group}' com o Zimbra: {e}", exc_info=True)
