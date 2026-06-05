@@ -721,7 +721,7 @@ def create_ad_user(conn, form_data, model_attrs):
         return {'success': False, 'message': f"Erro durante a verificação: {str(e)}"}
 
     email_domain = upn_suffix.lstrip('@')
-    email = f"{first_name.lower()}.{last_name_part.lower()}@{email_domain}"
+    email = normalize_email(f"{first_name}.{last_name_part}@{email_domain}")
 
     user_attributes = {
         'samAccountName': sam, 'userPrincipalName': upn, 'givenName': first_name, 
@@ -903,6 +903,23 @@ def load_history():
         pass
     return []
 
+import unicodedata
+
+def normalize_email(email):
+    """Normaliza o e-mail removendo acentos/diacríticos e convertendo para minúsculas.
+    
+    Evita erros de sintaxe em integrações como a API SOAP do Zimbra.
+    """
+    if not email:
+        return email
+    try:
+        # Decompõe caracteres acentuados (ex: 'ã' vira 'a' + til unicode)
+        normalized = unicodedata.normalize('NFD', email.strip().lower())
+        # Codifica para ASCII ignorando caracteres não-ASCII (remove acentos), decodifica de volta
+        return normalized.encode('ascii', 'ignore').decode('ascii')
+    except Exception:
+        return email.strip().lower()
+
 def get_group_members_emails(conn, group_dn):
     """Busca direta e normalizada dos e-mails dos membros de um grupo do AD.
     
@@ -921,7 +938,9 @@ def get_group_members_emails(conn, group_dn):
                     entry = conn.entries[0]
                     email = get_attr_value(entry, 'mail') or get_attr_value(entry, 'userPrincipalName')
                     if email:
-                        emails.add(email.strip().lower())
+                        normalized = normalize_email(email)
+                        if normalized:
+                            emails.add(normalized)
     except Exception as e:
         logging.error(f"[LDAP] Erro ao buscar membros do grupo '{group_dn}': {e}")
     return emails

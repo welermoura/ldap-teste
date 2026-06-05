@@ -26,6 +26,6 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     # O comando agora apenas inicia o cron em primeiro plano. A configuração é feita no Dockerfile.
-    command: cron -f
+    command: sh -c "printenv > /etc/environment && cron -f"
     restart: unless-stopped
     container_name: ad_manager_scheduler

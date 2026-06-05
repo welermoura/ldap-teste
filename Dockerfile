@@ -35,13 +35,18 @@ WORKDIR /app
 # Copy the entire project into the container
 COPY . .
 
+# Configure timezone
+RUN ln -snf /usr/share/zoneinfo/America/Sao_Paulo /etc/localtime && echo "America/Sao_Paulo" > /etc/timezone
+
 # Configure cron job
 # 1. Copy the crontab file to the cron directory
 # 2. Set the correct permissions
 # 3. Add a newline to the file to ensure cron reads it
+# 4. Modify pam_loginuid.so in /etc/pam.d/cron to optional to allow cron to run inside docker
 RUN cp scheduler/crontab /etc/cron.d/scheduler \
     && chmod 0644 /etc/cron.d/scheduler \
-    && echo "" >> /etc/cron.d/scheduler
+    && echo "" >> /etc/cron.d/scheduler \
+    && sed -i 's/required\s\+pam_loginuid.so/optional pam_loginuid.so/g' /etc/pam.d/cron
 
 # Make the install script executable
 RUN chmod +x ./install.sh
