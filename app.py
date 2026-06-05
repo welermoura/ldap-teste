@@ -59,9 +59,14 @@ with app.app_context():
     except Exception as e:
         logging.error(f"[DB] Erro ao sincronizar tabelas com o SQL Server na inicialização: {e}")
 
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 app.config['WTF_CSRF_ENABLED'] = True
 csrf = CSRFProtect(app)
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    logging.warning(f"CSRF Token Expirado ou Inválido: {e.description}")
+    return render_template('csrf_error.html', reason=e.description), 400
 
 # Configuração do Limiter
 limiter.init_app(app)
