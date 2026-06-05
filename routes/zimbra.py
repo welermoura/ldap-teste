@@ -183,7 +183,7 @@ def api_get_mapping_counts():
         return jsonify({'error': str(e)}), 500
 
 
-@zimbra_bp.route('/api/zimbra/save_config', methods=['POST'])'POST'])
+@zimbra_bp.route('/api/zimbra/save_config', methods=['POST'])
 @require_auth
 @require_permission(action='can_manage_zimbra')
 def api_save_config():
