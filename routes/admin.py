@@ -490,12 +490,30 @@ def api_dashboard_stats():
                 day = (today - timedelta(days=i)).isoformat()
                 trends[day] = 0
                 
-            history = load_history()
-            for entry in history:
-                if entry.get('action') == 'deactivation':
-                    log_day = entry['timestamp'][:10]
-                    if log_day in trends:
-                        trends[log_day] += 1
+            from common import get_sql_server_uri
+            sql_server_uri = get_sql_server_uri()
+            if sql_server_uri:
+                try:
+                    from models import HistoryLog, ensure_db_registered
+                    ensure_db_registered()
+                    thirty_days_ago = today - timedelta(days=30)
+                    deact_logs = HistoryLog.query.filter(
+                        HistoryLog.action == 'deactivation',
+                        HistoryLog.timestamp >= thirty_days_ago
+                    ).all()
+                    for l in deact_logs:
+                        log_day = l.timestamp.strftime('%Y-%m-%d')
+                        if log_day in trends:
+                            trends[log_day] += 1
+                except Exception as e:
+                    logging.error(f"[DB] Error loading deactivation trends: {e}")
+            else:
+                history = load_history()
+                for entry in history:
+                    if entry.get('action') == 'deactivation':
+                        log_day = entry['timestamp'][:10]
+                        if log_day in trends:
+                            trends[log_day] += 1
             
             data['trends'] = [{'date': d, 'count': c} for d, c in sorted(trends.items())]
 
