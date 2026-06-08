@@ -139,9 +139,14 @@ def seed_database_from_json(database_instance):
                     data = json.load(f)
                     if isinstance(data, list):
                         for item in data:
+                            group_dn = item.get('group_dn')
+                            target_mail = item.get('target_mail')
+                            if not group_dn or not target_mail:
+                                logging.warning(f"[DB Migration] Skipping invalid/empty group schedule item: {item}")
+                                continue
                             gsched = GroupSchedule(
-                                group_dn=item.get('group_dn'),
-                                target_mail=item.get('target_mail'),
+                                group_dn=group_dn,
+                                target_mail=target_mail,
                                 sync_type=item.get('sync_type', 'zimbra'),
                                 active=item.get('active', True)
                             )
