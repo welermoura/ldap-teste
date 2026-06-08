@@ -81,6 +81,13 @@ def seed_database_from_json(database_instance):
     except Exception as e:
         logging.error(f"[DB Migration] Error checking/adding 'views' column: {e}")
 
+    # Se estiver usando o SQL Server, não consultamos nem semeamos os arquivos JSON locais
+    from common import load_config
+    config = load_config()
+    if config.get('USE_SQL_SERVER') and config.get('SQL_SERVER_URI'):
+        logging.info("[DB Migration] SQL Server ativo. Ignorando a semeadura de arquivos JSON locais.")
+        return
+
     # 1. Seed general config
     if ConfigSetting.query.count() == 0:
         config_path = os.path.join(data_dir, 'config.json')
