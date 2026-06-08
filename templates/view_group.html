@@ -353,7 +353,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const groupName = {{ group.cn|tojson }};
-    const csrfToken = "{{ form.csrf_token._value() }}";
+    const csrfToken = "{{ form.csrf_token._value() if form.csrf_token else '' }}";
     let memberListPage = 1;
     let memberListQuery = '';
     let memberDebounceTimer;

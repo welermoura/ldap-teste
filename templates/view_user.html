@@ -150,6 +150,7 @@
                             <tr><td><strong>Iniciais:</strong></td><td>{{ get_attr_value(user, 'initials') }}</td></tr>
                             <tr><td><strong>Sobrenome:</strong></td><td>{{ get_attr_value(user, 'sn') }}</td></tr>
                             <tr><td><strong>Nome de Exibição:</strong></td><td>{{ get_attr_value(user, 'displayName') }}</td></tr>
+                            <tr><td><strong>Nome Completo:</strong></td><td>{{ get_attr_value(user, 'cn') }}</td></tr>
                             <tr><td><strong>Descrição:</strong></td><td>{{ get_attr_value(user, 'description') }}</td></tr>
                             <tr><td><strong>Escritório:</strong></td><td>{{ get_attr_value(user, 'physicalDeliveryOfficeName') }}</td></tr>
                             <tr><td><strong>E-mail:</strong></td><td>{{ get_attr_value(user, 'mail') }}</td></tr>
@@ -506,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // === Variáveis de Estado ===
     const username = {{ get_attr_value(user, 'sAMAccountName')|tojson }};
-    const csrfToken = "{{ form.csrf_token._value() }}";
+    const csrfToken = "{{ form.csrf_token._value() if form.csrf_token else '' }}";
     let allUserGroups = [];
     let tabLoaded = false;
     let searchTimeout;
