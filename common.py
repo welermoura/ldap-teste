@@ -614,12 +614,26 @@ def get_ldap_connection(user=None, password=None, read_only=False):
                 import ssl
                 from ldap3 import Tls
                 try:
+                    # Resolve os nomes válidos para a validação do certificado (ad_server e FQDN)
+                    valid_names = [ad_server]
+                    if '.' not in ad_server:
+                        search_base = config.get('AD_SEARCH_BASE', '')
+                        if search_base:
+                            try:
+                                domain_parts = [part.split('=')[1] for part in search_base.split(',') if part.lower().startswith('dc=')]
+                                if domain_parts:
+                                    fqdn = f"{ad_server}.{'.'.join(domain_parts)}"
+                                    valid_names.append(fqdn)
+                            except Exception:
+                                pass
+                    
                     tls_config = Tls(
                         validate=ssl.CERT_REQUIRED,
                         version=ssl.PROTOCOL_TLSv1_2,
-                        ca_certs_file=cert_path
+                        ca_certs_file=cert_path,
+                        valid_names=valid_names
                     )
-                    logging.info(f"[LDAP] Conectando via LDAPS com validação de certificado CA: {cert_path}")
+                    logging.info(f"[LDAP] Conectando via LDAPS com validação de certificado CA: {cert_path} (Nomes válidos: {valid_names})")
                 except Exception as e_tls:
                     logging.error(f"[LDAP] Erro ao configurar Tls com certificado CA: {e_tls}")
             else:
