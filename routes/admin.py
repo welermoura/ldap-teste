@@ -331,7 +331,6 @@ def admin_logs():
         query = request.args.get('search_query', '').strip()
         form.search_query.data = query
 
-    log_path = os.path.join(current_app.root_path, 'logs', 'ad_creator.log')
     logs = {
         'creation': [],
         'alteration': [],
@@ -339,38 +338,89 @@ def admin_logs():
         'movement': []
     }
     
-    if os.path.exists(log_path):
+    from common import get_sql_server_uri, load_history
+    from datetime import datetime
+    sql_server_uri = get_sql_server_uri()
+    
+    if sql_server_uri:
         try:
-            with open(log_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-                for line in reversed(lines):
-                    line_strip = line.strip()
-                    if not query or query.lower() in line_strip.lower():
-                        # Tenta parsear o formato: YYYY-MM-DD HH:MM:SS,mmm - LEVEL - MESSAGE
-                        parts = line_strip.split(' - ', 2)
-                        if len(parts) >= 3:
-                            ts = parts[0]
-                            msg = parts[2]
-                        else:
-                            ts = ""
-                            msg = line_strip
-                            
-                        log_obj = {'timestamp': ts, 'message': msg}
-                        
-                        if '[CRIAÇÃO]' in line_strip:
-                            logs['creation'].append(log_obj)
-                        elif '[ALTERAÇÃO]' in line_strip:
-                            logs['alteration'].append(log_obj)
-                        elif '[EXCLUSÃO]' in line_strip:
-                            logs['exclusion'].append(log_obj)
-                        elif '[MOVIMENTAÇÃO]' in line_strip:
-                            logs['movement'].append(log_obj)
-                    
-                    # Limita o total de logs para performance
-                    if sum(len(v) for v in logs.values()) >= 1000:
-                        break
+            from models import HistoryLog, ensure_db_registered
+            ensure_db_registered()
+            
+            # Buscamos diretamente do banco para performance e suporte a filtros
+            query_obj = HistoryLog.query
+            if query:
+                query_obj = query_obj.filter(
+                    (HistoryLog.user_sam.ilike(f"%{query}%")) |
+                    (HistoryLog.details.ilike(f"%{query}%")) |
+                    (HistoryLog.action.ilike(f"%{query}%"))
+                )
+            db_logs = query_obj.order_by(HistoryLog.timestamp.desc()).limit(1000).all()
+            
+            for l in db_logs:
+                ts_str = l.timestamp.strftime('%d-%m-%Y %H:%M:%S')
+                action = l.action
+                user_sam = l.user_sam
+                details = l.details
+                
+                # Mapeia a ação para a aba e mensagem
+                if action == 'creation':
+                    msg = f"[CRIAÇÃO] Usuário '{user_sam}' - {details}" if details else f"[CRIAÇÃO] Usuário '{user_sam}'"
+                    logs['creation'].append({'timestamp': ts_str, 'message': msg})
+                elif action == 'exclusion':
+                    msg = f"[EXCLUSÃO] Usuário/Objeto '{user_sam}' - {details}" if details else f"[EXCLUSÃO] Usuário/Objeto '{user_sam}'"
+                    logs['exclusion'].append({'timestamp': ts_str, 'message': msg})
+                elif action == 'movement':
+                    msg = f"[MOVIMENTAÇÃO] Objeto '{user_sam}' - {details}" if details else f"[MOVIMENTAÇÃO] Objeto '{user_sam}'"
+                    logs['movement'].append({'timestamp': ts_str, 'message': msg})
+                else: # alteration, activation, deactivation, password_reset, etc.
+                    msg = f"[ALTERAÇÃO] Objeto/Usuário '{user_sam}' - {details}" if details else f"[ALTERAÇÃO] Objeto/Usuário '{user_sam}'"
+                    logs['alteration'].append({'timestamp': ts_str, 'message': msg})
         except Exception as e:
-            flash(f"Erro ao ler arquivo de log: {e}", "error")
+            flash(f"Erro ao carregar logs do banco de dados: {e}", "error")
+            logging.error(f"[DB] Erro ao carregar logs: {e}")
+    else:
+        # Fallback para histórico local JSON (history.json) ou arquivos locais
+        try:
+            history_list = load_history()
+            for entry in history_list:
+                try:
+                    dt = datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00'))
+                    ts_str = dt.strftime('%d-%m-%Y %H:%M:%S')
+                except Exception:
+                    ts_str = entry['timestamp']
+                    
+                action = entry.get('action', '')
+                user_sam = entry.get('user_sam', '')
+                details = entry.get('details', '')
+                
+                if query:
+                    match = (
+                        query.lower() in action.lower() or
+                        query.lower() in user_sam.lower() or
+                        query.lower() in details.lower()
+                    )
+                    if not match:
+                        continue
+                
+                # Mapeia a ação para a aba e mensagem
+                if action == 'creation':
+                    msg = f"[CRIAÇÃO] Usuário '{user_sam}' - {details}" if details else f"[CRIAÇÃO] Usuário '{user_sam}'"
+                    logs['creation'].append({'timestamp': ts_str, 'message': msg})
+                elif action == 'exclusion':
+                    msg = f"[EXCLUSÃO] Usuário/Objeto '{user_sam}' - {details}" if details else f"[EXCLUSÃO] Usuário/Objeto '{user_sam}'"
+                    logs['exclusion'].append({'timestamp': ts_str, 'message': msg})
+                elif action == 'movement':
+                    msg = f"[MOVIMENTAÇÃO] Objeto '{user_sam}' - {details}" if details else f"[MOVIMENTAÇÃO] Objeto '{user_sam}'"
+                    logs['movement'].append({'timestamp': ts_str, 'message': msg})
+                else: # alteration, activation, deactivation, password_reset, etc.
+                    msg = f"[ALTERAÇÃO] Objeto/Usuário '{user_sam}' - {details}" if details else f"[ALTERAÇÃO] Objeto/Usuário '{user_sam}'"
+                    logs['alteration'].append({'timestamp': ts_str, 'message': msg})
+                    
+                if sum(len(v) for v in logs.values()) >= 1000:
+                    break
+        except Exception as e:
+            flash(f"Erro ao carregar histórico local: {e}", "error")
             
     return render_template('admin/logs.html', logs=logs, search_form=form, active_tab=active_tab)
 

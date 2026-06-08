@@ -96,9 +96,9 @@ def load_config(force_reload=False):
     except Exception:
         pass
 
-    # 2. Se o SQL Server estiver ativo e houver um contexto Flask ativo, carrega as configurações do banco
-    from flask import has_app_context
-    if has_app_context() and local_config.get('USE_SQL_SERVER') and local_config.get('SQL_SERVER_URI'):
+    # 2. Se o SQL Server estiver ativo e houver um contexto Flask ativo com SQLAlchemy inicializado, carrega as configurações do banco
+    from flask import has_app_context, current_app
+    if has_app_context() and current_app and 'sqlalchemy' in current_app.extensions and local_config.get('USE_SQL_SERVER') and local_config.get('SQL_SERVER_URI'):
         try:
             from models import ConfigSetting, ensure_db_registered
             ensure_db_registered()
