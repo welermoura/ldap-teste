@@ -340,6 +340,21 @@ def edit_user(username):
                 service_conn.modify(user.distinguishedName.value, changes)
                 if service_conn.result['description'] == 'success':
                     flash('Usuário atualizado com sucesso!', 'success')
+                    
+                    # Renomeia o CN (Nome Completo) do usuário se o Nome de Exibição foi alterado
+                    if 'displayName' in changes:
+                        new_display_name = form.display_name.data.strip() if form.display_name.data else ""
+                        original_cn = get_attr_value(user, 'cn')
+                        if new_display_name and new_display_name != original_cn:
+                            new_rdn = f"CN={new_display_name}"
+                            logging.info(f"Alteração de Nome de Exibição detectada. Renomeando CN do usuário '{username}' de '{original_cn}' para '{new_display_name}'")
+                            service_conn.modify_dn(user.distinguishedName.value, new_rdn)
+                            if service_conn.result['description'] == 'success':
+                                changes_to_log.append(f"cn: alterado de '{original_cn}' para '{new_display_name}'")
+                            else:
+                                flash(f"Aviso: Dados salvos, mas não foi possível renomear o Nome Completo (CN) no AD: {service_conn.result['message']}", 'warning')
+                                logging.warning(f"Erro ao renomear CN do usuário '{username}': {service_conn.result['message']}")
+                                
                     log_details = "; ".join(changes_to_log)
                     log_message = f"[ALTERAÇÃO] Usuário '{username}' atualizado por '{session.get('user_display_name', session.get('ad_user'))}'. Detalhes: {log_details}"
                     logging.info(log_message)
