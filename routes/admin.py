@@ -203,6 +203,7 @@ AVAILABLE_FIELDS = {
     'last_name': 'Sobrenome',
     'upn_suffix': 'Sufixo UPN',
     'display_name': 'Nome de Exibição',
+    'cn': 'Nome Completo',
     'description': 'Descrição',
     'office': 'Escritório',
     'telephone': 'Telefone Principal',

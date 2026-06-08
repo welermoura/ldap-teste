@@ -21,6 +21,7 @@ class EditUserForm(FlaskForm):
     initials = StringField('Iniciais')
     last_name = StringField('Sobrenome', validators=[DataRequired()])
     display_name = StringField('Nome de Exibição', validators=[DataRequired()])
+    cn = StringField('Nome Completo', validators=[DataRequired()])
     description = StringField('Descrição')
     office = StringField('Escritório')
     telephone = StringField('Telefone Principal')
