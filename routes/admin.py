@@ -130,6 +130,15 @@ def admin_config():
             config['DEFAULT_PASSWORD'] = form.default_password.data
         if form.service_account_password.data:
             config['SERVICE_ACCOUNT_PASSWORD'] = form.service_account_password.data
+        
+        # Salva o arquivo de certificado CA de forma persistente se enviado
+        if form.ca_cert.data:
+            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data')
+            os.makedirs(data_dir, exist_ok=True)
+            cert_path = os.path.join(data_dir, 'ca_raiz.cer')
+            form.ca_cert.data.save(cert_path)
+            logging.info(f"Novo certificado LDAPS CA salvo em: {cert_path}")
+            
         save_config(config)
         flash('Configurações salvas com sucesso!', 'success')
         logging.info(f"Configurações do sistema alteradas por '{session.get('user_display_name')}'.")
@@ -137,6 +146,9 @@ def admin_config():
     elif request.method == 'POST':
         logging.warning(f"Falha na validação do formulário de configuração: {form.errors}")
         
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data')
+    has_cert = os.path.exists(os.path.join(data_dir, 'ca_raiz.cer'))
+    
     db_config = {
         'db_host': config.get('DB_HOST', ''),
         'db_port': config.get('DB_PORT', '1433'),
@@ -144,7 +156,7 @@ def admin_config():
         'db_user': config.get('DB_USER', ''),
         'use_sql_server': config.get('USE_SQL_SERVER', False)
     }
-    return render_template('admin/config.html', form=form, db_config=db_config)
+    return render_template('admin/config.html', form=form, db_config=db_config, has_cert=has_cert)
 
 @admin_bp.route('/admin/appearance', methods=['GET', 'POST'])
 @require_auth

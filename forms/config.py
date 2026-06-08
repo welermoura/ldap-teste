@@ -6,6 +6,9 @@ from flask_wtf.file import FileAllowed
 class ConfigForm(FlaskForm):
     ad_server = StringField('Servidor AD', validators=[DataRequired()])
     use_ldaps = BooleanField('Usar LDAPS (SSL)', default=False)
+    ca_cert = FileField('Certificado de CA para LDAPS (.cer, .crt, .pem)', validators=[
+        FileAllowed(['cer', 'crt', 'pem'], 'Apenas certificados (.cer, .crt, .pem) são permitidos.')
+    ])
     ad_domain = StringField('Domínio (NetBIOS name, ex: MEUDOMINIO)', validators=[DataRequired()])
     ad_search_base = StringField('Base de Busca AD (ex: OU=Usuarios,DC=dominio,DC=com)', validators=[DataRequired()])
     sso_enabled = BooleanField('Habilitar Single Sign-On (SSO)', default=False)

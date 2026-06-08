@@ -25,7 +25,7 @@
     <div class="tab-content" id="configTabsContent">
         <!-- PANE 1: ACTIVE DIRECTORY -->
         <div class="tab-pane fade show active p-3" id="ad-pane" role="tabpanel" aria-labelledby="ad-tab">
-            <form method="POST" action="{{ url_for('admin.admin_config') }}">
+            <form method="POST" action="{{ url_for('admin.admin_config') }}" enctype="multipart/form-data">
                 {{ form.hidden_tag() }}
                 <div class="card-body pt-2">
                     <p class="card-text mb-4 text-muted">Preencha as informações abaixo para que a aplicação possa conectar e interagir com seu Active Directory.</p>
@@ -50,6 +50,18 @@
                         <div class="form-check form-switch mb-3">
                             {{ form.use_ldaps(class="form-check-input") }}
                             {{ form.use_ldaps.label(class="form-check-label") }}
+                        </div>
+                        <div class="mb-3">
+                            {{ render_field(form.ca_cert) }}
+                            {% if has_cert %}
+                                <div class="form-text text-success small">
+                                    <i class="fas fa-check-circle me-1"></i> Certificado digital ativo importado (/app/data/ca_raiz.cer). Envie um novo arquivo para substituir.
+                                </div>
+                            {% else %}
+                                <div class="form-text text-muted small">
+                                    Opcional. Se o seu servidor LDAPS exigir validação de CA confiável, envie o certificado raiz (.cer, .crt ou .pem).
+                                </div>
+                            {% endif %}
                         </div>
                     </fieldset>
 

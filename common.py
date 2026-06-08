@@ -607,7 +607,25 @@ def get_ldap_connection(user=None, password=None, read_only=False):
         raise Exception("Servidor AD não configurado.")
 
     try:
-        server = Server(ad_server, use_ssl=use_ldaps, get_info=ALL, connect_timeout=5)
+        tls_config = None
+        if use_ldaps:
+            cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'ca_raiz.cer')
+            if os.path.exists(cert_path):
+                import ssl
+                from ldap3 import Tls
+                try:
+                    tls_config = Tls(
+                        validate=ssl.CERT_REQUIRED,
+                        version=ssl.PROTOCOL_TLSv1_2,
+                        ca_certs_file=cert_path
+                    )
+                    logging.info(f"[LDAP] Conectando via LDAPS com validação de certificado CA: {cert_path}")
+                except Exception as e_tls:
+                    logging.error(f"[LDAP] Erro ao configurar Tls com certificado CA: {e_tls}")
+            else:
+                logging.warning("[LDAP] LDAPS está ativo, mas nenhum certificado CA foi configurado em /app/data/ca_raiz.cer. Conectando sem validação (inseguro).")
+
+        server = Server(ad_server, use_ssl=use_ldaps, tls=tls_config, get_info=ALL, connect_timeout=5)
         
         # Caso 1: Login de Usuário (Sempre Simples)
         if user and password:
