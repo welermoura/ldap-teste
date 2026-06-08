@@ -28,6 +28,13 @@ logging.basicConfig(
     encoding='utf-8'
 )
 
+# Filtro para ocultar o aviso de servidor de desenvolvimento (development server warning) do Werkzeug
+class NoDevServerWarningFilter(logging.Filter):
+    def filter(self, record):
+        return "development server" not in record.getMessage()
+
+logging.getLogger('werkzeug').addFilter(NoDevServerWarningFilter())
+
 # ==============================================================================
 # Inicialização do Aplicativo Flask
 # ==============================================================================
