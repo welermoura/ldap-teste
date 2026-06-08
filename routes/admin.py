@@ -116,16 +116,14 @@ def admin_config():
         form.ad_search_base.data = config.get('AD_SEARCH_BASE')
         form.sso_enabled.data = config.get('SSO_ENABLED', False)
         form.service_account_user.data = config.get('SERVICE_ACCOUNT_USER')
-        form.upn_suffixes.data = config.get('upn_suffixes', '')
     if form.validate_on_submit():
-        logging.info(f"Formulário de configuração validado. Novos sufixos: {form.upn_suffixes.data}")
+        logging.info("Formulário de configuração validado.")
         config['AD_SERVER'] = form.ad_server.data
         config['USE_LDAPS'] = form.use_ldaps.data
         config['AD_DOMAIN'] = form.ad_domain.data
         config['AD_SEARCH_BASE'] = form.ad_search_base.data
         config['SSO_ENABLED'] = form.sso_enabled.data
         config['SERVICE_ACCOUNT_USER'] = form.service_account_user.data
-        config['upn_suffixes'] = form.upn_suffixes.data
         if form.default_password.data:
             config['DEFAULT_PASSWORD'] = form.default_password.data
         if form.service_account_password.data:

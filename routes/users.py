@@ -52,8 +52,8 @@ def create_user_form():
     form = CreateUserForm()
     config = load_config()
     
-    # 1. Puxa sufixos manuais do config
-    manual_suffixes = [s.strip() for s in re.split(r'[,;]', config.get('upn_suffixes', '')) if s.strip()]
+    # 1. Puxa sufixos manuais (removido, campo obsoleto)
+    manual_suffixes = []
     
     # 2. Puxa sufixos automaticamente do AD
     auto_suffixes = []

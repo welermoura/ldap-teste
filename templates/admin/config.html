@@ -43,10 +43,6 @@
                         <div class="mb-3">
                             {{ render_field(form.ad_search_base, placeholder="ex: OU=Usuarios,DC=dominio,DC=local") }}
                         </div>
-                        <div class="mb-3">
-                            {{ render_field(form.upn_suffixes, placeholder="ex: @dominio.com.br, @empresa.com") }}
-                            <div class="form-text text-muted">Defina os domínios disponíveis para novos usuários. O primeiro será o padrão.</div>
-                        </div>
                         <div class="form-check form-switch mb-3">
                             {{ form.use_ldaps(class="form-check-input") }}
                             {{ form.use_ldaps.label(class="form-check-label") }}

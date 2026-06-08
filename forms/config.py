@@ -15,7 +15,6 @@ class ConfigForm(FlaskForm):
     default_password = PasswordField('Senha Padrão (deixe em branco para não alterar)')
     service_account_user = StringField('Usuário de Serviço (para tarefas automáticas)')
     service_account_password = PasswordField('Senha do Usuário de Serviço (deixe em branco para não alterar)')
-    upn_suffixes = StringField('Sufixos UPN (separados por vírgula, ex: @dominio.com.br, @empresa.com)')
     submit = SubmitField('Salvar Configuração')
 
 class AppearanceForm(FlaskForm):
