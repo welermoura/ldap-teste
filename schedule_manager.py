@@ -206,6 +206,28 @@ def process_zimbra_group_syncs(conn, config):
             ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
             if not ad_group_obj:
                 logging.error(f"Grupo do AD '{ad_group}' não foi encontrado para sincronização.")
+                # Se o grupo não existir no AD, verifica se a lista de distribuição também não existe no Zimbra
+                zimbra_exists = True
+                try:
+                    client.get_dl_members(zimbra_email)
+                except Exception as e:
+                    if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
+                        zimbra_exists = False
+                
+                try:
+                    from models import db, ZimbraMapping
+                    db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
+                    if db_m:
+                        db.session.delete(db_m)
+                        db.session.commit()
+                        if not zimbra_exists:
+                            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente pelo agendador porque o grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais.")
+                            logging.warning(f"Mapeamento '{ad_group}' -> '{zimbra_email}' deletado automaticamente (ambos ausentes).")
+                        else:
+                            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente pelo agendador porque o grupo AD '{ad_group}' não existe mais.")
+                            logging.warning(f"Mapeamento '{ad_group}' -> '{zimbra_email}' deletado automaticamente (grupo AD ausente).")
+                except Exception as e_del:
+                    logging.error(f"Erro ao deletar mapeamento do banco de dados para '{ad_group}': {e_del}")
                 continue
 
             # Extrai as identidades dos membros do AD (e-mail principal e aliases)
@@ -217,13 +239,18 @@ def process_zimbra_group_syncs(conn, config):
                 dl_info = client.get_dl_members(zimbra_email)
             except Exception as e:
                 if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
-                    logging.info(f"Lista '{zimbra_email}' não existe no Zimbra. Tentando criar automaticamente...")
+                    logging.warning(f"Lista '{zimbra_email}' não existe no Zimbra. Removendo mapeamento.")
                     try:
-                        client.create_dl(zimbra_email)
-                        dl_info = client.get_dl_members(zimbra_email)
-                    except Exception as e_create:
-                        logging.error(f"Erro ao criar lista '{zimbra_email}' no Zimbra: {e_create}")
-                        continue
+                        from models import db, ZimbraMapping
+                        db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
+                        if db_m:
+                            db.session.delete(db_m)
+                            db.session.commit()
+                            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente pelo agendador porque a lista Zimbra '{zimbra_email}' não existe mais.")
+                            logging.warning(f"Mapeamento '{ad_group}' -> '{zimbra_email}' deletado automaticamente (lista Zimbra ausente).")
+                    except Exception as e_del:
+                        logging.error(f"Erro ao deletar mapeamento do banco de dados para '{ad_group}': {e_del}")
+                    continue
                 else:
                     logging.error(f"Erro ao buscar membros da lista Zimbra '{zimbra_email}': {e}")
                     continue

@@ -343,7 +343,30 @@ def api_sync_group():
         conn = get_service_account_connection()
         ad_group_obj = get_group_by_name(conn, ad_group, ['distinguishedName'])
         if not ad_group_obj:
-            return jsonify({'error': 'Grupo do AD não encontrado.'}), 404
+            # AD group not found. Let's check Zimbra DL.
+            zimbra_exists = True
+            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+            try:
+                client.get_dl_members(zimbra_email)
+            except Exception as e:
+                if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
+                    zimbra_exists = False
+            
+            from models import db, ZimbraMapping
+            db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
+            if db_m:
+                db.session.delete(db_m)
+                db.session.commit()
+                if not zimbra_exists:
+                    save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente porque o grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais.")
+                    return jsonify({'error': f"O grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais. A regra de mapeamento foi removida das Regras Ativas."}), 404
+                else:
+                    save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente porque o grupo AD '{ad_group}' não existe mais.")
+                    return jsonify({'error': f"O grupo AD '{ad_group}' não existe mais. A regra de mapeamento foi removida das Regras Ativas."}), 404
+            
+            if not zimbra_exists:
+                return jsonify({'error': f"O grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem."}), 404
+            return jsonify({'error': f"Grupo do AD '{ad_group}' não encontrado."}), 404
             
         # Extrai as identidades dos membros diretos do AD (e-mail principal e aliases)
         ad_members = get_group_members_identities(conn, ad_group_obj.distinguishedName.value)
@@ -354,13 +377,13 @@ def api_sync_group():
             dl_info = client.get_dl_members(zimbra_email)
         except Exception as e:
             if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
-                logging.info(f"[ZIMBRA-SYNC] Lista {zimbra_email} não existe no Zimbra. Tentando criar automaticamente...")
-                try:
-                    client.create_dl(zimbra_email)
-                    dl_info = client.get_dl_members(zimbra_email)
-                except Exception as e_create:
-                    logging.error(f"[ZIMBRA-SYNC] Erro ao criar lista {zimbra_email} automaticamente: {e_create}")
-                    raise Exception(f"A lista de distribuição '{zimbra_email}' não existe no Zimbra e não pôde ser criada automaticamente: {str(e_create)}")
+                from models import db, ZimbraMapping
+                db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
+                if db_m:
+                    db.session.delete(db_m)
+                    db.session.commit()
+                    save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente porque a lista Zimbra '{zimbra_email}' não existe mais.")
+                return jsonify({'error': f"A lista Zimbra '{zimbra_email}' não existe mais. A regra de mapeamento foi removida das Regras Ativas."}), 404
             else:
                 raise e
                 

@@ -3,6 +3,11 @@ from unittest.mock import MagicMock
 from common import load_config, save_config
 from routes.zimbra import load_zimbra_mappings, save_zimbra_mappings
 
+@pytest.fixture(autouse=True)
+def app_context(app):
+    with app.app_context():
+        yield
+
 def test_zimbra_config_page(authenticated_client, mocker):
     # Mock load_config to return some basic config
     mocker.patch('routes.zimbra.load_config', return_value={
@@ -108,7 +113,7 @@ def test_api_sync_group(authenticated_client, mocker):
     assert response.json['stats']['removed'] == 1
 
 
-def test_api_sync_group_auto_create(authenticated_client, mocker):
+def test_api_sync_group_delete_when_zimbra_dl_not_found(authenticated_client, mocker):
     # Mock config e mapping
     mocker.patch('routes.zimbra.load_config', return_value={
         'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
@@ -120,38 +125,105 @@ def test_api_sync_group_auto_create(authenticated_client, mocker):
         {'ad_group_name': 'Diretoria', 'zimbra_dl_email': 'diretoria@comolatti.com.br'}
     ])
     
-    # Mock AD connection and group lookup
+    # Mock AD connection and group lookup (AD group exists)
     mocker.patch('routes.zimbra.get_service_account_connection')
     mock_group = MagicMock()
     mock_group.distinguishedName.value = 'CN=Diretoria,OU=Groups,DC=comolatti,DC=lan'
     mocker.patch('routes.zimbra.get_group_by_name', return_value=mock_group)
 
-    # Mock get_group_members_identities directly
-    mocker.patch('routes.zimbra.get_group_members_identities', return_value=[
-        {
-            'dn': 'CN=admin,OU=Users,DC=comolatti,DC=lan',
-            'primary_email': 'admin@comolatti.lan',
-            'all_emails': {'admin@comolatti.lan'}
-        }
-    ])
+    # Mock get_group_members_identities
+    mocker.patch('routes.zimbra.get_group_members_identities', return_value=[])
     
-    # Mock SOAP Client para levantar NO_SUCH_DISTRIBUTION_LIST na primeira chamada e funcionar na segunda
+    # Mock Zimbra SOAP (DL doesn't exist)
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
-    mock_client.return_value.get_account_info.return_value = None
-    mock_client.return_value.get_dl_members.side_effect = [
-        Exception("[account.NO_SUCH_DISTRIBUTION_LIST] no such distribution list"),
-        {
-            'id': 'dl-123',
-            'email': 'diretoria@comolatti.com.br',
-            'members': []
-        }
-    ]
+    mock_client.return_value.get_dl_members.side_effect = Exception("[account.NO_SUCH_DISTRIBUTION_LIST] no such distribution list")
+    
+    # Mock Banco de dados
+    mock_db_m = MagicMock()
+    mock_query = mocker.patch('models.ZimbraMapping.query')
+    mock_query.filter_by.return_value.first.return_value = mock_db_m
+    mock_db = mocker.patch('models.db')
+    mocker.patch('routes.zimbra.save_to_history')
     
     response = authenticated_client.post('/api/zimbra/sync_group', json={
         'ad_group_name': 'Diretoria'
     })
     
-    assert response.status_code == 200
-    assert response.json['success'] is True
-    mock_client.return_value.create_dl.assert_called_once_with('diretoria@comolatti.com.br')
-    assert response.json['stats']['added'] == 1
+    assert response.status_code == 404
+    assert 'não existe mais' in response.json['error']
+    assert 'Zimbra' in response.json['error']
+    mock_db.session.delete.assert_called_once_with(mock_db_m)
+    mock_db.session.commit.assert_called_once()
+
+def test_api_sync_group_delete_when_ad_group_not_found(authenticated_client, mocker):
+    # Mock config e mapping
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    mocker.patch('routes.zimbra.load_zimbra_mappings', return_value=[
+        {'ad_group_name': 'Diretoria', 'zimbra_dl_email': 'diretoria@comolatti.com.br'}
+    ])
+    
+    # Mock AD group missing
+    mocker.patch('routes.zimbra.get_service_account_connection')
+    mocker.patch('routes.zimbra.get_group_by_name', return_value=None)
+    
+    # Mock Zimbra SOAP (DL exists)
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.get_dl_members.return_value = {'id': 'dl-123', 'email': 'diretoria@comolatti.com.br', 'members': []}
+    
+    # Mock Banco de dados
+    mock_db_m = MagicMock()
+    mock_query = mocker.patch('models.ZimbraMapping.query')
+    mock_query.filter_by.return_value.first.return_value = mock_db_m
+    mock_db = mocker.patch('models.db')
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/sync_group', json={
+        'ad_group_name': 'Diretoria'
+    })
+    
+    assert response.status_code == 404
+    assert 'não existe mais' in response.json['error']
+    assert 'grupo AD' in response.json['error']
+    mock_db.session.delete.assert_called_once_with(mock_db_m)
+    mock_db.session.commit.assert_called_once()
+
+def test_api_sync_group_delete_when_both_not_found(authenticated_client, mocker):
+    # Mock config e mapping
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    mocker.patch('routes.zimbra.load_zimbra_mappings', return_value=[
+        {'ad_group_name': 'Diretoria', 'zimbra_dl_email': 'diretoria@comolatti.com.br'}
+    ])
+    
+    # Mock AD group missing
+    mocker.patch('routes.zimbra.get_service_account_connection')
+    mocker.patch('routes.zimbra.get_group_by_name', return_value=None)
+    
+    # Mock Zimbra SOAP (DL missing too)
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.get_dl_members.side_effect = Exception("[account.NO_SUCH_DISTRIBUTION_LIST] no such distribution list")
+    
+    # Mock Banco de dados
+    mock_db_m = MagicMock()
+    mock_query = mocker.patch('models.ZimbraMapping.query')
+    mock_query.filter_by.return_value.first.return_value = mock_db_m
+    mock_db = mocker.patch('models.db')
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/sync_group', json={
+        'ad_group_name': 'Diretoria'
+    })
+    
+    assert response.status_code == 404
+    assert 'não existem mais' in response.json['error']
+    mock_db.session.delete.assert_called_once_with(mock_db_m)
+    mock_db.session.commit.assert_called_once()
