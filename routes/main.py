@@ -42,9 +42,9 @@ def inject_appearance():
     config = load_config()
     appearance = {
         'bg_color': config.get('ORGANOGRAM_BG_COLOR', '#f8f9fa'),
-        'bg_image': config.get('ORGANOGRAM_BG_IMAGE'),
-        'logo': config.get('ORGANOGRAM_LOGO'),
-        'favicon': config.get('ORGANOGRAM_FAVICON'),
+        'bg_image': config.get('ORGANOGRAM_BG_IMAGE') if config.get('ORGANOGRAM_BG_IMAGE') else None,
+        'logo': config.get('ORGANOGRAM_LOGO') if config.get('ORGANOGRAM_LOGO') else None,
+        'favicon': config.get('ORGANOGRAM_FAVICON') if config.get('ORGANOGRAM_FAVICON') else None,
         'subtitle': config.get('ORGANOGRAM_SUBTITLE', 'Portal de Administração')
     }
     return dict(appearance=appearance)

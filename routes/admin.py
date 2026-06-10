@@ -165,6 +165,28 @@ def admin_appearance():
     if request.method == 'GET':
         form.bg_color.data = config.get('ORGANOGRAM_BG_COLOR', '#f8f9fa')
         form.subtitle.data = config.get('ORGANOGRAM_SUBTITLE', 'Portal de Administração')
+    if request.method == 'POST':
+        if 'clear_bg_color' in request.form:
+            config['ORGANOGRAM_BG_COLOR'] = '#f8f9fa'
+            save_config(config)
+            flash('Cor de fundo redefinida com sucesso!', 'success')
+            return redirect(url_for('admin.admin_appearance'))
+        if 'clear_bg_image' in request.form:
+            config['ORGANOGRAM_BG_IMAGE'] = None
+            save_config(config)
+            flash('Imagem de fundo removida com sucesso!', 'success')
+            return redirect(url_for('admin.admin_appearance'))
+        if 'clear_logo' in request.form:
+            config['ORGANOGRAM_LOGO'] = None
+            save_config(config)
+            flash('Logo removido com sucesso!', 'success')
+            return redirect(url_for('admin.admin_appearance'))
+        if 'clear_favicon' in request.form:
+            config['ORGANOGRAM_FAVICON'] = None
+            save_config(config)
+            flash('Favicon removido com sucesso!', 'success')
+            return redirect(url_for('admin.admin_appearance'))
+
     if form.validate_on_submit():
         config['ORGANOGRAM_BG_COLOR'] = form.bg_color.data
         config['ORGANOGRAM_SUBTITLE'] = form.subtitle.data
@@ -172,9 +194,10 @@ def admin_appearance():
         if not os.path.exists(upload_folder):
             os.makedirs(upload_folder)
         if form.bg_image.data:
-            filename = secure_filename('bg_image.' + form.bg_image.data.filename.rsplit('.', 1)[1].lower())
+            ext = form.bg_image.data.filename.rsplit('.', 1)[1].lower()
+            filename = secure_filename('bg_image.' + ext)
             form.bg_image.data.save(os.path.join(upload_folder, filename))
-            config['ORGANOGRAM_BG_IMAGE'] = url_for('static', filename='uploads/' + filename)
+            config['ORGANOGRAM_BG_IMAGE'] = filename
         if form.logo.data:
             ext = form.logo.data.filename.rsplit('.', 1)[1].lower()
             filename = secure_filename('logo.' + ext)
@@ -187,14 +210,21 @@ def admin_appearance():
                         img.save(logo_path)
                 except Exception as e:
                     logging.error(f"Erro ao processar imagem do logo: {e}")
-            config['ORGANOGRAM_LOGO'] = url_for('static', filename='uploads/' + filename)
+            config['ORGANOGRAM_LOGO'] = filename
         if form.favicon.data:
-            filename = secure_filename('favicon.' + form.favicon.data.filename.rsplit('.', 1)[1].lower())
+            ext = form.favicon.data.filename.rsplit('.', 1)[1].lower()
+            filename = secure_filename('favicon.' + ext)
             form.favicon.data.save(os.path.join(upload_folder, filename))
-            config['ORGANOGRAM_FAVICON'] = url_for('static', filename='uploads/' + filename)
+            config['ORGANOGRAM_FAVICON'] = filename
         save_config(config)
         flash('Aparência atualizada com sucesso!', 'success')
         return redirect(url_for('admin.admin_appearance'))
+
+    # Normaliza chaves vazias para None
+    for k in ['ORGANOGRAM_BG_IMAGE', 'ORGANOGRAM_LOGO', 'ORGANOGRAM_FAVICON']:
+        if not config.get(k):
+            config[k] = None
+
     return render_template('admin/appearance.html', form=form, config=config)
 
 AVAILABLE_FIELDS = {
