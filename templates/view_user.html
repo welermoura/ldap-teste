@@ -375,12 +375,26 @@
                     <label for="groupSearchInput" class="form-label">Buscar por nome de grupo:</label>
                     <input type="text" class="form-control" id="groupSearchInput" placeholder="Digite pelo menos 3 caracteres...">
                 </div>
-                <div id="groupSearchResults" style="max-height: 300px; overflow-y: auto;">
-                    <!-- Resultados da busca aparecerão aqui -->
+                <div id="groupSearchResults" class="table-responsive" style="max-height: 300px; overflow-y: auto; position: relative; display: none;">
+                    <table class="table table-sm align-middle text-white glass-table mb-0">
+                        <thead class="table-dark" style="position: sticky; top: 0; z-index: 100;">
+                            <tr>
+                                <th scope="col">Grupo</th>
+                                <th scope="col" class="text-center" style="width: 80px;">ADD</th>
+                                <th scope="col" class="text-center" style="width: 80px;">Temp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="groupSearchResultsTable">
+                            <!-- Resultados da busca aparecerão aqui -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="groupSearchResultsEmpty" class="text-muted p-2">
+                    Digite pelo menos 3 caracteres...
                 </div>
                 <div id="temporal-add-fields" class="mt-3 p-3 border rounded glass-form-section" style="display: none;">
                     <h5><i class="fas fa-clock me-2"></i>Acesso Temporário</h5>
-                    <p>Defina a data de início e fim para a participação no grupo selecionado.</p>
+                    <p>Defina a data de início e fim para a participação no(s) grupo(s) selecionado(s) como temporário(s).</p>
                      <div class="row">
                         <div class="col-md-6 mb-2">
                             <label for="add-group-start-date" class="form-label">Data de Início</label>
@@ -391,13 +405,11 @@
                             <input type="date" id="add-group-end-date" class="form-control">
                         </div>
                     </div>
-                    <div class="text-end mt-2">
-                         <button id="confirm-temp-add-btn" class="btn btn-info"><i class="fas fa-check me-2"></i>Confirmar Adição Temporária</button>
-                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex justify-content-between">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" id="btn-submit-table-adds" class="btn btn-primary" disabled>Confirmar Adições</button>
             </div>
         </div>
     </div>
@@ -482,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const temporalFieldsContainer = document.getElementById('temporal-add-fields');
     const startDateInput = document.getElementById('add-group-start-date');
     const endDateInput = document.getElementById('add-group-end-date');
-    const confirmTempAddBtn = document.getElementById('confirm-temp-add-btn');
+    const btnSubmitTableAdds = document.getElementById('btn-submit-table-adds');
     const deactivateBtn = document.getElementById('deactivate-btn');
     const resetPasswordBtn = document.getElementById('reset-password-btn');
     const cancelAbsenceBtn = document.getElementById('cancel-absence-btn');
@@ -542,29 +554,32 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderSearchResults(groups) {
-        groupSearchResults.innerHTML = '';
+        const tableBody = document.getElementById('groupSearchResultsTable');
+        const emptyDiv = document.getElementById('groupSearchResultsEmpty');
+        tableBody.innerHTML = '';
         if (!groups || groups.length === 0) {
-            groupSearchResults.innerHTML = '<p class="text-muted p-2">Nenhum grupo encontrado.</p>';
+            emptyDiv.innerHTML = '<p class="text-muted p-2">Nenhum grupo encontrado.</p>';
+            emptyDiv.style.display = 'block';
+            groupSearchResults.style.display = 'none';
             return;
         }
+        emptyDiv.style.display = 'none';
+        groupSearchResults.style.display = 'block';
         groups.forEach(group => {
-            const resultItem = document.createElement('div');
-            resultItem.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
-            resultItem.innerHTML = `
-                <div>
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
                     <strong>${escapeHTML(group.cn)}</strong>
                     <small class="d-block text-muted">${escapeHTML(group.description) || 'Sem descrição'}</small>
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-primary add-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Adicionar permanentemente">
-                        <i class="fas fa-plus"></i> Add
-                    </button>
-                    <button class="btn btn-sm btn-info add-group-temp-btn" data-group-name="${escapeHTML(group.cn)}" title="Adicionar com data de expiração">
-                        <i class="fas fa-clock"></i> Temp
-                    </button>
-                </div>
+                </td>
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input check-add" data-group-name="${escapeHTML(group.cn)}">
+                </td>
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input check-temp" data-group-name="${escapeHTML(group.cn)}">
+                </td>
             `;
-            groupSearchResults.appendChild(resultItem);
+            tableBody.appendChild(tr);
         });
     }
 
@@ -677,11 +692,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // === Funções Auxiliares ===
     function showLoading(container, message) {
-        container.innerHTML = `<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">${message}</p></div>`;
+        if (container.id === 'groupSearchResults') {
+            const emptyDiv = document.getElementById('groupSearchResultsEmpty');
+            emptyDiv.innerHTML = `<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">${message}</p></div>`;
+            emptyDiv.style.display = 'block';
+            container.style.display = 'none';
+        } else {
+            container.innerHTML = `<div class="text-center p-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2">${message}</p></div>`;
+        }
     }
 
     function showError(container, message) {
-        container.innerHTML = `<div class="alert alert-danger m-2">${message}</div>`;
+        if (container.id === 'groupSearchResults') {
+            const emptyDiv = document.getElementById('groupSearchResultsEmpty');
+            emptyDiv.innerHTML = `<div class="alert alert-danger m-2">${message}</div>`;
+            emptyDiv.style.display = 'block';
+            container.style.display = 'none';
+        } else {
+            container.innerHTML = `<div class="alert alert-danger m-2">${message}</div>`;
+        }
     }
 
     function escapeHTML(str) {
@@ -870,28 +899,117 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (groupSearchResults) {
-        groupSearchResults.addEventListener('click', function(e) {
-            const addBtn = e.target.closest('.add-group-btn');
-            if (addBtn) {
-                addGroup(addBtn.dataset.groupName);
+        groupSearchResults.addEventListener('change', function(e) {
+            const target = e.target;
+            if (target.classList.contains('check-add') && target.checked) {
+                const row = target.closest('tr');
+                const tempCheck = row.querySelector('.check-temp');
+                if (tempCheck) tempCheck.checked = false;
+            }
+            if (target.classList.contains('check-temp') && target.checked) {
+                const row = target.closest('tr');
+                const addCheck = row.querySelector('.check-add');
+                if (addCheck) addCheck.checked = false;
             }
 
-            const addTempBtn = e.target.closest('.add-group-temp-btn');
-            if (addTempBtn) {
-                selectedGroupForTempAdd = addTempBtn.dataset.groupName;
+            // Controle de visibilidade das datas
+            const anyTempChecked = document.querySelectorAll('.check-temp:checked').length > 0;
+            if (anyTempChecked) {
                 temporalFieldsContainer.style.display = 'block';
-                const today = new Date().toISOString().split('T')[0];
-                startDateInput.value = today;
-                endDateInput.value = '';
-                startDateInput.focus();
+                if (!startDateInput.value) {
+                    const today = new Date().toISOString().split('T')[0];
+                    startDateInput.value = today;
+                }
+            } else {
+                temporalFieldsContainer.style.display = 'none';
             }
+
+            // Habilita/desabilita o botão de confirmar adições
+            const anyChecked = document.querySelectorAll('.check-add:checked, .check-temp:checked').length > 0;
+            btnSubmitTableAdds.disabled = !anyChecked;
         });
     }
 
-    if (confirmTempAddBtn) {
-        confirmTempAddBtn.addEventListener('click', function() {
-            if (selectedGroupForTempAdd) {
-                addGroupTemp(selectedGroupForTempAdd, startDateInput.value, endDateInput.value);
+    if (btnSubmitTableAdds) {
+        btnSubmitTableAdds.addEventListener('click', async function() {
+            const addChecks = document.querySelectorAll('.check-add:checked');
+            const tempChecks = document.querySelectorAll('.check-temp:checked');
+            
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+
+            if (tempChecks.length > 0 && (!startDate || !endDate)) {
+                showToast('Por favor, informe a data de início e fim para os acessos temporários.', 'error');
+                return;
+            }
+
+            // Mostrar estado de carregando no botão
+            const originalText = btnSubmitTableAdds.innerHTML;
+            btnSubmitTableAdds.disabled = true;
+            btnSubmitTableAdds.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Adicionando...';
+
+            let successCount = 0;
+            let errorMessages = [];
+
+            // 1. Processa adições permanentes (ADD)
+            for (const cb of addChecks) {
+                const groupName = cb.dataset.groupName;
+                try {
+                    const response = await fetch('/api/add_user_to_group', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({ username, group_name: groupName })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorMessages.push(`${groupName}: ${result.error || 'Erro desconhecido'}`);
+                    }
+                } catch (e) {
+                    errorMessages.push(`${groupName}: Erro na requisição`);
+                    console.error(e);
+                }
+            }
+
+            // 2. Processa adições temporárias (Temp)
+            for (const cb of tempChecks) {
+                const groupName = cb.dataset.groupName;
+                try {
+                    const response = await fetch('/api/add_user_to_group_temp', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                        body: JSON.stringify({
+                            username,
+                            group_name: groupName,
+                            start_date: startDate,
+                            end_date: endDate
+                        })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorMessages.push(`${groupName} (Temp): ${result.error || 'Erro desconhecido'}`);
+                    }
+                } catch (e) {
+                    errorMessages.push(`${groupName} (Temp): Erro na requisição`);
+                    console.error(e);
+                }
+            }
+
+            // Restaurar botão
+            btnSubmitTableAdds.innerHTML = originalText;
+
+            if (successCount > 0) {
+                showToast(`${successCount} grupo(s) adicionado(s) com sucesso.`, 'success');
+                tabLoaded = false;
+                fetchUserGroups();
+                addGroupModal.hide();
+            }
+
+            if (errorMessages.length > 0) {
+                showToast(`Alguns grupos falharam:\n${errorMessages.join('\n')}`, 'error');
             }
         });
     }
@@ -902,8 +1020,15 @@ document.addEventListener('DOMContentLoaded', function() {
         startDateInput.value = '';
         endDateInput.value = '';
         groupSearchInput.value = '';
-        groupSearchResults.innerHTML = '';
-        selectedGroupForTempAdd = null;
+        const tableBody = document.getElementById('groupSearchResultsTable');
+        if (tableBody) tableBody.innerHTML = '';
+        groupSearchResults.style.display = 'none';
+        const emptyDiv = document.getElementById('groupSearchResultsEmpty');
+        if (emptyDiv) {
+            emptyDiv.innerHTML = 'Digite pelo menos 3 caracteres...';
+            emptyDiv.style.display = 'block';
+        }
+        btnSubmitTableAdds.disabled = true;
     });
 
     // --- Ações da Página com Modal de Confirmação ---
