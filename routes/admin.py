@@ -508,6 +508,9 @@ def admin_add_user():
 @require_auth
 @require_permission(action='can_edit_config')
 def admin_delete_user(username):
+    if username.lower() == 'admin':
+        flash('O administrador principal ("admin") não pode ser excluído.', 'error')
+        return redirect(url_for('admin.admin_users'))
     if username == session.get('master_admin'):
         flash('Você não pode excluir a si mesmo.', 'error')
         return redirect(url_for('admin.admin_users'))
