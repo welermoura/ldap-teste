@@ -86,7 +86,8 @@ def dashboard():
 @require_auth
 def admin_change_password():
     if 'master_admin' not in session:
-        return redirect(url_for('admin.admin_login'))
+        flash('Contas autenticadas via Active Directory não podem alterar a senha localmente. Altere no AD.', 'warning')
+        return redirect(url_for('admin.dashboard'))
     
     form = AdminChangePasswordForm()
     if form.validate_on_submit():

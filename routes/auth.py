@@ -39,6 +39,7 @@ def login():
                 session['ad_user'] = admin_key
                 session['user_display_name'] = f"{admin_key} (Admin Local)"
                 session['is_admin'] = True
+                session['master_admin'] = admin_key
                 session['access_level'] = 'full'
                 return redirect(url_for('main.dashboard'))
 
