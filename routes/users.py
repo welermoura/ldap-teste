@@ -1286,7 +1286,7 @@ def api_remove_subordinate():
 def api_user_exchange(username):
     try:
         conn = get_read_connection()
-        user = get_user_by_samaccountname(conn, username, attributes=['proxyAddresses', 'mail'])
+        user = get_user_by_samaccountname(conn, username, attributes=['proxyAddresses', 'mail', 'msExchHideFromAddressLists'])
         if not user:
             return jsonify({'error': 'Usuário não encontrado.'}), 404
             
@@ -1301,14 +1301,39 @@ def api_user_exchange(username):
                 aliases.append(addr[5:])
                 
         mail = get_attr_value(user, 'mail') or ''
+        hide_from_address_lists = user['msExchHideFromAddressLists'].value if 'msExchHideFromAddressLists' in user and user['msExchHideFromAddressLists'].value else False
         
         return jsonify({
             'primary': primary,
             'aliases': aliases,
-            'mail': mail
+            'mail': mail,
+            'hide_from_address_lists': hide_from_address_lists
         })
     except Exception as e:
         logging.error(f"Erro em api_user_exchange: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/update_user_hide_status/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_exchange')
+def api_update_user_hide_status(username):
+    data = request.get_json()
+    hide = data.get('hide', False)
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=['distinguishedName'])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+            
+        conn.modify(user.distinguishedName.value, {'msExchHideFromAddressLists': [(ldap3.MODIFY_REPLACE, [hide])]})
+        if conn.result['description'] == 'success':
+            logging.info(f"[EXCHANGE] Status ocultação de '{username}' alterado para {hide} por '{session.get('user_display_name')}'.")
+            save_to_history('exchange_change', username, f"Status ocultação alterado para {hide} por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
+    except Exception as e:
+        logging.error(f"Erro ao atualizar status de ocultação para {username}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/api/add_alias/<username>', methods=['POST'])

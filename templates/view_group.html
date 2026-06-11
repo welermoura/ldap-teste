@@ -112,6 +112,12 @@
                         <h5 class="mb-0">E-mail / Exchange (proxyAddresses)</h5>
                     </div>
                     <div class="card-body">
+                        <div class="card p-3 mb-4 bg-transparent border-secondary border-dashed">
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="hide-group-from-address-lists-switch">
+                                <label class="form-check-label" for="hide-group-from-address-lists-switch"><strong>Ocultar Grupo da Lista de Endereços Global (Exchange 365)</strong></label>
+                            </div>
+                        </div>
                         <div class="mb-4">
                             <label class="form-label">E-mail Primário (reply-to)</label>
                             <input type="email" class="form-control" id="group-primary-email" readonly value="{{ group.mail }}">
@@ -791,6 +797,12 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error('Falha ao carregar emails do grupo');
             const data = await response.json();
             
+            // Define o estado do switch de ocultação do grupo
+            const hideGroupSwitch = document.getElementById('hide-group-from-address-lists-switch');
+            if (hideGroupSwitch) {
+                hideGroupSwitch.checked = data.hide_from_address_lists || false;
+            }
+            
             primaryEmailInput.value = data.primary_email || 'Nenhum E-mail Primário';
             
             proxyTableBody.innerHTML = '';
@@ -819,6 +831,26 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Erro ao carregar exchange:', error);
             proxyTableBody.innerHTML = '<tr><td colspan="3" class="text-center text-danger">Erro ao carregar e-mails</td></tr>';
         }
+    }
+
+    const hideGroupSwitch = document.getElementById('hide-group-from-address-lists-switch');
+    if (hideGroupSwitch) {
+        hideGroupSwitch.addEventListener('change', async function() {
+            const hide = hideGroupSwitch.checked;
+            try {
+                const response = await fetch('/api/update_group_hide_status', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ group_name: groupName, hide })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro ao atualizar status de ocultação do grupo.');
+                showToast(`Status de ocultação do grupo atualizado para: ${hide ? 'Oculto' : 'Visível'}.`, 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+                hideGroupSwitch.checked = !hide; // Reverte
+            }
+        });
     }
 
     if (proxyTableBody) {

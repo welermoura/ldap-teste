@@ -151,7 +151,7 @@ def view_group(group_name):
     form = FlaskForm()
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'description', 'groupType', 'mail', 'proxyAddresses'])
+        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'description', 'groupType', 'mail', 'proxyAddresses', 'msExchHideFromAddressLists'])
         if not group:
             flash(f"Grupo '{group_name}' não encontrado.", 'error')
             return redirect(url_for('groups.group_management'))
@@ -160,6 +160,7 @@ def view_group(group_name):
         is_security = (g_type_val & 2147483648) or (g_type_val < 0)
         
         scope_val = 'domain_local' if (g_type_val & 4) else ('global' if (g_type_val & 2) else ('universal' if (g_type_val & 8) else 'unknown'))
+        hide_from_address_lists = group.msExchHideFromAddressLists.value if 'msExchHideFromAddressLists' in group and group.msExchHideFromAddressLists.value else False
         
         group_info = {
             'cn': group.cn.value if 'cn' in group else group_name,
@@ -168,7 +169,8 @@ def view_group(group_name):
             'is_security': is_security,
             'scope': scope_val,
             'mail': group.mail.value if 'mail' in group else '',
-            'proxyAddresses': group.proxyAddresses.values if 'proxyAddresses' in group else []
+            'proxyAddresses': group.proxyAddresses.values if 'proxyAddresses' in group else [],
+            'hide_from_address_lists': hide_from_address_lists
         }
             
         return render_template('view_group.html', group=group_info, form=form)
@@ -841,12 +843,13 @@ def api_update_group_settings():
 def api_group_exchange_info(group_name):
     try:
         conn = get_read_connection()
-        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'mail'])
+        group = get_group_by_name(conn, group_name, attributes=['proxyAddresses', 'mail', 'msExchHideFromAddressLists'])
         if not group:
             return jsonify({'error': 'Grupo não encontrado'}), 404
             
         primary_email = group.mail.value if 'mail' in group else None
         proxy_addresses = group.proxyAddresses.values if 'proxyAddresses' in group else []
+        hide_from_address_lists = group.msExchHideFromAddressLists.value if 'msExchHideFromAddressLists' in group and group.msExchHideFromAddressLists.value else False
         
         if not primary_email:
             for p in proxy_addresses:
@@ -856,9 +859,38 @@ def api_group_exchange_info(group_name):
                     
         return jsonify({
             'primary_email': primary_email,
-            'proxy_addresses': [str(p) for p in proxy_addresses if str(p).lower().startswith('smtp:')]
+            'proxy_addresses': [str(p) for p in proxy_addresses if str(p).lower().startswith('smtp:')],
+            'hide_from_address_lists': hide_from_address_lists
         })
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/update_group_hide_status', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_update_group_hide_status():
+    data = request.get_json()
+    group_name = data.get('group_name')
+    hide = data.get('hide', False)
+    
+    if not group_name:
+        return jsonify({'error': 'Grupo é obrigatório'}), 400
+        
+    try:
+        conn = get_service_account_connection()
+        group = get_group_by_name(conn, group_name, attributes=['distinguishedName'])
+        if not group:
+            return jsonify({'error': 'Grupo não encontrado'}), 404
+            
+        conn.modify(group.distinguishedName.value, {'msExchHideFromAddressLists': [(ldap3.MODIFY_REPLACE, [hide])]})
+        if conn.result['description'] == 'success':
+            logging.info(f"[EXCHANGE] Status ocultação do grupo '{group_name}' alterado para {hide} por '{session.get('user_display_name')}'.")
+            save_to_history('exchange_change', group_name, f"Status ocultação do grupo alterado para {hide} por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
+    except Exception as e:
+        logging.error(f"Erro ao atualizar status de ocultação para o grupo {group_name}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @groups_bp.route('/api/add_group_proxy_address', methods=['POST'])
