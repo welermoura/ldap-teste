@@ -86,8 +86,15 @@ def dashboard():
 @require_auth
 def admin_change_password():
     if 'master_admin' not in session:
-        flash('Contas autenticadas via Active Directory não podem alterar a senha localmente. Altere no AD.', 'warning')
-        return redirect(url_for('admin.dashboard'))
+        # Tenta recuperar a variável caso o login tenha sido feito antes do deploy
+        from common import load_admin_users
+        admins = load_admin_users()
+        current_user = session.get('ad_user')
+        if current_user and current_user in admins and admins[current_user] != "AD_AUTH":
+            session['master_admin'] = current_user
+        else:
+            flash('Contas autenticadas via Active Directory não podem alterar a senha localmente. Altere no AD.', 'warning')
+            return redirect(url_for('admin.dashboard'))
     
     form = AdminChangePasswordForm()
     if form.validate_on_submit():
