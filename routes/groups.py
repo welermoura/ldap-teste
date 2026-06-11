@@ -96,7 +96,7 @@ def group_management():
             query = form.search_query.data
             escaped_query = escape_filter_chars(query)
             search_filter = f"(&(objectClass=group)(|(cn=*{escaped_query}*)(mail=*{escaped_query}*)(proxyAddresses=*{escaped_query}*)))"
-            conn.search(search_base, search_filter, attributes=['cn', 'description', 'member', 'groupType', 'mail', 'proxyAddresses'])
+            conn.search(search_base, search_filter, attributes=['cn', 'sAMAccountName', 'description', 'member', 'groupType', 'mail', 'proxyAddresses'])
             
             groups = []
             for g in conn.entries:
@@ -132,6 +132,7 @@ def group_management():
 
                 groups.append({
                     'cn': g.cn.value if 'cn' in g else 'Desconhecido',
+                    'sAMAccountName': g.sAMAccountName.value if 'sAMAccountName' in g else (g.cn.value if 'cn' in g else 'Desconhecido'),
                     'member_count': len(g.member.values) if 'member' in g and g.member.values else 0,
                     'type_scope': f"{type_str} - {scope_str}",
                     'mail': mail_val
@@ -150,7 +151,7 @@ def view_group(group_name):
     form = FlaskForm()
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, attributes=['cn', 'description', 'groupType', 'mail', 'proxyAddresses'])
+        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'description', 'groupType', 'mail', 'proxyAddresses'])
         if not group:
             flash(f"Grupo '{group_name}' não encontrado.", 'error')
             return redirect(url_for('groups.group_management'))
@@ -162,6 +163,7 @@ def view_group(group_name):
         
         group_info = {
             'cn': group.cn.value if 'cn' in group else group_name,
+            'sAMAccountName': group.sAMAccountName.value if 'sAMAccountName' in group else (group.cn.value if 'cn' in group else group_name),
             'description': group.description.value if 'description' in group else '',
             'is_security': is_security,
             'scope': scope_val,
@@ -466,11 +468,12 @@ def api_user_groups(username):
         group_dns = user.memberOf.values if 'memberOf' in user and user.memberOf.values else []
         groups_details = []
         for dn in group_dns:
-            conn.search(dn, '(objectClass=group)', BASE, attributes=['cn', 'description'])
+            conn.search(dn, '(objectClass=group)', BASE, attributes=['cn', 'sAMAccountName', 'description'])
             if conn.entries:
                 group_entry = conn.entries[0]
                 groups_details.append({
                     'cn': get_attr_value(group_entry, 'cn'),
+                    'sAMAccountName': get_attr_value(group_entry, 'sAMAccountName') or get_attr_value(group_entry, 'cn'),
                     'description': get_attr_value(group_entry, 'description')
                 })
         sorted_groups = sorted(groups_details, key=lambda g: g.get('cn', '').lower())
@@ -807,12 +810,17 @@ def api_update_group_settings():
             
         current_type = group.groupType.value if 'groupType' in group and group.groupType.value else 0
         
-        # Limpar apenas bit de segurança (0x80000000)
-        new_type = current_type & ~2147483648
+        # Garantir tratamento de 32 bits em Python
+        current_type_32 = current_type & 0xffffffff
+        new_type = current_type_32 & ~2147483648
         
         # Adicionar bit de segurança se for o caso
         if is_security:
             new_type = new_type | 2147483648
+            
+        # Converter de volta para signed 32-bit para evitar overflow e erro 00000057 do AD
+        if new_type >= 0x80000000:
+            new_type -= 0x100000000
             
         conn.modify(group.distinguishedName.value, {'groupType': [(ldap3.MODIFY_REPLACE, [new_type])]})
         

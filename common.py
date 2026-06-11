@@ -828,8 +828,8 @@ def search_groups_for_user_addition(conn, query, username):
         current_user_groups_dns = set(user.memberOf.values) if 'memberOf' in user and user.memberOf.values else set()
 
         # 2. Buscar todos os grupos que correspondem à query
-        search_filter = f"(&(objectClass=group)(cn=*{escape_filter_chars(query)}*))"
-        conn.search(search_base, search_filter, attributes=['cn', 'description', 'distinguishedName'])
+        search_filter = f"(&(objectClass=group)(|(cn=*{escape_filter_chars(query)}*)(sAMAccountName=*{escape_filter_chars(query)}*)))"
+        conn.search(search_base, search_filter, attributes=['cn', 'sAMAccountName', 'description', 'distinguishedName'])
 
         # 3. Filtrar os resultados para excluir aqueles dos quais o usuário já é membro
         groups_not_member_of = []
@@ -837,6 +837,7 @@ def search_groups_for_user_addition(conn, query, username):
             if group.distinguishedName.value not in current_user_groups_dns:
                 groups_not_member_of.append({
                     'cn': group.cn.value if 'cn' in group else '',
+                    'sAMAccountName': group.sAMAccountName.value if 'sAMAccountName' in group else (group.cn.value if 'cn' in group else ''),
                     'description': group.description.value if 'description' in group else 'N/A'
                 })
 
@@ -862,9 +863,17 @@ def get_group_by_name(conn, group_name, attributes=None):
         attributes = ALL_ATTRIBUTES
     config = load_config()
     search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
+    
+    # 1. Tenta buscar por sAMAccountName (único e preciso)
+    conn.search(search_base, f'(&(objectClass=group)(sAMAccountName={group_name}))', attributes=attributes)
+    if conn.entries:
+        return conn.entries[0]
+        
+    # 2. Fallback para cn (compatibilidade)
     conn.search(search_base, f'(&(objectClass=group)(cn={group_name}))', attributes=attributes)
     if conn.entries:
         return conn.entries[0]
+        
     return None
 
 def save_to_history(action, user_sam, details=""):

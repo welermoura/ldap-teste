@@ -46,7 +46,7 @@
                         </td>
                         <td class="text-center">{{ group.member_count }}</td>
                         <td class="text-end">
-                            <a href="{{ url_for('groups.view_group', group_name=group.cn) }}" class="btn btn-sm btn-info">
+                            <a href="{{ url_for('groups.view_group', group_name=group.sAMAccountName) }}" class="btn btn-sm btn-info">
                                 <i class="fas fa-edit me-1"></i> Editar Grupo
                             </a>
                         </td>

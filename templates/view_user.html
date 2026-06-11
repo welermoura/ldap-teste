@@ -541,10 +541,10 @@ document.addEventListener('DOMContentLoaded', function() {
         groups.forEach(group => {
             const row = tbody.insertRow();
             row.innerHTML = `
-                <td><a href="/view_group/${encodeURIComponent(group.cn)}">${escapeHTML(group.cn)}</a></td>
+                <td><a href="/view_group/${encodeURIComponent(group.sAMAccountName || group.cn)}">${escapeHTML(group.cn)}</a></td>
                 <td>${escapeHTML(group.description) || 'N/A'}</td>
                 <td class="text-end">
-                    <button class="btn btn-danger btn-sm remove-group-btn" data-group-name="${escapeHTML(group.cn)}" title="Remover do grupo">
+                    <button class="btn btn-danger btn-sm remove-group-btn" data-group-name="${escapeHTML(group.sAMAccountName || group.cn)}" title="Remover do grupo">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </td>
@@ -573,10 +573,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <small class="d-block text-muted">${escapeHTML(group.description) || 'Sem descrição'}</small>
                 </td>
                 <td class="text-center">
-                    <input type="checkbox" class="form-check-input check-add" data-group-name="${escapeHTML(group.cn)}">
+                    <input type="checkbox" class="form-check-input check-add" data-group-name="${escapeHTML(group.sAMAccountName || group.cn)}">
                 </td>
                 <td class="text-center">
-                    <input type="checkbox" class="form-check-input check-temp" data-group-name="${escapeHTML(group.cn)}">
+                    <input type="checkbox" class="form-check-input check-temp" data-group-name="${escapeHTML(group.sAMAccountName || group.cn)}">
                 </td>
             `;
             tableBody.appendChild(tr);

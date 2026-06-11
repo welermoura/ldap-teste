@@ -33,7 +33,7 @@
                      <button class="btn btn-sm btn-danger animate-hover d-none" id="btn-batch-remove-members">
                         <i class="fas fa-trash-alt me-1"></i> Remover Selecionados (<span id="batch-remove-count">0</span>)
                      </button>
-                     <a href="{{ url_for('groups.api_export_group_members', group_name=group.cn) }}" class="btn btn-sm btn-secondary">
+                     <a href="{{ url_for('groups.api_export_group_members', group_name=group.sAMAccountName) }}" class="btn btn-sm btn-secondary">
                         <i class="fas fa-file-csv me-1"></i> Exportar Membros
                     </a>
                     <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#batchAddMembersModal">
@@ -352,7 +352,7 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const groupName = {{ group.cn|tojson }};
+    const groupName = {{ group.sAMAccountName|tojson }};
     const csrfToken = "{{ form.csrf_token._value() if form.csrf_token else '' }}";
     let memberListPage = 1;
     let memberListQuery = '';
