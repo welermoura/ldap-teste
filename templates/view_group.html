@@ -72,6 +72,11 @@
                     </div>
                     <div class="card-body">
                         <form id="group-settings-form">
+                            <div class="mb-4">
+                                <label for="group-display-name" class="form-label"><strong>Nome do Grupo</strong></label>
+                                <input type="text" class="form-control" id="group-display-name" value="{{ group.displayName if group.displayName else group.cn }}" required>
+                            </div>
+                            
                             <h6 class="mb-3">Tipo do Grupo</h6>
                             <div class="mb-4">
                                 <div class="form-check form-check-inline">
@@ -100,7 +105,7 @@
                                 </div>
                             </div>
                             
-                            <button type="button" id="save-group-settings-btn" class="btn btn-primary">Salvar Alteração de Tipo</button>
+                            <button type="button" id="save-group-settings-btn" class="btn btn-primary">Salvar Configurações</button>
                         </form>
                     </div>
                 </div>
@@ -753,6 +758,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveGroupSettingsBtn = document.getElementById('save-group-settings-btn');
     if (saveGroupSettingsBtn) {
         saveGroupSettingsBtn.addEventListener('click', async () => {
+            const displayName = document.getElementById('group-display-name').value.trim();
+            if (!displayName) {
+                showToast('O nome do grupo é obrigatório.', 'warning', 'Aviso');
+                return;
+            }
             const isSecurity = document.getElementById('type_security').checked;
             let scope = 'global';
             if (document.getElementById('scope_domain_local').checked) scope = 'domain_local';
@@ -768,17 +778,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({
                         group_name: groupName,
                         is_security: isSecurity,
-                        scope: scope
+                        scope: scope,
+                        display_name: displayName
                     })
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
-                showToast('Configurações atualizadas com sucesso.', 'success', 'Sucesso');
+                showToast('Configurações atualizadas com sucesso. Recarregando página...', 'success', 'Sucesso');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } catch (error) {
                 showToast(`Falha ao salvar configurações: ${error.message}`, 'error', 'Erro');
-            } finally {
                 saveGroupSettingsBtn.disabled = false;
-                saveGroupSettingsBtn.textContent = 'Salvar Alteração de Tipo';
+                saveGroupSettingsBtn.textContent = 'Salvar Configurações';
             }
         });
     }

@@ -151,7 +151,7 @@ def view_group(group_name):
     form = FlaskForm()
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'description', 'groupType', 'mail', 'proxyAddresses', 'msExchHideFromAddressLists'])
+        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'displayName', 'description', 'groupType', 'mail', 'proxyAddresses', 'msExchHideFromAddressLists'])
         if not group:
             flash(f"Grupo '{group_name}' não encontrado.", 'error')
             return redirect(url_for('groups.group_management'))
@@ -164,6 +164,7 @@ def view_group(group_name):
         
         group_info = {
             'cn': group.cn.value if 'cn' in group else group_name,
+            'displayName': group.displayName.value if 'displayName' in group and group.displayName.value else (group.cn.value if 'cn' in group else group_name),
             'sAMAccountName': group.sAMAccountName.value if 'sAMAccountName' in group else (group.cn.value if 'cn' in group else group_name),
             'description': group.description.value if 'description' in group else '',
             'is_security': is_security,
@@ -800,16 +801,31 @@ def api_update_group_settings():
     group_name = data.get('group_name')
     is_security = data.get('is_security', True)
     scope = data.get('scope', 'global')
+    display_name = data.get('display_name')
     
     if not group_name:
         return jsonify({'error': 'Nome do grupo obrigatório'}), 400
         
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, ['distinguishedName', 'groupType'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName', 'groupType', 'cn', 'displayName'])
         if not group:
             return jsonify({'error': 'Grupo não encontrado'}), 404
             
+        current_dn = group.distinguishedName.value
+        new_name = display_name.strip() if display_name else ''
+        
+        # 1. Renomeia o objeto no AD se o CN mudou
+        if new_name and new_name != group.cn.value:
+            conn.modify_dn(group.distinguishedName.value, f"cn={new_name}")
+            if conn.result['description'] == 'success':
+                # Reconstrói o novo DN
+                parent_dn = ','.join(group.distinguishedName.value.split(',')[1:])
+                current_dn = f"CN={new_name},{parent_dn}"
+            else:
+                return jsonify({'error': f"Falha ao renomear o grupo no AD: {conn.result['message']}"}), 400
+                
+        # 2. Atualiza os atributos displayName e groupType
         current_type = group.groupType.value if 'groupType' in group and group.groupType.value else 0
         
         # Garantir tratamento de 32 bits em Python
@@ -824,11 +840,17 @@ def api_update_group_settings():
         if new_type >= 0x80000000:
             new_type -= 0x100000000
             
-        conn.modify(group.distinguishedName.value, {'groupType': [(ldap3.MODIFY_REPLACE, [new_type])]})
+        modifications = {
+            'groupType': [(ldap3.MODIFY_REPLACE, [new_type])]
+        }
+        if new_name:
+            modifications['displayName'] = [(ldap3.MODIFY_REPLACE, [new_name])]
+            
+        conn.modify(current_dn, modifications)
         
         if conn.result['description'] == 'success':
-            logging.info(f"Tipo do grupo '{group_name}' alterado por '{session.get('user_display_name')}'.")
-            save_to_history('alteration', group_name, f"Tipo do grupo alterado por '{session.get('user_display_name')}'")
+            logging.info(f"Configurações do grupo '{group_name}' atualizadas por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', group_name, f"Configurações do grupo atualizadas por '{session.get('user_display_name')}' (Nome: {new_name or group.cn.value})")
             return jsonify({'success': True, 'message': 'Configurações atualizadas'})
         else:
             return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
