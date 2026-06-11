@@ -1164,11 +1164,58 @@ def api_delete_object():
         
     try:
         conn = get_service_account_connection()
+        
+        # Verifica se o objeto deletado é um grupo e pega seu sAMAccountName antes de deletar
+        is_group = False
+        sam_name = None
+        try:
+            conn.search(dn, '(objectClass=group)', attributes=['sAMAccountName'])
+            if conn.entries:
+                is_group = True
+                sam_name = conn.entries[0].sAMAccountName.value
+        except Exception as e_search:
+            logging.warning(f"Erro ao verificar se o objeto a ser deletado é um grupo: {e_search}")
+            
         conn.delete(dn)
         
         if conn.result['description'] == 'success':
             logging.info(f"[EXCLUSÃO] Objeto '{name or dn}' excluído por '{session.get('user_display_name')}'.")
             save_to_history('exclusion', name or dn, f"Objeto excluído via API por '{session.get('user_display_name')}'")
+            
+            # Se for um grupo e a integração com o Zimbra estiver ativa, exclui a DL correspondente no Zimbra
+            if is_group and sam_name:
+                config = load_config()
+                if config.get('ZIMBRA_ENABLED', False):
+                    try:
+                        from routes.zimbra import load_zimbra_mappings, save_zimbra_mappings
+                        mappings = load_zimbra_mappings()
+                        target_mapping = None
+                        for m in mappings:
+                            if m.get('ad_group_name') == sam_name:
+                                target_mapping = m
+                                break
+                                
+                        if target_mapping:
+                            zimbra_email = target_mapping.get('zimbra_dl_email')
+                            if zimbra_email:
+                                zimbra_url = config.get('ZIMBRA_API_URL')
+                                zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+                                zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+                                if zimbra_url and zimbra_user and zimbra_password:
+                                    from routes.zimbra_api import ZimbraSOAPClient
+                                    client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+                                    try:
+                                        client.delete_dl(zimbra_email)
+                                        logging.info(f"[ZIMBRA] DL '{zimbra_email}' excluída automaticamente após exclusão do grupo AD '{sam_name}'.")
+                                    except Exception as ez_del:
+                                        logging.error(f"[ZIMBRA] Erro ao excluir DL '{zimbra_email}' do Zimbra: {ez_del}")
+                            
+                            # Remove o mapeamento
+                            mappings = [m for m in mappings if m.get('ad_group_name') != sam_name]
+                            save_zimbra_mappings(mappings)
+                    except Exception as ez:
+                        logging.error(f"[ZIMBRA] Erro ao limpar mapeamento do Zimbra após exclusão do grupo '{sam_name}': {ez}")
+            
             return jsonify({'success': True, 'message': 'Objeto excluído com sucesso.'})
         else:
             return jsonify({'success': False, 'error': conn.result['description']}), 500

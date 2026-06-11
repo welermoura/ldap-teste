@@ -247,6 +247,51 @@ class ZimbraSOAPClient:
         self._send_soap_request(body_xml)
         return True
 
+    def rename_dl(self, dl_email, new_dl_email):
+        """
+        Renomeia uma Lista de Distribuição no Zimbra.
+        """
+        if not self.auth_token:
+            self.authenticate()
+            
+        # Busca o ID da lista pelo e-mail atual
+        dl_info = self.get_dl_members(dl_email)
+        dl_id = dl_info.get("id")
+        if not dl_id:
+            raise Exception(f"Lista de distribuição '{dl_email}' não encontrada no Zimbra.")
+            
+        body_xml = f"""
+        <RenameDistributionListRequest xmlns="urn:zimbraAdmin">
+            <id>{escape(dl_id)}</id>
+            <newName>{escape(new_dl_email)}</newName>
+        </RenameDistributionListRequest>
+        """
+        
+        self._send_soap_request(body_xml)
+        return True
+
+    def delete_dl(self, dl_email):
+        """
+        Exclui uma Lista de Distribuição no Zimbra.
+        """
+        if not self.auth_token:
+            self.authenticate()
+            
+        # Busca o ID da lista pelo e-mail atual
+        dl_info = self.get_dl_members(dl_email)
+        dl_id = dl_info.get("id")
+        if not dl_id:
+            raise Exception(f"Lista de distribuição '{dl_email}' não encontrada no Zimbra.")
+            
+        body_xml = f"""
+        <DeleteDistributionListRequest xmlns="urn:zimbraAdmin">
+            <id>{escape(dl_id)}</id>
+        </DeleteDistributionListRequest>
+        """
+        
+        self._send_soap_request(body_xml)
+        return True
+
     def get_all_dls(self):
         """
         Obtém todas as Listas de Distribuição no Zimbra, incluindo os seus apelidos (aliases).

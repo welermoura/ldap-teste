@@ -8,6 +8,8 @@
 {% block page_title %}{% endblock %}
 
 {% block content %}
+{{ render_page_header('<i class="fas fa-user-plus me-2"></i>Criar Novo Usuário', back_url=url_for('users.manage_users')) }}
+
 <div class="card glass-card">
     <div class="card-body">
         <p class="card-text mb-4">Preencha os dados básicos do novo usuário e, em seguida, busque por um usuário modelo para copiar as permissões e atributos.</p>

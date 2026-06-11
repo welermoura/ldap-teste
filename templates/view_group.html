@@ -76,6 +76,10 @@
                                 <label for="group-display-name" class="form-label"><strong>Nome do Grupo</strong></label>
                                 <input type="text" class="form-control" id="group-display-name" value="{{ group.displayName if group.displayName else group.cn }}" required>
                             </div>
+                            <div class="mb-4">
+                                <label for="group-sam-account-name" class="form-label"><strong>Nome do grupo (anterior ao Windows 2000)</strong></label>
+                                <input type="text" class="form-control" id="group-sam-account-name" value="{{ group.sAMAccountName }}" required>
+                            </div>
                             
                             <h6 class="mb-3">Tipo do Grupo</h6>
                             <div class="mb-4">
@@ -106,6 +110,11 @@
                             </div>
                             
                             <button type="button" id="save-group-settings-btn" class="btn btn-primary">Salvar Configurações</button>
+                            {% if check_permission(action='can_delete_user') %}
+                            <button type="button" class="btn btn-danger ms-2 animate-hover" data-bs-toggle="modal" data-bs-target="#deleteGroupModal">
+                                <i class="fas fa-trash-alt me-1"></i>Excluir Grupo
+                            </button>
+                            {% endif %}
                         </form>
                     </div>
                 </div>
@@ -357,6 +366,36 @@
     </div>
   </div>
 </div>
+<!-- Modal de Exclusão de Grupo -->
+{% if check_permission(action='can_delete_user') %}
+<div class="modal fade" id="deleteGroupModal" tabindex="-1" aria-labelledby="deleteGroupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteGroupModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Confirmar Exclusão Permanente</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-dark">
+        <p>Esta ação <strong>não pode ser desfeita</strong>. O grupo <strong>{{ group.displayName }}</strong> será removido permanentemente do Active Directory.</p>
+        {% if group.is_zimbra_mapped %}
+        <p class="text-warning fw-bold"><i class="fas fa-exclamation-circle me-1"></i> Este grupo está integrado ao Zimbra. A lista correspondente no Zimbra será excluída automaticamente.</p>
+        {% else %}
+        <p class="text-danger fw-bold"><i class="fas fa-exclamation-circle me-1"></i> Este grupo NÃO está integrado ao Zimbra por regras de sincronização. Se a lista de distribuição existir no Zimbra, você precisará acessar o portal do Zimbra e removê-la manualmente.</p>
+        {% endif %}
+        <p>Para confirmar, por favor, digite o <strong>nome pré-Windows 2000 (sAMAccountName)</strong> do grupo no campo abaixo:</p>
+        <div class="mb-3">
+          <label for="confirm-group-sam" class="form-label">Digite o Nome: <strong class="text-highlight">{{ group.sAMAccountName }}</strong></label>
+          <input type="text" class="form-control" id="confirm-group-sam" placeholder="Ex: {{ group.sAMAccountName }}" autocomplete="off">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="confirm-delete-group-btn" class="btn btn-danger" disabled>Excluir Grupo</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -763,6 +802,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 showToast('O nome do grupo é obrigatório.', 'warning', 'Aviso');
                 return;
             }
+            const samAccountName = document.getElementById('group-sam-account-name').value.trim();
+            if (!samAccountName) {
+                showToast('O nome anterior ao Windows 2000 é obrigatório.', 'warning', 'Aviso');
+                return;
+            }
             const isSecurity = document.getElementById('type_security').checked;
             let scope = 'global';
             if (document.getElementById('scope_domain_local').checked) scope = 'domain_local';
@@ -779,15 +823,24 @@ document.addEventListener('DOMContentLoaded', function() {
                         group_name: groupName,
                         is_security: isSecurity,
                         scope: scope,
-                        display_name: displayName
+                        display_name: displayName,
+                        sam_account_name: samAccountName
                     })
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
-                showToast('Configurações atualizadas com sucesso. Recarregando página...', 'success', 'Sucesso');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                
+                if (result.new_sam) {
+                    showToast('Configurações atualizadas com sucesso. Redirecionando...', 'success', 'Sucesso');
+                    setTimeout(() => {
+                        window.location.href = '/view_group/' + encodeURIComponent(result.new_sam);
+                    }, 1000);
+                } else {
+                    showToast('Configurações atualizadas com sucesso. Recarregando página...', 'success', 'Sucesso');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
             } catch (error) {
                 showToast(`Falha ao salvar configurações: ${error.message}`, 'error', 'Erro');
                 saveGroupSettingsBtn.disabled = false;
@@ -1169,6 +1222,57 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         batchAddModalEl.addEventListener('hidden.bs.modal', resetBatchModalState);
+    }
+
+    // === Exclusão de Grupo ===
+    const confirmGroupSamInput = document.getElementById('confirm-group-sam');
+    const confirmDeleteGroupBtn = document.getElementById('confirm-delete-group-btn');
+    const groupSamToCheck = {{ group.sAMAccountName|tojson }};
+    const groupDnToDelete = {{ group.dn|tojson }};
+    
+    if (confirmGroupSamInput && confirmDeleteGroupBtn) {
+        confirmGroupSamInput.addEventListener('input', function() {
+            const typedVal = this.value.trim().toLowerCase();
+            if (typedVal === groupSamToCheck.toLowerCase()) {
+                confirmDeleteGroupBtn.removeAttribute('disabled');
+            } else {
+                confirmDeleteGroupBtn.setAttribute('disabled', 'true');
+            }
+        });
+        
+        confirmDeleteGroupBtn.addEventListener('click', async function() {
+            try {
+                confirmDeleteGroupBtn.disabled = true;
+                confirmDeleteGroupBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Excluindo...';
+                
+                const response = await fetch('/api/delete_object', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        dn: groupDnToDelete,
+                        name: groupSamToCheck
+                    })
+                });
+                
+                const result = await response.json();
+                if (response.ok && result.success) {
+                    showToast('Grupo excluído com sucesso!', 'success', 'Sucesso');
+                    // Redireciona para o gerenciamento de grupos após 1.5s
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('groups.group_management') }}";
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Erro desconhecido');
+                }
+            } catch (error) {
+                showToast(`Erro ao excluir grupo: ${error.message}`, 'error', 'Erro');
+                confirmDeleteGroupBtn.disabled = false;
+                confirmDeleteGroupBtn.innerHTML = 'Excluir Grupo';
+            }
+        });
     }
 });
 </script>

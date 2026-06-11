@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}Criar Novo Grupo - Gestão AD{% endblock %}
+
+{% from "_macros.html" import render_page_header %}
+
+{% block page_title %}{% endblock %}
+
+{% block content %}
+{{ render_page_header('<i class="fas fa-layer-group me-2"></i>Criar Novo Grupo', back_url=url_for('groups.group_management')) }}
+
+<div class="card glass-card">
+    <div class="card-body">
+        <p class="card-text mb-4">Preencha as configurações do novo grupo para criá-lo no Active Directory.</p>
+
+        <form method="POST" action="{{ url_for('groups.create_group_form') }}" class="needs-validation" novalidate>
+            {{ form.hidden_tag() }}
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 text-primary"><i class="fas fa-id-card me-2"></i>Identificação do Grupo</legend>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="display_name" class="form-label"><strong>Nome do Grupo</strong> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="display_name" name="display_name" placeholder="Ex: Coordenadores TI" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="sam_account_name" class="form-label"><strong>Nome do grupo (anterior ao Windows 2000)</strong> <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="sam_account_name" name="sam_account_name" placeholder="Ex: Coordenadores-TI" required>
+                        <small class="text-muted">Evite espaços e caracteres especiais como \ / [ ] : ; | = , + * ? < ></small>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label for="description" class="form-label"><strong>Descrição</strong></label>
+                        <input type="text" class="form-control" id="description" name="description" placeholder="Descreva brevemente a finalidade deste grupo (opcional)">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12 mb-3 d-none" id="email-field-container">
+                        <div class="mb-3">
+                            <label for="email" class="form-label"><strong>E-mail do Grupo</strong> <span id="email-required-indicator" class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" placeholder="Ex: grupo@grupocomolatti.com.br">
+                            <small class="text-muted" id="email-help-text">Obrigatório para grupos de distribuição.</small>
+                        </div>
+                        <div class="form-check form-switch p-3 bg-light bg-opacity-10 rounded border border-secondary border-opacity-25 mt-3">
+                            <input class="form-check-input ms-0 me-2" type="checkbox" role="switch" id="hide_from_gal" name="hide_from_gal" value="true">
+                            <label class="form-check-label text-warning fw-bold cursor-pointer" for="hide_from_gal">
+                                <i class="fas fa-eye-slash me-1"></i> Ocultar Grupo da Lista de Endereços Global (Exchange 365)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 text-primary"><i class="fas fa-sliders-h me-2"></i>Tipo e Escopo</legend>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label d-block"><strong>Tipo do Grupo</strong></label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="group_type" id="type_security" value="security" checked>
+                            <label class="form-check-label" for="type_security">Segurança</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="group_type" id="type_distribution" value="distribution">
+                            <label class="form-check-label" for="type_distribution">Distribuição</label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label d-block"><strong>Escopo do Grupo</strong></label>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="group_scope" id="scope_global" value="global" checked>
+                            <label class="form-check-label" for="scope_global">Global</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="group_scope" id="scope_domain_local" value="domain_local">
+                            <label class="form-check-label" for="scope_domain_local">Local de Domínio</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="group_scope" id="scope_universal" value="universal">
+                            <label class="form-check-label" for="scope_universal">Universal</label>
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="mb-4">
+                <legend class="h5 mb-3 text-primary"><i class="fas fa-folder me-2"></i>Localização no AD</legend>
+                <div class="mb-3">
+                    <label for="ou_search_input" class="form-label"><strong>OU de Destino (Organizational Unit)</strong> <span class="text-danger">*</span></label>
+                    <div class="dropdown">
+                        <input type="text" class="form-control dropdown-toggle" id="ou_search_input" placeholder="Digite para pesquisar a OU..." data-bs-toggle="dropdown" autocomplete="off" required>
+                        <div class="spinner-border spinner-border-sm text-primary position-absolute top-50 end-0 translate-middle-y me-5 d-none" id="ou-loading-spinner" role="status"></div>
+                        <ul class="dropdown-menu w-100 shadow-sm" id="ou_dropdown_menu" style="max-height: 250px; overflow-y: auto; z-index: 1050;">
+                            <li class="p-2 text-center text-muted" id="ou-dropdown-loading">Carregando OUs...</li>
+                        </ul>
+                        <input type="hidden" name="target_ou" id="target_ou_hidden" required>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="mt-4 text-end">
+                <a href="{{ url_for('groups.group_management') }}" class="btn btn-secondary btn-lg me-2">Cancelar</a>
+                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                    <i class="fas fa-check me-2"></i>Criar Grupo
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Alerta para Validação -->
+<div class="modal fade" id="validationModal" tabindex="-1" aria-labelledby="validationModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="validationModalLabel"><i class="fas fa-exclamation-triangle me-2"></i>Atenção</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="validationModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    const form = document.querySelector('form');
+    const validationModal = new bootstrap.Modal(document.getElementById('validationModal'));
+    const validationModalBody = document.getElementById('validationModalBody');
+    const ouLoadingSpinner = document.getElementById('ou-loading-spinner');
+    
+    const displayNameInput = document.getElementById('display_name');
+    const samAccountInput = document.getElementById('sam_account_name');
+    
+    const typeSecurityRadio = document.getElementById('type_security');
+    const typeDistributionRadio = document.getElementById('type_distribution');
+    const emailInput = document.getElementById('email');
+    const emailRequiredIndicator = document.getElementById('email-required-indicator');
+    const emailHelpText = document.getElementById('email-help-text');
+    const emailFieldContainer = document.getElementById('email-field-container');
+
+    let allOUs = []; // Cache list of OUs
+
+    // 1. Sugestão automática de sAMAccountName a partir do displayName
+    if (displayNameInput && samAccountInput) {
+        displayNameInput.addEventListener('input', function() {
+            let val = this.value;
+            val = val.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove acentos
+            val = val.replace(/[^a-zA-Z0-9\s-_]/g, ""); // Mantém letras, números, espaços, hifens, underlines
+            val = val.trim().replace(/\s+/g, "-"); // Substitui espaços por hifens
+            samAccountInput.value = val;
+        });
+    }
+
+    const hideFromGalCheckbox = document.getElementById('hide_from_gal');
+
+    // 2. Toggle de obrigatoriedade e visibilidade do e-mail dependendo do tipo do grupo
+    function updateEmailFieldBehavior() {
+        if (typeDistributionRadio.checked) {
+            emailFieldContainer.classList.remove('d-none');
+            emailInput.required = true;
+        } else {
+            emailFieldContainer.classList.add('d-none');
+            emailInput.required = false;
+            emailInput.value = ''; // Limpa o valor para não enviar e-mail em grupos de segurança
+            if (hideFromGalCheckbox) {
+                hideFromGalCheckbox.checked = false; // Desmarca o switch de ocultação se mudar para segurança
+            }
+        }
+    }
+
+    if (typeSecurityRadio && typeDistributionRadio) {
+        typeSecurityRadio.addEventListener('change', updateEmailFieldBehavior);
+        typeDistributionRadio.addEventListener('change', updateEmailFieldBehavior);
+        updateEmailFieldBehavior(); // Executa no load
+    }
+
+    // 3. Dropdown de OUs Pesquisável
+    const ouSearchInput = document.getElementById('ou_search_input');
+    const ouDropdownMenu = document.getElementById('ou_dropdown_menu');
+    const targetOuHidden = document.getElementById('target_ou_hidden');
+
+    function renderOuDropdown(list) {
+        ouDropdownMenu.innerHTML = '';
+        if (list.length === 0) {
+            ouDropdownMenu.innerHTML = '<li class="p-2 text-center text-muted">Nenhuma OU encontrada</li>';
+            return;
+        }
+        list.forEach(ou => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.className = 'dropdown-item cursor-pointer';
+            a.href = '#';
+            a.dataset.dn = ou.dn;
+            a.dataset.name = ou.name;
+            a.textContent = ou.name;
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                ouSearchInput.value = ou.name;
+                targetOuHidden.value = ou.dn;
+                
+                // Fecha o dropdown manualmente
+                const dropdownInstance = bootstrap.Dropdown.getOrCreateInstance(ouSearchInput);
+                dropdownInstance.hide();
+            });
+            li.appendChild(a);
+            ouDropdownMenu.appendChild(li);
+        });
+    }
+
+    // Carrega as OUs via API
+    try {
+        if (ouLoadingSpinner) ouLoadingSpinner.classList.remove('d-none');
+        const response = await fetch('/api/list_organizational_units');
+        if (!response.ok) throw new Error("Falha ao carregar as OUs");
+        allOUs = await response.json();
+        
+        renderOuDropdown(allOUs);
+    } catch (err) {
+        console.error(err);
+        document.getElementById('ou-dropdown-loading').textContent = "Erro ao carregar OUs";
+    } finally {
+        if (ouLoadingSpinner) ouLoadingSpinner.classList.add('d-none');
+    }
+
+    // Filtro de OUs ao digitar
+    ouSearchInput.addEventListener('input', function() {
+        const term = this.value.toLowerCase();
+        targetOuHidden.value = '';
+        
+        const filtered = allOUs.filter(ou => ou.name.toLowerCase().includes(term));
+        renderOuDropdown(filtered);
+        
+        const dropdownInstance = bootstrap.Dropdown.getOrCreateInstance(ouSearchInput);
+        dropdownInstance.show();
+    });
+
+    // Re-renderiza tudo e exibe ao focar
+    ouSearchInput.addEventListener('focus', function() {
+        renderOuDropdown(allOUs);
+        const dropdownInstance = bootstrap.Dropdown.getOrCreateInstance(ouSearchInput);
+        dropdownInstance.show();
+    });
+
+    // 4. Validação do formulário
+    if (form) {
+        form.addEventListener('submit', function(event) {
+            const displayName = displayNameInput.value.trim();
+            const samAccountName = samAccountInput.value.trim();
+            const targetOu = targetOuHidden.value;
+            const email = emailInput.value.trim();
+
+            if (!displayName) {
+                event.preventDefault();
+                validationModalBody.textContent = "O campo 'Nome do Grupo' é obrigatório.";
+                validationModal.show();
+                displayNameInput.focus();
+                return;
+            }
+
+            if (!samAccountName) {
+                event.preventDefault();
+                validationModalBody.textContent = "O campo 'Nome do grupo (anterior ao Windows 2000)' é obrigatório.";
+                validationModal.show();
+                samAccountInput.focus();
+                return;
+            }
+
+            const invalidChars = /[\\\/\[\]:;|#=,\+\*\?<>"]/;
+            if (invalidChars.test(samAccountName)) {
+                event.preventDefault();
+                validationModalBody.textContent = "O campo 'Nome anterior ao Windows 2000' contém caracteres inválidos.";
+                validationModal.show();
+                samAccountInput.focus();
+                return;
+            }
+
+            if (samAccountName.length > 256) {
+                event.preventDefault();
+                validationModalBody.textContent = "O nome anterior ao Windows 2000 excede o limite de 256 caracteres.";
+                validationModal.show();
+                samAccountInput.focus();
+                return;
+            }
+
+            if (typeDistributionRadio.checked && !email) {
+                event.preventDefault();
+                validationModalBody.textContent = "O campo 'E-mail do Grupo' é obrigatório para grupos de distribuição.";
+                validationModal.show();
+                emailInput.focus();
+                return;
+            }
+
+            if (email) {
+                const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailPattern.test(email)) {
+                    event.preventDefault();
+                    validationModalBody.textContent = "Por favor, insira um endereço de e-mail válido.";
+                    validationModal.show();
+                    emailInput.focus();
+                    return;
+                }
+            }
+
+            if (!targetOu) {
+                event.preventDefault();
+                validationModalBody.textContent = "Por favor, selecione uma OU de Destino da lista sugerida.";
+                validationModal.show();
+                ouSearchInput.focus();
+                return;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

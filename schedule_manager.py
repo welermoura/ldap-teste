@@ -214,6 +214,15 @@ def process_zimbra_group_syncs(conn, config):
                     if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
                         zimbra_exists = False
                 
+                # Exclui a DL do Zimbra se o grupo do AD foi removido
+                if zimbra_exists:
+                    try:
+                        client.delete_dl(zimbra_email)
+                        logging.warning(f"Lista do Zimbra '{zimbra_email}' excluída automaticamente porque o grupo AD '{ad_group}' correspondente foi removido.")
+                        zimbra_exists = False
+                    except Exception as e_dl_del:
+                        logging.error(f"Erro ao excluir DL no Zimbra '{zimbra_email}' para o grupo AD removido '{ad_group}': {e_dl_del}")
+
                 try:
                     from models import db, ZimbraMapping
                     db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
@@ -221,7 +230,7 @@ def process_zimbra_group_syncs(conn, config):
                         db.session.delete(db_m)
                         db.session.commit()
                         if not zimbra_exists:
-                            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente pelo agendador porque o grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais.")
+                            save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento e lista do Zimbra removidos automaticamente pelo agendador porque o grupo AD '{ad_group}' foi removido.")
                             logging.warning(f"Mapeamento '{ad_group}' -> '{zimbra_email}' deletado automaticamente (ambos ausentes).")
                         else:
                             save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente pelo agendador porque o grupo AD '{ad_group}' não existe mais.")

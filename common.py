@@ -246,12 +246,16 @@ def load_permissions():
                 loaded_views = json.loads(p.views) if hasattr(p, 'views') and p.views else {}
                 if isinstance(loaded_views, list):
                     loaded_views = {}
+                loaded_fields = json.loads(p.fields) if hasattr(p, 'fields') and p.fields else []
+                if not isinstance(loaded_fields, list):
+                    loaded_fields = []
 
                 result[p.group_name] = {
                     'type': p.type,
                     'allowed_ous': json.loads(p.allowed_ous) if p.allowed_ous else [],
                     'actions': loaded_actions,
-                    'views': loaded_views
+                    'views': loaded_views,
+                    'fields': loaded_fields
                 }
             return result
         except Exception as e:
@@ -266,6 +270,8 @@ def load_permissions():
                     v['actions'] = {}
                 if 'views' not in v or isinstance(v['views'], list):
                     v['views'] = {}
+                if 'fields' not in v or not isinstance(v['fields'], list):
+                    v['fields'] = []
             return data
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -285,19 +291,22 @@ def save_permissions(permissions):
                 allowed_ous_str = json.dumps(v.get('allowed_ous', []))
                 actions_str = json.dumps(v.get('actions', {}))
                 views_str = json.dumps(v.get('views', {}))
+                fields_str = json.dumps(v.get('fields', []))
                 perm = Permission.query.filter_by(group_name=k).first()
                 if perm:
                     perm.type = v.get('type', 'none')
                     perm.allowed_ous = allowed_ous_str
                     perm.actions = actions_str
                     perm.views = views_str
+                    perm.fields = fields_str
                 else:
                     perm = Permission(
                         group_name=k,
                         type=v.get('type', 'none'),
                         allowed_ous=allowed_ous_str,
                         actions=actions_str,
-                        views=views_str
+                        views=views_str,
+                        fields=fields_str
                     )
                     db.session.add(perm)
             db.session.commit()

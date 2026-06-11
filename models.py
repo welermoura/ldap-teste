@@ -37,6 +37,7 @@ class Permission(db.Model):
     allowed_ous = db.Column(db.Text, nullable=True) # JSON array encoded as string
     actions = db.Column(db.Text, nullable=True) # JSON object/array encoded as string
     views = db.Column(db.Text, nullable=True) # JSON object encoded as string
+    fields = db.Column(db.Text, nullable=True) # JSON array encoded as string
 
 class AdminUser(db.Model):
     __tablename__ = 'admin_users'
@@ -66,7 +67,7 @@ def seed_database_from_json(database_instance):
     basedir = os.path.abspath(os.path.dirname(__file__))
     data_dir = os.path.join(basedir, 'data')
     
-    # Executa verificação e migração simples para a coluna 'views' na tabela 'permissions'
+    # Executa verificação e migração simples para as colunas 'views' e 'fields' na tabela 'permissions'
     try:
         from sqlalchemy import inspect
         inspector = inspect(database_instance.engine)
@@ -78,8 +79,17 @@ def seed_database_from_json(database_instance):
                 database_instance.session.execute(db.text("ALTER TABLE permissions ADD views VARCHAR(MAX) NULL"))
                 database_instance.session.commit()
                 logging.info("[DB Migration] Column 'views' added successfully to 'permissions' table.")
+            if 'fields' not in columns:
+                logging.info("[DB Migration] Column 'fields' is missing from 'permissions' table. Adding it now...")
+                dialect = database_instance.engine.dialect.name
+                if dialect == 'sqlite':
+                    database_instance.session.execute(db.text("ALTER TABLE permissions ADD fields TEXT NULL"))
+                else:
+                    database_instance.session.execute(db.text("ALTER TABLE permissions ADD fields VARCHAR(MAX) NULL"))
+                database_instance.session.commit()
+                logging.info("[DB Migration] Column 'fields' added successfully to 'permissions' table.")
     except Exception as e:
-        logging.error(f"[DB Migration] Error checking/adding 'views' column: {e}")
+        logging.error(f"[DB Migration] Error checking/adding columns to permissions table: {e}")
 
     # Se estiver usando o SQL Server, não consultamos nem semeamos os arquivos JSON locais
     from common import load_config
@@ -175,12 +185,14 @@ def seed_database_from_json(database_instance):
                         allowed_ous_str = json.dumps(v.get('allowed_ous', []))
                         actions_str = json.dumps(v.get('actions', {}))
                         views_str = json.dumps(v.get('views', {}))
+                        fields_str = json.dumps(v.get('fields', []))
                         perm = Permission(
                             group_name=k,
                             type=v.get('type', 'none'),
                             allowed_ous=allowed_ous_str,
                             actions=actions_str,
-                            views=views_str
+                            views=views_str,
+                            fields=fields_str
                         )
                         database_instance.session.add(perm)
                 database_instance.session.commit()

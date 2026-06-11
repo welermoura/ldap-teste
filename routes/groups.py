@@ -151,7 +151,7 @@ def view_group(group_name):
     form = FlaskForm()
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'displayName', 'description', 'groupType', 'mail', 'proxyAddresses', 'msExchHideFromAddressLists'])
+        group = get_group_by_name(conn, group_name, attributes=['cn', 'sAMAccountName', 'displayName', 'description', 'groupType', 'mail', 'proxyAddresses', 'msExchHideFromAddressLists', 'distinguishedName'])
         if not group:
             flash(f"Grupo '{group_name}' não encontrado.", 'error')
             return redirect(url_for('groups.group_management'))
@@ -162,7 +162,20 @@ def view_group(group_name):
         scope_val = 'domain_local' if (g_type_val & 4) else ('global' if (g_type_val & 2) else ('universal' if (g_type_val & 8) else 'unknown'))
         hide_from_address_lists = group.msExchHideFromAddressLists.value if 'msExchHideFromAddressLists' in group and group.msExchHideFromAddressLists.value else False
         
+        # Verifica se o grupo está mapeado no Zimbra
+        is_mapped_to_zimbra = False
+        try:
+            from routes.zimbra import load_zimbra_mappings
+            mappings = load_zimbra_mappings()
+            for m in mappings:
+                if m.get('ad_group_name') == group_name and m.get('active', True):
+                    is_mapped_to_zimbra = True
+                    break
+        except Exception as ez_map:
+            logging.error(f"Erro ao verificar se o grupo está mapeado no Zimbra: {ez_map}")
+
         group_info = {
+            'dn': group.distinguishedName.value if 'distinguishedName' in group else group.entry_dn,
             'cn': group.cn.value if 'cn' in group else group_name,
             'displayName': group.displayName.value if 'displayName' in group and group.displayName.value else (group.cn.value if 'cn' in group else group_name),
             'sAMAccountName': group.sAMAccountName.value if 'sAMAccountName' in group else (group.cn.value if 'cn' in group else group_name),
@@ -171,7 +184,8 @@ def view_group(group_name):
             'scope': scope_val,
             'mail': group.mail.value if 'mail' in group else '',
             'proxyAddresses': group.proxyAddresses.values if 'proxyAddresses' in group else [],
-            'hide_from_address_lists': hide_from_address_lists
+            'hide_from_address_lists': hide_from_address_lists,
+            'is_zimbra_mapped': is_mapped_to_zimbra
         }
             
         return render_template('view_group.html', group=group_info, form=form)
@@ -802,20 +816,22 @@ def api_update_group_settings():
     is_security = data.get('is_security', True)
     scope = data.get('scope', 'global')
     display_name = data.get('display_name')
+    sam_account_name = data.get('sam_account_name')
     
     if not group_name:
         return jsonify({'error': 'Nome do grupo obrigatório'}), 400
         
     try:
         conn = get_service_account_connection()
-        group = get_group_by_name(conn, group_name, ['distinguishedName', 'groupType', 'cn', 'displayName'])
+        group = get_group_by_name(conn, group_name, ['distinguishedName', 'groupType', 'cn', 'displayName', 'sAMAccountName'])
         if not group:
             return jsonify({'error': 'Grupo não encontrado'}), 404
             
         current_dn = group.distinguishedName.value
         new_name = display_name.strip() if display_name else ''
+        new_sam = sam_account_name.strip() if sam_account_name else ''
         
-        # 1. Renomeia o objeto no AD se o CN mudou
+        # 1. Renomeia o objeto no AD (CN) se ele mudou
         if new_name and new_name != group.cn.value:
             conn.modify_dn(group.distinguishedName.value, f"cn={new_name}")
             if conn.result['description'] == 'success':
@@ -823,9 +839,9 @@ def api_update_group_settings():
                 parent_dn = ','.join(group.distinguishedName.value.split(',')[1:])
                 current_dn = f"CN={new_name},{parent_dn}"
             else:
-                return jsonify({'error': f"Falha ao renomear o grupo no AD: {conn.result['message']}"}), 400
+                return jsonify({'error': f"Falha ao renomear o grupo no AD (CN): {conn.result['message']}"}), 400
                 
-        # 2. Atualiza os atributos displayName e groupType
+        # 2. Atualiza os atributos (displayName, groupType, sAMAccountName)
         current_type = group.groupType.value if 'groupType' in group and group.groupType.value else 0
         
         # Garantir tratamento de 32 bits em Python
@@ -846,12 +862,43 @@ def api_update_group_settings():
         if new_name:
             modifications['displayName'] = [(ldap3.MODIFY_REPLACE, [new_name])]
             
+        # Validação e alteração do sAMAccountName se ele mudou
+        sam_changed = False
+        if new_sam and new_sam != group.sAMAccountName.value:
+            # Validar caracteres inválidos: \ / [ ] : ; | = , + * ? < >
+            invalid_chars = set(r'\/[]:;|#=,+*?<>' + '"')
+            if any(char in invalid_chars for char in new_sam):
+                return jsonify({'error': 'O nome anterior ao Windows 2000 contém caracteres inválidos.'}), 400
+            if len(new_sam) > 256:
+                return jsonify({'error': 'O nome anterior ao Windows 2000 excede o limite de 256 caracteres.'}), 400
+                
+            # Verificar se já existe outro grupo com este sAMAccountName
+            config = load_config()
+            search_base = config.get('AD_SEARCH_BASE', conn.server.info.other['defaultNamingContext'][0])
+            conn.search(search_base, f'(&(objectClass=group)(sAMAccountName={new_sam}))', attributes=['cn'])
+            if conn.entries:
+                return jsonify({'error': f"Já existe outro grupo com o nome anterior ao Windows 2000 '{new_sam}'"}), 400
+                
+            modifications['sAMAccountName'] = [(ldap3.MODIFY_REPLACE, [new_sam])]
+            sam_changed = True
+            
         conn.modify(current_dn, modifications)
         
         if conn.result['description'] == 'success':
-            logging.info(f"Configurações do grupo '{group_name}' atualizadas por '{session.get('user_display_name')}'.")
-            save_to_history('alteration', group_name, f"Configurações do grupo atualizadas por '{session.get('user_display_name')}' (Nome: {new_name or group.cn.value})")
-            return jsonify({'success': True, 'message': 'Configurações atualizadas'})
+            log_msg = f"Configurações do grupo '{group_name}' atualizadas por '{session.get('user_display_name')}'"
+            if new_name:
+                log_msg += f" (Nome: {new_name})"
+            if sam_changed:
+                log_msg += f" (sAMAccountName: {new_sam})"
+                
+            logging.info(f"{log_msg}.")
+            save_to_history('alteration', new_sam if sam_changed else group_name, log_msg)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Configurações atualizadas',
+                'new_sam': new_sam if sam_changed else None
+            })
         else:
             return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
             
@@ -1043,9 +1090,226 @@ def api_set_group_primary_email():
         if conn.result['description'] == 'success':
             logging.info(f"E-mail primário do grupo '{group_name}' alterado para '{new_primary}' por '{session.get('user_display_name')}'")
             save_to_history('alteration', group_name, f"E-mail primário alterado para '{new_primary}' por '{session.get('user_display_name')}'")
+            
+            # Sincronização automática com o Zimbra se estiver ativo globalmente
+            config = load_config()
+            if config.get('ZIMBRA_ENABLED', False):
+                old_email = None
+                try:
+                    from routes.zimbra import load_zimbra_mappings, save_zimbra_mappings
+                    mappings = load_zimbra_mappings()
+                    
+                    # Procura se o grupo tem mapeamento no Zimbra
+                    zimbra_mapping = None
+                    for m in mappings:
+                        if m.get('ad_group_name') == group_name:
+                            zimbra_mapping = m
+                            break
+                    
+                    if zimbra_mapping:
+                        old_email = zimbra_mapping.get('zimbra_dl_email')
+                        if old_email and old_email.lower() != new_primary.lower():
+                            # Renomeia no Zimbra
+                            zimbra_url = config.get('ZIMBRA_API_URL')
+                            zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+                            zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+                            
+                            if zimbra_url and zimbra_user and zimbra_password:
+                                from routes.zimbra_api import ZimbraSOAPClient
+                                client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+                                client.rename_dl(old_email, new_primary)
+                                
+                                # Atualiza a lista de mapeamentos
+                                zimbra_mapping['zimbra_dl_email'] = new_primary
+                                save_zimbra_mappings(mappings)
+                                logging.info(f"[ZIMBRA] DL '{old_email}' renomeada para '{new_primary}' com sucesso.")
+                except Exception as ez:
+                    logging.error(f"[ZIMBRA] Erro ao renomear DL no Zimbra de '{old_email}' para '{new_primary}': {ez}")
+            
             return jsonify({'success': True})
         else:
             return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/list_organizational_units')
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_list_organizational_units():
+    try:
+        conn = get_read_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+        
+        # Busca todas as OUs sob o search_base
+        conn.search(search_base, '(objectClass=organizationalUnit)', search_scope=ldap3.SUBTREE, attributes=['distinguishedName'])
+        
+        # Coleta e ordena os DNs por tamanho (do mais curto/raiz para o mais longo/folha)
+        ous = [entry.entry_dn for entry in conn.entries]
+        
+        # Garante que a própria raiz (search_base) esteja inclusa como opção
+        if search_base not in ous:
+            ous.insert(0, search_base)
+            
+        def format_dn_path(dn):
+            parts = dn.split(',')
+            path_parts = []
+            for part in parts:
+                part = part.strip()
+                if part.upper().startswith('OU='):
+                    path_parts.insert(0, part[3:])
+                elif part.upper().startswith('CN='):
+                    path_parts.insert(0, part[3:])
+            if not path_parts:
+                dc_parts = [part[3:] for part in parts if part.strip().upper().startswith('DC=')]
+                return '.'.join(dc_parts)
+            return ' > '.join(path_parts)
+            
+        ou_list = []
+        for ou in ous:
+            ou_list.append({
+                'dn': ou,
+                'name': format_dn_path(ou)
+            })
+            
+        # Ordena pelo nome legível
+        ou_list = sorted(ou_list, key=lambda x: x['name'].lower())
+        return jsonify(ou_list)
+    except Exception as e:
+        logging.error(f"Erro ao listar OUs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/create_group', methods=['GET', 'POST'])
+@require_auth
+@require_permission(action='can_manage_groups')
+def create_group_form():
+    form = FlaskForm()
+    if request.method == 'POST':
+        display_name = request.form.get('display_name', '').strip()
+        sam_account_name = request.form.get('sam_account_name', '').strip()
+        description = request.form.get('description', '').strip()
+        email = request.form.get('email', '').strip()
+        group_type = request.form.get('group_type', 'security')
+        group_scope = request.form.get('group_scope', 'global')
+        target_ou = request.form.get('target_ou', '').strip()
+        
+        if not display_name or not sam_account_name or not target_ou:
+            flash("Os campos Nome do Grupo, Nome pré-Windows 2000 e OU de Destino são obrigatórios.", 'error')
+            return render_template('create_group_form.html', form=form)
+            
+        # Validação do e-mail para grupos de distribuição
+        if group_type == 'distribution' and not email:
+            flash("O campo E-mail do Grupo é obrigatório para grupos de distribuição.", 'error')
+            return render_template('create_group_form.html', form=form)
+            
+        # Validação do sAMAccountName
+        invalid_chars = set(r'\/[]:;|#=,+*?<>' + '"')
+        if any(char in invalid_chars for char in sam_account_name):
+            flash("O nome anterior ao Windows 2000 contém caracteres inválidos.", 'error')
+            return render_template('create_group_form.html', form=form)
+        if len(sam_account_name) > 256:
+            flash("O nome anterior ao Windows 2000 excede o limite de 256 caracteres.", 'error')
+            return render_template('create_group_form.html', form=form)
+            
+        try:
+            conn = get_service_account_connection()
+            
+            # Verificar se já existe grupo com o mesmo sAMAccountName
+            config = load_config()
+            search_base = config.get('AD_SEARCH_BASE')
+            conn.search(search_base, f'(&(objectClass=group)(sAMAccountName={sam_account_name}))', attributes=['cn'])
+            if conn.entries:
+                flash(f"Já existe um grupo com o nome pré-Windows 2000 '{sam_account_name}'.", 'error')
+                return render_template('create_group_form.html', form=form)
+                
+            # Verificar se já existe um objeto com o mesmo CN na OU de destino
+            group_dn = f"CN={display_name},{target_ou}"
+            conn.search(target_ou, f'(cn={escape_filter_chars(display_name)})', attributes=['cn'])
+            if conn.entries:
+                flash(f"Já existe um objeto com o nome '{display_name}' na OU selecionada.", 'error')
+                return render_template('create_group_form.html', form=form)
+                
+            # Calcular o groupType
+            is_security = (group_type == 'security')
+            g_type = 2 # Global padrão
+            if group_scope == 'domain_local':
+                g_type = 4
+            elif group_scope == 'global':
+                g_type = 2
+            elif group_scope == 'universal':
+                g_type = 8
+                
+            if is_security:
+                g_type |= 0x80000000
+                
+            # Ajustar para 32-bit assinado para evitar overflow
+            if g_type >= 0x80000000:
+                g_type -= 0x100000000
+                
+            # Atributos do grupo
+            group_attributes = {
+                'sAMAccountName': sam_account_name,
+                'displayName': display_name,
+                'groupType': g_type
+            }
+            if description:
+                group_attributes['description'] = description
+            if email:
+                group_attributes['mail'] = email
+                group_attributes['proxyAddresses'] = [f"SMTP:{email}"]
+                
+                # Ocultar da Lista de Endereços Global se solicitado
+                hide_from_gal = request.form.get('hide_from_gal') == 'true'
+                group_attributes['msExchHideFromAddressLists'] = hide_from_gal
+                
+            # Cria o grupo no AD
+            conn.add(group_dn, ['group'], group_attributes)
+            if conn.result['description'] == 'success':
+                logging.info(f"[CRIAÇÃO] Grupo '{display_name}' ({sam_account_name}) criado por '{session.get('user_display_name', session.get('ad_user', 'System'))}'.")
+                save_to_history('creation', sam_account_name, f"Grupo criado por {session.get('user_display_name', 'System')}")
+                
+                # Criação no Zimbra (automática se for grupo de distribuição, com e-mail e integração ativa)
+                zimbra_created = False
+                config = load_config()
+                is_zimbra_enabled = config.get('ZIMBRA_ENABLED', False)
+                
+                if group_type == 'distribution' and email and is_zimbra_enabled:
+                    try:
+                        zimbra_url = config.get('ZIMBRA_API_URL')
+                        zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+                        zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+                        
+                        if zimbra_url and zimbra_user and zimbra_password:
+                            from routes.zimbra_api import ZimbraSOAPClient
+                            from routes.zimbra import load_zimbra_mappings, save_zimbra_mappings
+                            
+                            # 1. Cria a lista de distribuição no Zimbra
+                            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+                            client.create_dl(email)
+                            
+                            # 2. Adiciona o mapeamento entre o grupo AD e a lista no Zimbra
+                            mappings = load_zimbra_mappings()
+                            # Evita duplicatas
+                            mappings = [m for m in mappings if m['ad_group_name'] != sam_account_name]
+                            mappings.append({
+                                'ad_group_name': sam_account_name,
+                                'zimbra_dl_email': email,
+                                'active': True
+                            })
+                            save_zimbra_mappings(mappings)
+                            zimbra_created = True
+                            logging.info(f"[ZIMBRA] DL '{email}' criada com sucesso e mapeada para o grupo '{sam_account_name}'.")
+                    except Exception as ez:
+                        logging.error(f"Erro ao criar lista no Zimbra para o grupo {sam_account_name}: {ez}")
+                        flash(f"Grupo criado no AD, mas ocorreu um erro ao criar a lista no Zimbra: {str(ez)}", 'warning')
+                
+                flash(f"Grupo '{display_name}' criado com sucesso!", 'success')
+                return redirect(url_for('groups.view_group', group_name=sam_account_name))
+            else:
+                flash(f"Erro ao criar o grupo no Active Directory: {conn.result['message']}", 'error')
+        except Exception as e:
+            logging.error(f"Erro ao criar grupo: {e}", exc_info=True)
+            flash(f"Erro ao criar grupo: {str(e)}", 'error')
+            
+    return render_template('create_group_form.html', form=form)

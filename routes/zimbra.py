@@ -352,14 +352,23 @@ def api_sync_group():
                 if "NO_SUCH_DISTRIBUTION_LIST" in str(e):
                     zimbra_exists = False
             
+            # Exclui a DL no Zimbra se ela ainda existir e o grupo do AD foi removido
+            if zimbra_exists:
+                try:
+                    client.delete_dl(zimbra_email)
+                    logging.info(f"[ZIMBRA] DL '{zimbra_email}' excluída porque o grupo AD '{ad_group}' correspondente não existe mais.")
+                    zimbra_exists = False
+                except Exception as ez_del:
+                    logging.error(f"[ZIMBRA] Erro ao excluir DL '{zimbra_email}' do Zimbra: {ez_del}")
+            
             from models import db, ZimbraMapping
             db_m = ZimbraMapping.query.filter_by(ad_group_name=ad_group).first()
             if db_m:
                 db.session.delete(db_m)
                 db.session.commit()
                 if not zimbra_exists:
-                    save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente porque o grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais.")
-                    return jsonify({'error': f"O grupo AD '{ad_group}' e a lista Zimbra '{zimbra_email}' não existem mais. A regra de mapeamento foi removida das Regras Ativas."}), 404
+                    save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento e lista do Zimbra removidos porque o grupo AD '{ad_group}' não existe mais.")
+                    return jsonify({'error': f"O grupo AD '{ad_group}' foi removido. A lista correspondente no Zimbra '{zimbra_email}' e a regra de mapeamento foram excluídas."}), 404
                 else:
                     save_to_history('zimbra_mapping_delete', ad_group, f"Mapeamento removido automaticamente porque o grupo AD '{ad_group}' não existe mais.")
                     return jsonify({'error': f"O grupo AD '{ad_group}' não existe mais. A regra de mapeamento foi removida das Regras Ativas."}), 404

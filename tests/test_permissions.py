@@ -26,6 +26,7 @@ def test_load_permissions_normalization(mocker):
     perm_normal.allowed_ous = json.dumps(["OU=Users,DC=company,DC=com"])
     perm_normal.actions = json.dumps({"can_create": True})
     perm_normal.views = json.dumps({"can_view_user_stats": True})
+    perm_normal.fields = json.dumps(["telephone", "mobile"])
     
     # Case 2: actions/views stored as empty list string "[]" (as seen in type 'none' saves previously)
     perm_empty_list = MagicMock()
@@ -34,6 +35,7 @@ def test_load_permissions_normalization(mocker):
     perm_empty_list.allowed_ous = json.dumps([])
     perm_empty_list.actions = "[]"
     perm_empty_list.views = "[]"
+    perm_empty_list.fields = "[]"
     
     # Case 3: actions/views as None/empty string
     perm_none = MagicMock()
@@ -42,6 +44,7 @@ def test_load_permissions_normalization(mocker):
     perm_none.allowed_ous = None
     perm_none.actions = None
     perm_none.views = None
+    perm_none.fields = None
     
     mock_permission_query.all.return_value = [perm_normal, perm_empty_list, perm_none]
     
@@ -52,16 +55,22 @@ def test_load_permissions_normalization(mocker):
     assert result["GroupNormal"]["actions"].get("can_create") is True
     assert isinstance(result["GroupNormal"]["views"], dict)
     assert result["GroupNormal"]["views"].get("can_view_user_stats") is True
+    assert isinstance(result["GroupNormal"]["fields"], list)
+    assert result["GroupNormal"]["fields"] == ["telephone", "mobile"]
     
     assert isinstance(result["GroupEmptyList"]["actions"], dict)
     assert result["GroupEmptyList"]["actions"] == {}
     assert isinstance(result["GroupEmptyList"]["views"], dict)
     assert result["GroupEmptyList"]["views"] == {}
+    assert isinstance(result["GroupEmptyList"]["fields"], list)
+    assert result["GroupEmptyList"]["fields"] == []
     
     assert isinstance(result["GroupNone"]["actions"], dict)
     assert result["GroupNone"]["actions"] == {}
     assert isinstance(result["GroupNone"]["views"], dict)
     assert result["GroupNone"]["views"] == {}
+    assert isinstance(result["GroupNone"]["fields"], list)
+    assert result["GroupNone"]["fields"] == []
 
 def test_api_dashboard_stats_permissions(client, mocker):
     # Mock AD/DB helpers so we don't hit external services
