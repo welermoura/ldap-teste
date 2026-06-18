@@ -419,29 +419,41 @@ def api_sync_group():
             for z_email, identities in results:
                 zimbra_member_identities[z_email] = identities
                 
-        # Calcula diferenças considerando todos os aliases de ambos os lados (AD e Zimbra)
+        # Mapeia cada e-mail do Zimbra ao membro correspondente do AD (se houver) para evitar duplicatas/aliases
+        ad_member_to_zimbra_emails = {i: [] for i in range(len(ad_members))}
+        unmatched_zimbra_emails = set()
+        
+        for z_email, z_identities in zimbra_member_identities.items():
+            matched_indices = []
+            for i, member in enumerate(ad_members):
+                if z_identities & member['all_emails']:
+                    matched_indices.append(i)
+            
+            if matched_indices:
+                for idx in matched_indices:
+                    ad_member_to_zimbra_emails[idx].append(z_email)
+            else:
+                unmatched_zimbra_emails.add(z_email)
+                
         to_add = set()
-        for member in ad_members:
-            # Verifica se o membro do AD já está representado no Zimbra sob qualquer e-mail/apelido
-            is_represented = False
-            for z_identities in zimbra_member_identities.values():
-                if member['all_emails'] & z_identities:
-                    is_represented = True
-                    break
-            if not is_represented:
+        to_remove = set(unmatched_zimbra_emails)
+        
+        for i, member in enumerate(ad_members):
+            matching_emails = ad_member_to_zimbra_emails[i]
+            if not matching_emails:
                 if member['primary_email']:
                     to_add.add(member['primary_email'])
+            else:
+                # Se o usuário está representado por múltiplos e-mails/aliases na DL, mantém apenas um
+                primary = member['primary_email']
+                if primary and primary in matching_emails:
+                    keep_email = primary
+                else:
+                    keep_email = matching_emails[0]
                     
-        to_remove = set()
-        # Junta todas as identidades (e-mails e aliases) de todos os membros do AD
-        all_ad_emails = set()
-        for member in ad_members:
-            all_ad_emails.update(member['all_emails'])
-            
-        for z_email, z_identities in zimbra_member_identities.items():
-            # Se o membro do Zimbra (sob nenhum de seus apelidos/e-mail principal) não coincide com nenhuma identidade no AD, remove
-            if not (z_identities & all_ad_emails):
-                to_remove.add(z_email)
+                for email in matching_emails:
+                    if email != keep_email:
+                        to_remove.add(email)
         
         stats = {
             'added': 0,

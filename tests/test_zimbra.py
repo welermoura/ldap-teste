@@ -187,7 +187,7 @@ def test_api_sync_group_delete_when_ad_group_not_found(authenticated_client, moc
     })
     
     assert response.status_code == 404
-    assert 'não existe mais' in response.json['error']
+    assert 'foi removido' in response.json['error']
     assert 'grupo AD' in response.json['error']
     mock_db.session.delete.assert_called_once_with(mock_db_m)
     mock_db.session.commit.assert_called_once()
@@ -224,6 +224,6 @@ def test_api_sync_group_delete_when_both_not_found(authenticated_client, mocker)
     })
     
     assert response.status_code == 404
-    assert 'não existem mais' in response.json['error']
+    assert 'foi removido' in response.json['error']
     mock_db.session.delete.assert_called_once_with(mock_db_m)
     mock_db.session.commit.assert_called_once()
