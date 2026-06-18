@@ -160,9 +160,21 @@
                         {% else %}
                             {% for field_name in tab_fields %}
                             {% set field = form[field_name] %}
-                            <div class="col-md-6 mb-3 {% if field_name in editable_fields %}is-editable{% endif %}">
-                                {{ render_field(field, disabled=(field_name not in editable_fields)) }}
-                            </div>
+                            {% if field_name == 'upn_prefix' %}
+                                <div class="col-md-6 mb-3 {% if 'upn_prefix' in editable_fields or 'upn_suffix' in editable_fields %}is-editable{% endif %}">
+                                    <label class="form-label fw-bold">Login / UPN</label>
+                                    <div class="input-group">
+                                        {{ form.upn_prefix(class="form-control", placeholder="usuario", disabled=('upn_prefix' not in editable_fields)) }}
+                                        {{ form.upn_suffix(class="form-select", style="max-width: 250px;", disabled=('upn_suffix' not in editable_fields)) }}
+                                    </div>
+                                </div>
+                            {% elif field_name == 'upn_suffix' %}
+                                {# Ignora, pois já é renderizado junto com o prefixo #}
+                            {% else %}
+                                <div class="col-md-6 mb-3 {% if field_name in editable_fields %}is-editable{% endif %}">
+                                    {{ render_field(field, disabled=(field_name not in editable_fields)) }}
+                                </div>
+                            {% endif %}
                             {% endfor %}
                         {% endif %}
                     </div>
