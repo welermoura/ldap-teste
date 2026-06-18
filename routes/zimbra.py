@@ -975,6 +975,66 @@ def mock_zimbra_soap():
             <RemoveDistributionListMemberResponse xmlns="urn:zimbraAdmin"/>
             """
             
+        elif tag_name == "AddDistributionListAliasRequest":
+            dl_email = request_el.attrib.get("id")
+            alias_email = request_el.attrib.get("alias")
+            
+            dl_email = dl_email.strip().lower() if dl_email else ""
+            alias_email = alias_email.strip().lower() if alias_email else ""
+            # Resolve UUID de volta para e-mail na simulação
+            if "@" not in dl_email:
+                for k in list(MOCK_DLS.keys()):
+                    if f"dl-id-{hash(k) & 0xffff}" == dl_email:
+                        dl_email = k
+                        break
+                        
+            logging.info(f"[ZIMBRA-MOCK] Adicionando alias '{alias_email}' à lista '{dl_email}'")
+            
+            response_body = """
+            <AddDistributionListAliasResponse xmlns="urn:zimbraAdmin"/>
+            """
+            
+        elif tag_name == "RenameDistributionListRequest":
+            id_el = request_el.find("{urn:zimbraAdmin}id")
+            new_name_el = request_el.find("{urn:zimbraAdmin}newName")
+            
+            dl_email = id_el.text.strip().lower() if id_el is not None and id_el.text else ""
+            new_email = new_name_el.text.strip().lower() if new_name_el is not None and new_name_el.text else ""
+            
+            # Resolve UUID de volta para e-mail na simulação
+            if "@" not in dl_email:
+                for k in list(MOCK_DLS.keys()):
+                    if f"dl-id-{hash(k) & 0xffff}" == dl_email:
+                        dl_email = k
+                        break
+            
+            logging.info(f"[ZIMBRA-MOCK] Renomeando lista '{dl_email}' para '{new_email}'")
+            if dl_email in MOCK_DLS:
+                MOCK_DLS[new_email] = MOCK_DLS.pop(dl_email)
+                
+            response_body = """
+            <RenameDistributionListResponse xmlns="urn:zimbraAdmin"/>
+            """
+            
+        elif tag_name == "DeleteDistributionListRequest":
+            id_el = request_el.find("{urn:zimbraAdmin}id")
+            dl_email = id_el.text.strip().lower() if id_el is not None and id_el.text else ""
+            
+            # Resolve UUID de volta para e-mail na simulação
+            if "@" not in dl_email:
+                for k in list(MOCK_DLS.keys()):
+                    if f"dl-id-{hash(k) & 0xffff}" == dl_email:
+                        dl_email = k
+                        break
+                        
+            logging.info(f"[ZIMBRA-MOCK] Removendo lista '{dl_email}'")
+            if dl_email in MOCK_DLS:
+                MOCK_DLS.pop(dl_email)
+                
+            response_body = """
+            <DeleteDistributionListResponse xmlns="urn:zimbraAdmin"/>
+            """
+            
         else:
             logging.warning(f"[ZIMBRA-MOCK] Requisição desconhecida: {tag_name}")
             return f"""<?xml version="1.0" encoding="utf-8"?>

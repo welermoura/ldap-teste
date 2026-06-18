@@ -227,3 +227,15 @@ def test_api_sync_group_delete_when_both_not_found(authenticated_client, mocker)
     assert 'foi removido' in response.json['error']
     mock_db.session.delete.assert_called_once_with(mock_db_m)
     mock_db.session.commit.assert_called_once()
+
+def test_add_dl_alias(mocker):
+    from routes.zimbra_api import ZimbraSOAPClient
+    client = ZimbraSOAPClient('http://localhost:5000/mock/zimbra/soap', 'admin@comolatti.com.br', 'adminpassword')
+    mocker.patch.object(client, 'authenticate')
+    mocker.patch.object(client, 'get_dl_members', return_value={'id': 'dl-id-123'})
+    mock_send = mocker.patch.object(client, '_send_soap_request')
+    
+    res = client.add_dl_alias('ti@comolatti.com.br', 'ti-alias@comolatti.com.br')
+    assert res is True
+    mock_send.assert_called_once()
+    assert 'AddDistributionListAliasRequest' in mock_send.call_args[0][0]

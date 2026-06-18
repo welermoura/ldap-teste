@@ -231,6 +231,24 @@ class ZimbraSOAPClient:
         self._send_soap_request(body_xml)
         return True
 
+    def add_dl_alias(self, dl_email, alias_email):
+        """
+        Adiciona um apelido (alias) a uma Lista de Distribuição no Zimbra.
+        """
+        if not self.auth_token:
+            self.authenticate()
+            
+        # Busca o ID da lista pelo e-mail
+        dl_info = self.get_dl_members(dl_email)
+        dl_id = dl_info.get("id")
+        if not dl_id:
+            raise Exception(f"Lista de distribuição '{dl_email}' não encontrada no Zimbra.")
+        body_xml = f"""
+        <AddDistributionListAliasRequest xmlns="urn:zimbraAdmin" id="{escape(dl_id)}" alias="{escape(alias_email)}" />
+        """
+        self._send_soap_request(body_xml)
+        return True
+
     def create_dl(self, dl_email):
         """
         Cria uma nova Lista de Distribuição no Zimbra.

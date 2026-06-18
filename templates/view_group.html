@@ -15,13 +15,16 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
+        <button class="nav-link" id="memberof-tab" data-bs-toggle="tab" data-bs-target="#memberof-tab-pane" type="button" role="tab" aria-controls="memberof-tab-pane" aria-selected="false">
+            <i class="fas fa-sitemap me-2"></i>Membro de
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
         <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings-tab-pane" type="button" role="tab" aria-controls="settings-tab-pane" aria-selected="false">
             <i class="fas fa-cog me-2"></i>Configurações
         </button>
     </li>
-</ul>
-
-<div class="tab-content" id="groupTabsContent">
+</ul><div class="tab-content" id="groupTabsContent">
     <!-- ABA MEMBROS -->
     <div class="tab-pane fade show active" id="members-tab-pane" role="tabpanel" aria-labelledby="members-tab" tabindex="0">
         <!-- Card da Lista de Membros -->
@@ -58,6 +61,34 @@
             </div>
             <div class="card-footer text-center">
                 <span id="member-count-badge" class="badge bg-secondary rounded-pill fs-6">Carregando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ABA MEMBRO DE -->
+    <div class="tab-pane fade" id="memberof-tab-pane" role="tabpanel" aria-labelledby="memberof-tab" tabindex="0">
+        <div class="card glass-card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0 me-3">Membro de</h5>
+                <div class="d-flex gap-2 flex-wrap ms-auto">
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addParentGroupModal">
+                        <i class="fas fa-plus me-1"></i> Adicionar a Grupo
+                    </button>
+                </div>
+                <div style="min-width: 200px; max-width: 250px;">
+                    <input type="text" id="parent-group-search-input" class="form-control form-control-sm" placeholder="Filtrar grupos...">
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" id="parent-groups-table-container" style="min-height: 200px;">
+                    <div class="text-center p-5" id="parent-groups-loading-spinner">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Carregando associações...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-center">
+                <span id="parent-group-count-badge" class="badge bg-secondary rounded-pill fs-6">0 grupos</span>
             </div>
         </div>
     </div>
@@ -396,6 +427,44 @@
   </div>
 </div>
 {% endif %}
+
+<!-- Modal Adicionar a Grupo Pai -->
+<div class="modal fade" id="addParentGroupModal" tabindex="-1" aria-labelledby="addParentGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addParentGroupModalLabel"><i class="fas fa-sitemap me-2"></i>Adicionar Grupo a um Grupo Pai</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-dark">
+                <div class="mb-3">
+                    <label for="parentGroupSearchInput" class="form-label">Buscar por nome de grupo pai:</label>
+                    <input type="text" class="form-control" id="parentGroupSearchInput" placeholder="Digite pelo menos 3 caracteres...">
+                </div>
+                <div id="parentGroupSearchResults" class="table-responsive" style="max-height: 300px; overflow-y: auto; position: relative; display: none;">
+                    <table class="table table-sm align-middle text-dark glass-table mb-0">
+                        <thead class="table-dark" style="position: sticky; top: 0; z-index: 100;">
+                            <tr>
+                                <th scope="col">Grupo</th>
+                                <th scope="col">Descrição</th>
+                                <th scope="col" class="text-center" style="width: 80px;">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="parentGroupSearchResultsTable">
+                            <!-- Resultados da busca aparecerão aqui -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="parentGroupSearchResultsEmpty" class="text-muted p-2 text-center">
+                    Digite pelo menos 3 caracteres...
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -1222,6 +1291,254 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         batchAddModalEl.addEventListener('hidden.bs.modal', resetBatchModalState);
+    }
+
+    // === Parent Group Memberships (Membro de) ===
+    const memberOfTab = document.getElementById('memberof-tab');
+    const parentGroupsTableContainer = document.getElementById('parent-groups-table-container');
+    const parentGroupSearchInput = document.getElementById('parent-group-search-input');
+    const parentGroupCountBadge = document.getElementById('parent-group-count-badge');
+    
+    const addParentGroupModalEl = document.getElementById('addParentGroupModal');
+    const addParentGroupModal = addParentGroupModalEl ? new bootstrap.Modal(addParentGroupModalEl) : null;
+    const parentGroupQueryInput = document.getElementById('parentGroupSearchInput');
+    const parentGroupSearchResults = document.getElementById('parentGroupSearchResults');
+    const parentGroupSearchResultsTable = document.getElementById('parentGroupSearchResultsTable');
+    const parentGroupSearchResultsEmpty = document.getElementById('parentGroupSearchResultsEmpty');
+
+    let allParentGroups = [];
+    let parentTabLoaded = false;
+    let parentSearchTimeout;
+
+    // Helper HTML escaper
+    function escapeHTML(str) {
+        if (!str) return '';
+        return str.replace(/[&<>'"]/g, 
+            tag => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                "'": '&#39;',
+                '"': '&quot;'
+            }[tag] || tag)
+        );
+    }
+
+    async function fetchParentGroups() {
+        if (parentTabLoaded) return;
+        parentGroupsTableContainer.innerHTML = `
+            <div class="text-center p-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Carregando associações...</p>
+            </div>
+        `;
+        try {
+            const response = await fetch(`/api/group_memberships/${encodeURIComponent(groupName)}`);
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || 'Falha ao buscar os grupos pais.');
+            }
+            allParentGroups = await response.json();
+            renderParentGroups(allParentGroups);
+            parentTabLoaded = true;
+        } catch (error) {
+            parentGroupsTableContainer.innerHTML = `<div class="alert alert-danger m-2">Erro: ${error.message}</div>`;
+            console.error('Erro ao carregar associações de grupos:', error);
+        }
+    }
+
+    function renderParentGroups(groups) {
+        parentGroupsTableContainer.innerHTML = '';
+        if (parentGroupCountBadge) {
+            parentGroupCountBadge.textContent = `${groups.length} grupo(s)`;
+        }
+        
+        if (!groups || groups.length === 0) {
+            parentGroupsTableContainer.innerHTML = '<div class="alert alert-info m-2">Este grupo não é membro de nenhum grupo.</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm table-hover glass-table mb-0 text-white';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Nome do Grupo Pai</th>
+                    <th>Descrição</th>
+                    <th class="text-end" style="width: 100px;">Ação</th>
+                </tr>
+            </thead>
+        `;
+        const tbody = table.createTBody();
+
+        groups.forEach(group => {
+            const row = tbody.insertRow();
+            row.innerHTML = `
+                <td><a href="/view_group/${encodeURIComponent(group.sAMAccountName || group.cn)}" class="text-info">${escapeHTML(group.cn)}</a></td>
+                <td>${escapeHTML(group.description) || 'N/A'}</td>
+                <td class="text-end">
+                    <button class="btn btn-danger btn-sm remove-parent-group-btn" data-parent-name="${escapeHTML(group.sAMAccountName || group.cn)}" title="Remover deste grupo pai">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            `;
+        });
+        parentGroupsTableContainer.appendChild(table);
+    }
+
+    async function removeParentGroup(parentName) {
+        setupConfirmationModal('Confirmar Remoção', `Tem certeza que deseja remover este grupo do grupo pai "${parentName}"?`, async () => {
+            try {
+                const response = await fetch('/api/remove_group_from_group', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                    body: JSON.stringify({ group_name: groupName, parent_group_name: parentName })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+                showToast('Grupo removido com sucesso.', 'success');
+                parentTabLoaded = false;
+                fetchParentGroups();
+            } catch (error) {
+                showToast(`Falha ao remover do grupo pai: ${error.message}`, 'error');
+                console.error('Erro ao remover do grupo pai:', error);
+            }
+        });
+    }
+
+    async function searchParentGroups(query) {
+        if (!query || query.length < 3) {
+            parentGroupSearchResultsTable.innerHTML = '';
+            parentGroupSearchResultsEmpty.innerHTML = 'Digite pelo menos 3 caracteres...';
+            parentGroupSearchResultsEmpty.style.display = 'block';
+            parentGroupSearchResults.style.display = 'none';
+            return;
+        }
+
+        parentGroupSearchResultsEmpty.innerHTML = `
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+            Buscando grupos...
+        `;
+        parentGroupSearchResultsEmpty.style.display = 'block';
+        parentGroupSearchResults.style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/search_groups_for_group?q=${encodeURIComponent(query)}&group_name=${encodeURIComponent(groupName)}`);
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || 'Erro ao buscar grupos.');
+            }
+            const groups = await response.json();
+            renderParentSearchResults(groups);
+        } catch (error) {
+            parentGroupSearchResultsEmpty.innerHTML = `Erro: ${error.message}`;
+            console.error('Erro ao buscar grupos:', error);
+        }
+    }
+
+    function renderParentSearchResults(groups) {
+        parentGroupSearchResultsTable.innerHTML = '';
+        if (!groups || groups.length === 0) {
+            parentGroupSearchResultsEmpty.innerHTML = 'Nenhum grupo elegível encontrado.';
+            parentGroupSearchResultsEmpty.style.display = 'block';
+            parentGroupSearchResults.style.display = 'none';
+            return;
+        }
+
+        parentGroupSearchResultsEmpty.style.display = 'none';
+        parentGroupSearchResults.style.display = 'block';
+
+        groups.forEach(group => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <strong>${escapeHTML(group.cn)}</strong>
+                    <small class="d-block text-muted">${escapeHTML(group.sAMAccountName || group.cn)}</small>
+                </td>
+                <td>${escapeHTML(group.description) || 'Sem descrição'}</td>
+                <td class="text-center">
+                    <button class="btn btn-primary btn-sm add-parent-group-btn" data-parent-name="${escapeHTML(group.sAMAccountName || group.cn)}">
+                        <i class="fas fa-plus"></i> Adicionar
+                    </button>
+                </td>
+            `;
+            parentGroupSearchResultsTable.appendChild(tr);
+        });
+    }
+
+    async function addParentGroup(parentName) {
+        try {
+            const response = await fetch('/api/add_group_to_group', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+                body: JSON.stringify({ group_name: groupName, parent_group_name: parentName })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+
+            showToast('Associação adicionada com sucesso.', 'success');
+            if (addParentGroupModal) {
+                addParentGroupModal.hide();
+            }
+            parentTabLoaded = false;
+            fetchParentGroups();
+        } catch (error) {
+            showToast(`Falha ao adicionar grupo pai: ${error.message}`, 'error');
+            console.error('Erro ao adicionar grupo pai:', error);
+        }
+    }
+
+    // Event Listeners for Parent Nesting
+    if (memberOfTab) {
+        memberOfTab.addEventListener('shown.bs.tab', fetchParentGroups);
+    }
+
+    if (parentGroupSearchInput) {
+        parentGroupSearchInput.addEventListener('keyup', function() {
+            const query = this.value.toLowerCase();
+            const filteredGroups = allParentGroups.filter(g =>
+                g.cn.toLowerCase().includes(query) || (g.description && g.description.toLowerCase().includes(query))
+            );
+            renderParentGroups(filteredGroups);
+        });
+    }
+
+    if (parentGroupsTableContainer) {
+        parentGroupsTableContainer.addEventListener('click', function(e) {
+            const btn = e.target.closest('.remove-parent-group-btn');
+            if (btn) {
+                removeParentGroup(btn.dataset.parentName);
+            }
+        });
+    }
+
+    if (parentGroupQueryInput) {
+        parentGroupQueryInput.addEventListener('keyup', () => {
+            clearTimeout(parentSearchTimeout);
+            parentSearchTimeout = setTimeout(() => {
+                searchParentGroups(parentGroupQueryInput.value);
+            }, 300);
+        });
+    }
+
+    if (parentGroupSearchResultsTable) {
+        parentGroupSearchResultsTable.addEventListener('click', function(e) {
+            const btn = e.target.closest('.add-parent-group-btn');
+            if (btn) {
+                addParentGroup(btn.dataset.parentName);
+            }
+        });
+    }
+
+    if (addParentGroupModalEl) {
+        addParentGroupModalEl.addEventListener('hidden.bs.modal', function() {
+            parentGroupQueryInput.value = '';
+            parentGroupSearchResultsTable.innerHTML = '';
+            parentGroupSearchResultsEmpty.style.display = 'block';
+            parentGroupSearchResultsEmpty.innerHTML = 'Digite pelo menos 3 caracteres...';
+            parentGroupSearchResults.style.display = 'none';
+        });
     }
 
     // === Exclusão de Grupo ===

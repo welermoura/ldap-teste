@@ -82,6 +82,59 @@ def sync_zimbra_member_realtime(group_name, user_sam, action):
     # Dispara a sincronização em uma thread separada para não travar a requisição da página do usuário
     threading.Thread(target=_run_sync, daemon=True).start()
 
+def sync_zimbra_alias_realtime(group_name, alias_email):
+    """
+    Sincroniza um apelido (alias) em tempo real com o Zimbra em segundo plano (thread) se a integração estiver ativa.
+    """
+    import threading
+    
+    def _run_sync():
+        try:
+            from common import load_config
+            config = load_config()
+            if not config.get('ZIMBRA_ENABLED', False):
+                return
+                
+            zimbra_url = config.get('ZIMBRA_API_URL')
+            zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+            zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+            
+            if not zimbra_url or not zimbra_user:
+                return
+                
+            # 1. Verifica se o grupo está mapeado
+            from routes.zimbra import load_zimbra_mappings
+            mappings = load_zimbra_mappings()
+            zimbra_email = None
+            for m in mappings:
+                if m['ad_group_name'] == group_name:
+                    zimbra_email = m['zimbra_dl_email']
+                    break
+                    
+            # 2. Caso não esteja mapeado, busca o e-mail principal do grupo diretamente no AD
+            if not zimbra_email:
+                from common import get_service_account_connection, get_group_by_name
+                conn = get_service_account_connection()
+                group_obj = get_group_by_name(conn, group_name, attributes=['mail'])
+                if group_obj and 'mail' in group_obj and group_obj.mail.value:
+                    zimbra_email = str(group_obj.mail.value).strip().lower()
+                    
+            if not zimbra_email:
+                logging.warning(f"[ZIMBRA-REALTIME-SYNC] Não foi possível encontrar o e-mail principal para o grupo '{group_name}'. Sincronização de alias '{alias_email}' cancelada.")
+                return
+                
+            # Conecta e adiciona o alias no Zimbra
+            from routes.zimbra_api import ZimbraSOAPClient
+            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+            client.add_dl_alias(zimbra_email, alias_email)
+            logging.info(f"[ZIMBRA-REALTIME-SYNC] Alias '{alias_email}' adicionado ao grupo Zimbra '{zimbra_email}' em tempo real.")
+            
+        except Exception as e:
+            logging.error(f"[ZIMBRA-REALTIME-SYNC] Erro ao sincronizar alias em tempo real para o grupo {group_name}: {e}")
+
+    # Dispara a sincronização em uma thread separada para não travar a requisição
+    threading.Thread(target=_run_sync, daemon=True).start()
+
 @groups_bp.route('/group_management', methods=['GET', 'POST'])
 @require_auth
 @require_permission(action='can_manage_groups')
@@ -993,6 +1046,11 @@ def api_add_group_proxy_address():
         if conn.result['description'] == 'success':
             logging.info(f"Alias '{new_proxy}' adicionado ao grupo '{group_name}' por '{session.get('user_display_name')}'")
             save_to_history('alteration', group_name, f"Alias '{new_proxy}' adicionado ao grupo por '{session.get('user_display_name')}'")
+            
+            # Sincroniza em tempo real com o Zimbra
+            alias_email = new_proxy[5:] if new_proxy.lower().startswith('smtp:') else new_proxy
+            sync_zimbra_alias_realtime(group_name, alias_email)
+            
             return jsonify({'success': True})
         else:
             return jsonify({'error': f"LDAP error: {conn.result['message']}"}), 400
@@ -1313,3 +1371,132 @@ def create_group_form():
             flash(f"Erro ao criar grupo: {str(e)}", 'error')
             
     return render_template('create_group_form.html', form=form)
+
+@groups_bp.route('/api/group_memberships/<group_name>')
+@require_auth
+def api_group_memberships(group_name):
+    try:
+        conn = get_read_connection()
+        group = get_group_by_name(conn, group_name, attributes=['memberOf'])
+        if not group:
+            return jsonify([])
+        parent_dns = group.memberOf.values if 'memberOf' in group and group.memberOf.values else []
+        parents_details = []
+        for dn in parent_dns:
+            conn.search(dn, '(objectClass=group)', BASE, attributes=['cn', 'sAMAccountName', 'description'])
+            if conn.entries:
+                parent_entry = conn.entries[0]
+                parents_details.append({
+                    'cn': get_attr_value(parent_entry, 'cn'),
+                    'sAMAccountName': get_attr_value(parent_entry, 'sAMAccountName') or get_attr_value(parent_entry, 'cn'),
+                    'description': get_attr_value(parent_entry, 'description')
+                })
+        sorted_parents = sorted(parents_details, key=lambda g: g.get('cn', '').lower())
+        return jsonify(sorted_parents)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/search_groups_for_group', methods=['GET'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_search_groups_for_group():
+    query = request.args.get('q', '')
+    group_name = request.args.get('group_name', '')
+    if not query or len(query) < 3:
+        return jsonify([])
+    try:
+        conn = get_service_account_connection()
+        config = load_config()
+        search_base = config.get('AD_SEARCH_BASE')
+        
+        # Busca o grupo atual para obter do que ele já é membro
+        current_member_of = set()
+        if group_name:
+            current_group = get_group_by_name(conn, group_name, attributes=['memberOf'])
+            if current_group and 'memberOf' in current_group and current_group.memberOf.values:
+                current_member_of = {dn.lower() for dn in current_group.memberOf.values}
+        
+        # Filtro de busca de grupos
+        sanitized_query = escape_filter_chars(query)
+        search_filter = f"(&(objectClass=group)(|(cn=*{sanitized_query}*)(sAMAccountName=*{sanitized_query}*)))"
+        
+        conn.search(
+            search_base,
+            search_filter,
+            attributes=['cn', 'sAMAccountName', 'description', 'distinguishedName']
+        )
+        
+        results = []
+        for entry in conn.entries:
+            sam = get_attr_value(entry, 'sAMAccountName') or get_attr_value(entry, 'cn')
+            dn = entry.entry_dn
+            # Omitir o próprio grupo e grupos dos quais ele já é membro
+            if sam.lower() == group_name.lower() or dn.lower() in current_member_of:
+                continue
+            results.append({
+                'cn': get_attr_value(entry, 'cn'),
+                'sAMAccountName': sam,
+                'description': get_attr_value(entry, 'description')
+            })
+            
+        sorted_results = sorted(results, key=lambda g: g.get('cn', '').lower())
+        return jsonify(sorted_results[:20]) # Limitado a 20 resultados
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/add_group_to_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_add_group_to_group():
+    data = request.get_json()
+    group_name = data.get('group_name') # O subgrupo (membro)
+    parent_group_name = data.get('parent_group_name') # O grupo pai
+    if not group_name or not parent_group_name:
+        return jsonify({'error': 'Nome do grupo membro e nome do grupo pai são obrigatórios.'}), 400
+    try:
+        conn = get_service_account_connection()
+        child_group = get_group_by_name(conn, group_name, ['distinguishedName'])
+        parent_group = get_group_by_name(conn, parent_group_name, ['distinguishedName'])
+        if not child_group or not parent_group:
+            return jsonify({'error': 'Grupo membro ou grupo pai não encontrado.'}), 404
+        
+        conn.extend.microsoft.add_members_to_groups([child_group.distinguishedName.value], parent_group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            msg = f"Grupo '{group_name}' adicionado como membro de '{parent_group_name}' por '{session.get('user_display_name')}'"
+            logging.info(f"[ALTERAÇÃO] {msg}")
+            save_to_history('alteration', group_name, msg)
+            save_to_history('alteration', parent_group_name, f"Grupo '{group_name}' adicionado como membro por '{session.get('user_display_name')}'")
+            return jsonify({'success': True, 'message': 'Grupo adicionado ao grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@groups_bp.route('/api/remove_group_from_group', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_groups')
+def api_remove_group_from_group():
+    data = request.get_json()
+    group_name = data.get('group_name') # O subgrupo (membro)
+    parent_group_name = data.get('parent_group_name') # O grupo pai
+    if not group_name or not parent_group_name:
+        return jsonify({'error': 'Nome do grupo membro e nome do grupo pai são obrigatórios.'}), 400
+    try:
+        conn = get_service_account_connection()
+        child_group = get_group_by_name(conn, group_name, ['distinguishedName'])
+        parent_group = get_group_by_name(conn, parent_group_name, ['distinguishedName'])
+        if not child_group or not parent_group:
+            return jsonify({'error': 'Grupo membro ou grupo pai não encontrado.'}), 404
+            
+        conn.extend.microsoft.remove_members_from_groups([child_group.distinguishedName.value], parent_group.distinguishedName.value)
+        if conn.result['description'] == 'success':
+            msg = f"Grupo '{group_name}' removido de '{parent_group_name}' por '{session.get('user_display_name')}'"
+            logging.info(f"[ALTERAÇÃO] {msg}")
+            save_to_history('alteration', group_name, msg)
+            save_to_history('alteration', parent_group_name, f"Grupo '{group_name}' removido como membro por '{session.get('user_display_name')}'")
+            return jsonify({'success': True, 'message': 'Grupo removido do grupo com sucesso.'})
+        else:
+            raise Exception(f"Falha do LDAP: {conn.result['message']}")
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
