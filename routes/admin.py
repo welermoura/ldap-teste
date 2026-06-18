@@ -246,7 +246,7 @@ AVAILABLE_FIELDS = {
     'office': 'Escritório',
     'telephone': 'Telefone Principal',
     'email': 'E-mail',
-    'upn': 'Login (UPN)',
+    'upn_prefix': 'Prefixo UPN',
     'web_page': 'Página da Web',
     'street': 'Rua',
     'post_office_box': 'Caixa Postal',

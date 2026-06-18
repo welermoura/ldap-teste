@@ -17,6 +17,11 @@ class MockLDAPUser:
         return getattr(self, item)
 
 def get_form_data(user, overrides=None):
+    upn_val = get_attr_value(user, 'userPrincipalName') or 'john.doe@domain.com'
+    parts = upn_val.split('@', 1)
+    upn_prefix = parts[0] if parts else 'john.doe'
+    upn_suffix = '@' + parts[1] if len(parts) == 2 else '@domain.com'
+
     data = {
         'first_name': get_attr_value(user, 'givenName'),
         'last_name': get_attr_value(user, 'sn'),
@@ -26,7 +31,8 @@ def get_form_data(user, overrides=None):
         'description': get_attr_value(user, 'description'),
         'office': get_attr_value(user, 'physicalDeliveryOfficeName'),
         'email': get_attr_value(user, 'mail'),
-        'upn': get_attr_value(user, 'userPrincipalName') or 'john.doe@domain.com',
+        'upn_prefix': upn_prefix,
+        'upn_suffix': upn_suffix,
         'web_page': get_attr_value(user, 'wWWHomePage'),
         'street': get_attr_value(user, 'streetAddress'),
         'post_office_box': get_attr_value(user, 'postOfficeBox'),

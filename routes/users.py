@@ -277,6 +277,14 @@ def edit_user(username):
             return redirect(url_for('users.manage_users'))
 
         form = EditUserForm()
+        auto_suffixes = get_ad_upn_suffixes(conn)
+        if auto_suffixes:
+            form.upn_suffix.choices = [(s, s) for s in auto_suffixes]
+        else:
+            current_upn = get_attr_value(user, 'userPrincipalName') or ""
+            parts = current_upn.split('@', 1)
+            suffix = '@' + parts[1] if len(parts) == 2 else '@'
+            form.upn_suffix.choices = [(suffix, suffix)]
         config = load_config()
         
         editable_fields = {f.name for f in form if f.type not in ('CSRFTokenField', 'SubmitField') and check_permission(field=f.name)}
@@ -315,7 +323,7 @@ def edit_user(username):
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
                 'display_name': 'displayName', 'cn': 'cn', 'description': 'description', 'office': 'physicalDeliveryOfficeName',
-                'telephone': 'telephoneNumber', 'email': 'mail', 'upn': 'userPrincipalName', 'web_page': 'wWWHomePage',
+                'telephone': 'telephoneNumber', 'email': 'mail', 'web_page': 'wWWHomePage',
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
@@ -332,8 +340,23 @@ def edit_user(username):
                 if new_cn and new_cn != original_cn:
                     cn_changed = True
 
+            # Process UPN prefix/suffix modification
+            if 'upn_prefix' in editable_fields or 'upn_suffix' in editable_fields:
+                submitted_prefix = form.upn_prefix.data.strip() if 'upn_prefix' in editable_fields else None
+                submitted_suffix = form.upn_suffix.data if 'upn_suffix' in editable_fields else None
+                current_upn = get_attr_value(user, 'userPrincipalName') or ""
+                parts = current_upn.split('@', 1)
+                current_prefix = parts[0] if len(parts) >= 1 else ""
+                current_suffix = '@' + parts[1] if len(parts) == 2 else ""
+                final_prefix = submitted_prefix if submitted_prefix is not None else current_prefix
+                final_suffix = submitted_suffix if submitted_suffix is not None else current_suffix
+                new_upn = f"{final_prefix}{final_suffix}"
+                if new_upn != current_upn:
+                    changes['userPrincipalName'] = [(ldap3.MODIFY_REPLACE, [new_upn])]
+                    changes_to_log.append(f"userPrincipalName: De '{current_upn}' Para '{new_upn}'")
+
             for field_name in editable_fields:
-                if field_name == 'cn':
+                if field_name in ['cn', 'upn_prefix', 'upn_suffix']:
                     continue
                 if field_name in field_to_attr:
                     attr_name = field_to_attr[field_name]
@@ -384,10 +407,22 @@ def edit_user(username):
                         field.data = get_attr_value(m_entry, 'sAMAccountName')
                 continue
 
+            if field.name == 'upn_prefix':
+                current_upn = get_attr_value(user, 'userPrincipalName') or ""
+                parts = current_upn.split('@', 1)
+                field.data = parts[0] if parts else ""
+                continue
+
+            if field.name == 'upn_suffix':
+                current_upn = get_attr_value(user, 'userPrincipalName') or ""
+                parts = current_upn.split('@', 1)
+                field.data = '@' + parts[1] if len(parts) == 2 else ""
+                continue
+
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
                 'display_name': 'displayName', 'cn': 'cn', 'description': 'description', 'office': 'physicalDeliveryOfficeName',
-                'telephone': 'telephoneNumber', 'email': 'mail', 'upn': 'userPrincipalName', 'web_page': 'wWWHomePage',
+                'telephone': 'telephoneNumber', 'email': 'mail', 'web_page': 'wWWHomePage',
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
