@@ -315,7 +315,7 @@ def edit_user(username):
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
                 'display_name': 'displayName', 'cn': 'cn', 'description': 'description', 'office': 'physicalDeliveryOfficeName',
-                'telephone': 'telephoneNumber', 'email': 'mail', 'web_page': 'wWWHomePage',
+                'telephone': 'telephoneNumber', 'email': 'mail', 'upn': 'userPrincipalName', 'web_page': 'wWWHomePage',
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',
@@ -387,7 +387,7 @@ def edit_user(username):
             field_to_attr = {
                 'first_name': 'givenName', 'last_name': 'sn', 'initials': 'initials',
                 'display_name': 'displayName', 'cn': 'cn', 'description': 'description', 'office': 'physicalDeliveryOfficeName',
-                'telephone': 'telephoneNumber', 'email': 'mail', 'web_page': 'wWWHomePage',
+                'telephone': 'telephoneNumber', 'email': 'mail', 'upn': 'userPrincipalName', 'web_page': 'wWWHomePage',
                 'street': 'streetAddress', 'post_office_box': 'postOfficeBox', 'city': 'l',
                 'state': 'st', 'zip_code': 'postalCode', 'home_phone': 'homePhone',
                 'pager': 'pager', 'mobile': 'mobile', 'fax': 'facsimileTelephoneNumber',

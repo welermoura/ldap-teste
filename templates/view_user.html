@@ -154,7 +154,8 @@
                             <tr><td><strong>Descrição:</strong></td><td>{{ get_attr_value(user, 'description') }}</td></tr>
                             <tr><td><strong>Escritório:</strong></td><td>{{ get_attr_value(user, 'physicalDeliveryOfficeName') }}</td></tr>
                             <tr><td><strong>E-mail:</strong></td><td>{{ get_attr_value(user, 'mail') }}</td></tr>
-                            <tr><td><strong>Login de Rede:</strong></td><td><code class="text-info">{{ get_attr_value(user, 'sAMAccountName') }}</code></td></tr>
+                            <tr><td><strong>Login de Rede (sAMAccountName):</strong></td><td><code class="text-info">{{ get_attr_value(user, 'sAMAccountName') }}</code></td></tr>
+                            <tr><td><strong>Login de Rede (UPN):</strong></td><td><code class="text-info">{{ get_attr_value(user, 'userPrincipalName') }}</code></td></tr>
                             <tr><td><strong>Página da Web:</strong></td><td>{{ get_attr_value(user, 'wWWHomePage') }}</td></tr>
                         </table>
                     </div>

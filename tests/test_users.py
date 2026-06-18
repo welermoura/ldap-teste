@@ -26,6 +26,7 @@ def get_form_data(user, overrides=None):
         'description': get_attr_value(user, 'description'),
         'office': get_attr_value(user, 'physicalDeliveryOfficeName'),
         'email': get_attr_value(user, 'mail'),
+        'upn': get_attr_value(user, 'userPrincipalName') or 'john.doe@domain.com',
         'web_page': get_attr_value(user, 'wWWHomePage'),
         'street': get_attr_value(user, 'streetAddress'),
         'post_office_box': get_attr_value(user, 'postOfficeBox'),
@@ -66,6 +67,7 @@ def test_edit_user_render(authenticated_client, mocker):
         'distinguishedName': 'CN=John Doe Original,OU=Users,DC=domain,DC=com',
         'description': 'Test description',
         'mail': 'john.doe@domain.com',
+        'userPrincipalName': 'john.doe@domain.com',
         'manager': 'CN=Boss,OU=Users,DC=domain,DC=com'
     })
     mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
@@ -97,6 +99,7 @@ def test_edit_user_cn_changed(authenticated_client, mocker):
         'distinguishedName': 'CN=John Doe Original,OU=Users,DC=domain,DC=com',
         'description': 'Test description',
         'mail': 'john.doe@domain.com',
+        'userPrincipalName': 'john.doe@domain.com',
         'manager': ''
     })
     mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
@@ -136,6 +139,7 @@ def test_edit_user_display_name_changed_only(authenticated_client, mocker):
         'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
         'description': 'Test description',
         'mail': 'john.doe@domain.com',
+        'userPrincipalName': 'john.doe@domain.com',
         'manager': ''
     })
     mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
@@ -177,6 +181,7 @@ def test_edit_user_both_changed(authenticated_client, mocker):
         'distinguishedName': 'CN=John Doe Original CN,OU=Users,DC=domain,DC=com',
         'description': 'Test description',
         'mail': 'john.doe@domain.com',
+        'userPrincipalName': 'john.doe@domain.com',
         'manager': ''
     })
     mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
