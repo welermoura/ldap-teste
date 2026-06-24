@@ -709,7 +709,7 @@ def is_recycle_bin_enabled(conn):
         logging.error(f"Erro ao verificar o status da Lixeira do AD: {e}")
         return False
 
-def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
+def get_user_by_samaccountname(conn, sam_account_name, attributes=None, controls=None):
     if attributes is None:
         attributes = ALL_ATTRIBUTES
     config = load_config()
@@ -720,7 +720,7 @@ def get_user_by_samaccountname(conn, sam_account_name, attributes=None):
         else:
             raise Exception("AD_SEARCH_BASE não configurado e informações do servidor indisponíveis.")
             
-    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=attributes)
+    conn.search(search_base, f'(sAMAccountName={sam_account_name})', attributes=attributes, controls=controls)
     if conn.entries:
         return conn.entries[0]
     return None

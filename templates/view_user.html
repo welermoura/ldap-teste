@@ -246,6 +246,24 @@
                     {% endif %}
                     {% if check_permission(action='can_manage_exchange') %}
                     <div class="tab-pane fade" id="exchange" role="tabpanel" aria-labelledby="exchange-tab">
+                        <!-- Tipo de Caixa de Correio (Exchange 365) -->
+                        <div class="card glass-card p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1"><strong>Tipo de Caixa de Correio (Sincronização 365)</strong></h6>
+                                    <span id="mailbox-type-badge" class="badge bg-secondary fs-7">Carregando status...</span>
+                                </div>
+                                {% if check_permission(action='can_manage_exchange') %}
+                                <button type="button" class="btn btn-warning btn-sm text-dark fw-semibold" id="convert-shared-btn" style="display: none;">
+                                    <i class="fas fa-exchange-alt me-1"></i>Converter para Compartilhada
+                                </button>
+                                <button type="button" class="btn btn-warning btn-sm text-dark fw-semibold" id="convert-normal-btn" style="display: none;">
+                                    <i class="fas fa-user-edit me-1"></i>Converter para Caixa Normal
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+
                         <div class="card glass-card p-3 mb-3">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch" id="hide-from-address-lists-switch">
@@ -264,6 +282,7 @@
                         <div id="exchange-list-container" class="table-responsive" style="min-height: 200px;">
                             <!-- O conteúdo será carregado via JS -->
                         </div>
+
                     </div>
                     {% endif %}
                 </div>
@@ -479,6 +498,59 @@
           {{ delete_form.submit(class="btn btn-danger") }}
         </div>
       </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal de Conversão para Caixa Compartilhada -->
+{% if check_permission(action='can_manage_exchange') %}
+<div class="modal fade" id="convertSharedModal" tabindex="-1" aria-labelledby="convertSharedModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="convertSharedModalLabel"><i class="fas fa-exchange-alt me-2"></i>Confirmar Conversão para Caixa Compartilhada</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Você está prestes a converter a conta de <strong>{{ get_attr_value(user, 'displayName') }}</strong> para uma <strong>Caixa Compartilhada (Shared Mailbox)</strong> no Exchange Online.</p>
+        <p class="text-warning mb-2"><strong>Atenção para as alterações no AD Local:</strong></p>
+        <ul>
+          <li class="mb-1">A conta de usuário local será <strong>desabilitada</strong> no Active Directory, impedindo logons de rede diretos (conforme padrão Microsoft para caixas compartilhadas).</li>
+        </ul>
+        <p class="mb-0">Tem certeza de que deseja realizar essa conversão?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning text-dark fw-semibold" id="confirm-convert-shared-btn">Confirmar Conversão</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modal de Conversão para Caixa Normal -->
+{% if check_permission(action='can_manage_exchange') %}
+<div class="modal fade" id="convertNormalModal" tabindex="-1" aria-labelledby="convertNormalModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="convertNormalModalLabel"><i class="fas fa-user-edit me-2"></i>Confirmar Conversão para Caixa Normal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Você está prestes a converter a caixa de correio de <strong>{{ get_attr_value(user, 'displayName') }}</strong> de volta para uma <strong>Caixa de Usuário / Normal</strong>.</p>
+        <p class="text-warning mb-2"><strong>Atenção para as alterações no AD Local:</strong></p>
+        <ul>
+          <li class="mb-1">A conta de usuário local será <strong>reativada/habilitada</strong> no Active Directory.</li>
+          <li class="mb-1">Lembre-se de atribuir uma <strong>licença do Exchange Online</strong> válida para esta conta no Microsoft 365.</li>
+        </ul>
+        <p class="mb-0">Tem certeza de que deseja realizar essa conversão?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning text-dark fw-semibold" id="confirm-convert-normal-btn">Confirmar Conversão</button>
+      </div>
     </div>
   </div>
 </div>
@@ -749,6 +821,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 hideSwitch.checked = data.hide_from_address_lists || false;
             }
             
+            // Renderiza o tipo de caixa
+            renderMailboxType(data);
+            
             renderExchangeData(data);
             exchangeLoaded = true;
         } catch (error) {
@@ -896,6 +971,133 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    function renderMailboxType(data) {
+        const badge = document.getElementById('mailbox-type-badge');
+        const convertBtn = document.getElementById('convert-shared-btn');
+        const convertNormalBtn = document.getElementById('convert-normal-btn');
+        if (!badge) return;
+
+        // msExchRecipientTypeDetails = 34359738368 e msExchRemoteRecipientType = 100 ou 97
+        const isShared = (data.ms_exch_recipient_type_details === 34359738368 && (data.ms_exch_remote_recipient_type === 100 || data.ms_exch_remote_recipient_type === 97));
+
+        if (isShared) {
+            badge.className = 'badge bg-success fs-7';
+            badge.innerHTML = '<i class="fas fa-share-alt me-1"></i>Caixa Compartilhada (Shared Mailbox)';
+            if (convertBtn) convertBtn.style.display = 'none';
+            if (convertNormalBtn) convertNormalBtn.style.display = 'inline-block';
+        } else {
+            badge.className = 'badge bg-info fs-7';
+            badge.innerHTML = '<i class="fas fa-user me-1"></i>Caixa de Usuário / Normal';
+            if (convertBtn) convertBtn.style.display = 'inline-block';
+            if (convertNormalBtn) convertNormalBtn.style.display = 'none';
+        }
+    }
+
+    const convertSharedBtn = document.getElementById('convert-shared-btn');
+    const confirmConvertSharedBtn = document.getElementById('confirm-convert-shared-btn');
+    const convertSharedModalEl = document.getElementById('convertSharedModal');
+    let convertModalInstance = null;
+    if (convertSharedModalEl) {
+        convertModalInstance = new bootstrap.Modal(convertSharedModalEl);
+    }
+
+    if (convertSharedBtn && convertModalInstance) {
+        convertSharedBtn.addEventListener('click', function() {
+            convertModalInstance.show();
+        });
+    }
+
+    if (confirmConvertSharedBtn) {
+        confirmConvertSharedBtn.addEventListener('click', async function() {
+            confirmConvertSharedBtn.disabled = true;
+            confirmConvertSharedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Convertendo...';
+            try {
+                const response = await fetch(`/api/convert_user_shared/${username}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                
+                showToast('Conversão para Caixa Compartilhada realizada com sucesso!', 'success');
+                if (convertModalInstance) {
+                    convertModalInstance.hide();
+                }
+                
+                // Recarrega os dados do Exchange
+                exchangeLoaded = false;
+                await fetchExchangeData();
+                
+                // Recarrega a página após 1.5 segundos para refletir a desativação da conta
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } catch (error) {
+                showToast(`Erro ao converter: ${error.message}`, 'error');
+                console.error('Erro na conversão:', error);
+            } finally {
+                confirmConvertSharedBtn.disabled = false;
+                confirmConvertSharedBtn.innerHTML = 'Confirmar Conversão';
+            }
+        });
+    }
+
+    const convertNormalBtn = document.getElementById('convert-normal-btn');
+    const confirmConvertNormalBtn = document.getElementById('confirm-convert-normal-btn');
+    const convertNormalModalEl = document.getElementById('convertNormalModal');
+    let convertNormalModalInstance = null;
+    if (convertNormalModalEl) {
+        convertNormalModalInstance = new bootstrap.Modal(convertNormalModalEl);
+    }
+
+    if (convertNormalBtn && convertNormalModalInstance) {
+        convertNormalBtn.addEventListener('click', function() {
+            convertNormalModalInstance.show();
+        });
+    }
+
+    if (confirmConvertNormalBtn) {
+        confirmConvertNormalBtn.addEventListener('click', async function() {
+            confirmConvertNormalBtn.disabled = true;
+            confirmConvertNormalBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Convertendo...';
+            try {
+                const response = await fetch(`/api/convert_user_normal/${username}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Erro desconhecido');
+                
+                showToast('Conversão para Caixa Normal realizada com sucesso!', 'success');
+                if (convertNormalModalInstance) {
+                    convertNormalModalInstance.hide();
+                }
+                
+                // Recarrega os dados do Exchange
+                exchangeLoaded = false;
+                await fetchExchangeData();
+                
+                // Recarrega a página após 1.5 segundos para refletir a ativação da conta
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } catch (error) {
+                showToast(`Erro ao converter: ${error.message}`, 'error');
+                console.error('Erro na conversão:', error);
+            } finally {
+                confirmConvertNormalBtn.disabled = false;
+                confirmConvertNormalBtn.innerHTML = 'Confirmar Conversão';
+            }
+        });
+    }
+
 
     // === Event Listeners ===
     if (memberOfTab) {

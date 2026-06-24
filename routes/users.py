@@ -1360,6 +1360,8 @@ def api_remove_subordinate():
         logging.error(f"Erro ao remover subordinado: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+
 # --- EXCHANGE MANAGEMENT ENDPOINTS ---
 
 @users_bp.route('/api/user_exchange/<username>', methods=['GET'])
@@ -1368,7 +1370,11 @@ def api_remove_subordinate():
 def api_user_exchange(username):
     try:
         conn = get_read_connection()
-        user = get_user_by_samaccountname(conn, username, attributes=['proxyAddresses', 'mail', 'msExchHideFromAddressLists'])
+        user = get_user_by_samaccountname(conn, username, attributes=[
+            'proxyAddresses', 'mail', 'msExchHideFromAddressLists', 
+            'msExchRecipientTypeDetails', 'msExchRemoteRecipientType'
+        ])
+        
         if not user:
             return jsonify({'error': 'Usuário não encontrado.'}), 404
             
@@ -1385,14 +1391,89 @@ def api_user_exchange(username):
         mail = get_attr_value(user, 'mail') or ''
         hide_from_address_lists = user['msExchHideFromAddressLists'].value if 'msExchHideFromAddressLists' in user and user['msExchHideFromAddressLists'].value else False
         
+        ms_exch_recipient_type_details = user['msExchRecipientTypeDetails'].value if 'msExchRecipientTypeDetails' in user else None
+        ms_exch_remote_recipient_type = user['msExchRemoteRecipientType'].value if 'msExchRemoteRecipientType' in user else None
+        
         return jsonify({
             'primary': primary,
             'aliases': aliases,
             'mail': mail,
-            'hide_from_address_lists': hide_from_address_lists
+            'hide_from_address_lists': hide_from_address_lists,
+            'ms_exch_recipient_type_details': ms_exch_recipient_type_details,
+            'ms_exch_remote_recipient_type': ms_exch_remote_recipient_type
         })
     except Exception as e:
         logging.error(f"Erro em api_user_exchange: {e}")
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        logging.error(f"Erro em api_user_exchange: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@users_bp.route('/api/convert_user_shared/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_exchange')
+def api_convert_user_shared(username):
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=[
+            'distinguishedName', 'userAccountControl', 'msExchRecipientTypeDetails', 'msExchRemoteRecipientType',
+            'userPrincipalName', 'mail', 'targetAddress', 'proxyAddresses', 'mailNickname'
+        ])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+            
+        upn = get_attr_value(user, 'userPrincipalName')
+        if not upn:
+            return jsonify({'error': 'O usuário não possui UPN (User Principal Name) definido. A conversão necessita do UPN como base.'}), 400
+            
+        uac = user.userAccountControl.value if 'userAccountControl' in user else 512
+        new_uac = uac | 2 # Desabilita a conta localmente (ACCOUNTDISABLE)
+        
+        modifications = {
+            'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])],
+            'msExchRecipientTypeDetails': [(ldap3.MODIFY_REPLACE, [34359738368])],
+            'msExchRemoteRecipientType': [(ldap3.MODIFY_REPLACE, [97])]
+        }
+        
+        # Validar e ajustar e-mail principal
+        current_mail = get_attr_value(user, 'mail')
+        final_mail = current_mail if current_mail else upn
+        if not current_mail:
+            modifications['mail'] = [(ldap3.MODIFY_REPLACE, [final_mail])]
+            
+        # Validar e ajustar targetAddress
+        current_target = get_attr_value(user, 'targetAddress')
+        if not current_target or current_target != final_mail:
+            modifications['targetAddress'] = [(ldap3.MODIFY_REPLACE, [final_mail])]
+            
+        # Validar e ajustar mailNickname (Alias no Exchange)
+        current_nickname = get_attr_value(user, 'mailNickname')
+        if not current_nickname:
+            nickname = final_mail.split('@')[0] if '@' in final_mail else username
+            modifications['mailNickname'] = [(ldap3.MODIFY_REPLACE, [nickname])]
+            
+        # Validar e ajustar proxyAddresses
+        current_proxies = user['proxyAddresses'].values if 'proxyAddresses' in user else []
+        has_primary = False
+        for addr in current_proxies:
+            if addr.startswith('SMTP:'):
+                has_primary = True
+                break
+                
+        if not has_primary:
+            new_proxies = [str(p) for p in current_proxies]
+            new_proxies.append('SMTP:' + final_mail)
+            modifications['proxyAddresses'] = [(ldap3.MODIFY_REPLACE, new_proxies)]
+            
+        conn.modify(user.distinguishedName.value, modifications)
+        if conn.result['description'] == 'success':
+            logging.info(f"[EXCHANGE] Usuário '{username}' convertido para Caixa Compartilhada por '{session.get('user_display_name')}'.")
+            save_to_history('exchange_change', username, f"Convertido para Caixa Compartilhada por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
+    except Exception as e:
+        logging.error(f"Erro ao converter {username} para caixa compartilhada: {e}")
         return jsonify({'error': str(e)}), 500
 
 @users_bp.route('/api/update_user_hide_status/<username>', methods=['POST'])
@@ -1523,15 +1604,10 @@ def api_set_primary_alias(username):
         if not found:
             new_proxies.append(f"SMTP:{new_primary}")
             
-        current_upn = user.userPrincipalName.value if 'userPrincipalName' in user and user.userPrincipalName.value else f"{username}@"
-        upn_prefix = current_upn.split('@')[0]
-        new_domain = new_primary.split('@')[1] if '@' in new_primary else ''
-        new_upn = f"{upn_prefix}@{new_domain}" if new_domain else current_upn
-
         changes = {
             'proxyAddresses': [(ldap3.MODIFY_REPLACE, new_proxies)],
             'mail': [(ldap3.MODIFY_REPLACE, [new_primary])],
-            'userPrincipalName': [(ldap3.MODIFY_REPLACE, [new_upn])]
+            'targetAddress': [(ldap3.MODIFY_REPLACE, [new_primary])]
         }
         
         conn.modify(user.distinguishedName.value, changes)
@@ -1543,4 +1619,38 @@ def api_set_primary_alias(username):
         return jsonify({'message': 'Email principal alterado com sucesso.'})
     except Exception as e:
         logging.error(f"Erro em api_set_primary_alias: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@users_bp.route('/api/convert_user_normal/<username>', methods=['POST'])
+@require_auth
+@require_api_permission(action='can_manage_exchange')
+def api_convert_user_normal(username):
+    try:
+        conn = get_service_account_connection()
+        user = get_user_by_samaccountname(conn, username, attributes=[
+            'distinguishedName', 'userAccountControl', 'msExchRecipientTypeDetails', 'msExchRemoteRecipientType', 'targetAddress'
+        ])
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado.'}), 404
+            
+        uac = user.userAccountControl.value if 'userAccountControl' in user else 512
+        new_uac = uac & ~2 # Habilita/Reativa a conta localmente (remove ACCOUNTDISABLE)
+        
+        modifications = {
+            'userAccountControl': [(ldap3.MODIFY_REPLACE, [str(new_uac)])],
+            'msExchRecipientTypeDetails': [(ldap3.MODIFY_REPLACE, [])],   # Limpa o atributo
+            'msExchRemoteRecipientType': [(ldap3.MODIFY_REPLACE, [])],   # Limpa o atributo
+            'targetAddress': [(ldap3.MODIFY_REPLACE, [])]                # Limpa o targetAddress
+        }
+        
+        conn.modify(user.distinguishedName.value, modifications)
+        if conn.result['description'] == 'success':
+            logging.info(f"[EXCHANGE] Usuário '{username}' convertido de volta para Caixa de Usuário / Normal por '{session.get('user_display_name')}'.")
+            save_to_history('exchange_change', username, f"Convertido para Caixa de Usuário / Normal por '{session.get('user_display_name')}'")
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': f"Falha no LDAP: {conn.result['message']}"}), 400
+    except Exception as e:
+        logging.error(f"Erro ao converter {username} para caixa normal: {e}")
         return jsonify({'error': str(e)}), 500

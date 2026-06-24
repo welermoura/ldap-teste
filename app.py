@@ -38,8 +38,21 @@ logging.getLogger('werkzeug').addFilter(NoDevServerWarningFilter())
 # ==============================================================================
 # Inicialização do Aplicativo Flask
 # ==============================================================================
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 app = Flask(__name__)
 app.secret_key = get_flask_secret_key()
+
+# Permite que o Flask reconheça requisições HTTPS encaminhadas por um Proxy Reverso
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Configuração de cookies compatível com HTTP e HTTPS (seguro se configurado em SESSION_COOKIE_SECURE)
+config = load_config()
+use_secure_cookies = str(config.get('SESSION_COOKIE_SECURE', os.environ.get('SESSION_COOKIE_SECURE', 'False'))).lower() == 'true'
+app.config['SESSION_COOKIE_SECURE'] = use_secure_cookies
+app.config['REMEMBER_COOKIE_SECURE'] = use_secure_cookies
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # ==============================================================================
 # Inicialização do Banco de Dados (SQL Server / Fallback JSON)

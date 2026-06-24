@@ -8,7 +8,12 @@ class MockLDAPUser:
     def __init__(self, attributes):
         self._attributes = attributes
         for k, v in attributes.items():
-            setattr(self, k, MagicMock(value=v))
+            mock_attr = MagicMock(value=v)
+            if isinstance(v, list):
+                mock_attr.values = v
+            else:
+                mock_attr.values = [v]
+            setattr(self, k, mock_attr)
             
     def __contains__(self, item):
         return item in self._attributes
@@ -212,3 +217,193 @@ def test_edit_user_both_changed(authenticated_client, mocker):
         'CN=John Doe Original CN,OU=Users,DC=domain,DC=com',
         'CN=John Doe New CN'
     )
+
+def test_api_convert_user_shared_success(authenticated_client, mocker):
+    service_conn = MagicMock()
+    service_conn.result = {'description': 'success'}
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userAccountControl': 512,
+        'userPrincipalName': 'john.doe@domain.com',
+        'mail': '',
+        'targetAddress': '',
+        'mailNickname': '',
+        'proxyAddresses': []
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    mocker.patch('routes.users.save_to_history')
+    
+    response = authenticated_client.post('/api/convert_user_shared/john.doe')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['success'] is True
+    
+    # Verifica as modificações enviadas ao AD
+    service_conn.modify.assert_called_once()
+    args, kwargs = service_conn.modify.call_args
+    assert args[0] == 'CN=John Doe,OU=Users,DC=domain,DC=com'
+    changes = args[1]
+    
+    # 512 | 2 = 514 (desabilitado)
+    assert changes['userAccountControl'] == [('MODIFY_REPLACE', ['514'])]
+    assert changes['msExchRecipientTypeDetails'] == [('MODIFY_REPLACE', [34359738368])]
+    assert changes['msExchRemoteRecipientType'] == [('MODIFY_REPLACE', [97])]
+    
+    # Novas validações baseadas no UPN
+    assert changes['mail'] == [('MODIFY_REPLACE', ['john.doe@domain.com'])]
+    assert changes['targetAddress'] == [('MODIFY_REPLACE', ['john.doe@domain.com'])]
+    assert changes['mailNickname'] == [('MODIFY_REPLACE', ['john.doe'])]
+    assert changes['proxyAddresses'] == [('MODIFY_REPLACE', ['SMTP:john.doe@domain.com'])]
+
+def test_api_convert_user_shared_missing_upn(authenticated_client, mocker):
+    service_conn = MagicMock()
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userAccountControl': 512,
+        'userPrincipalName': ''
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    
+    response = authenticated_client.post('/api/convert_user_shared/john.doe')
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert 'error' in data
+    assert 'UPN' in data['error']
+
+def test_api_set_primary_alias_valid_upn_suffix(authenticated_client, mocker):
+    service_conn = MagicMock()
+    service_conn.result = {'description': 'success'}
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userPrincipalName': 'john.doe@domain.com',
+        'proxyAddresses': ['SMTP:john.doe@domain.com', 'smtp:john.new@comolatti.com.br']
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    mocker.patch('routes.users.get_ad_upn_suffixes', return_value=['@domain.com', '@comolatti.com.br'])
+    mocker.patch('routes.users.save_to_history')
+    
+    # Define john.new@comolatti.com.br (UPN suffix válido) como principal
+    response = authenticated_client.post('/api/set_primary_alias/john.doe', json={'alias': 'john.new@comolatti.com.br'})
+    assert response.status_code == 200
+    
+    service_conn.modify.assert_called_once()
+    args, kwargs = service_conn.modify.call_args
+    changes = args[1]
+    
+    # O UPN não deve ser alterado (não deve estar nas mudanças)
+    assert 'userPrincipalName' not in changes
+    # O targetAddress deve ser o novo e-mail principal
+    assert changes['targetAddress'] == [('MODIFY_REPLACE', ['john.new@comolatti.com.br'])]
+    assert changes['mail'] == [('MODIFY_REPLACE', ['john.new@comolatti.com.br'])]
+
+def test_api_set_primary_alias_invalid_upn_suffix(authenticated_client, mocker):
+    service_conn = MagicMock()
+    service_conn.result = {'description': 'success'}
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userPrincipalName': 'john.doe@domain.com',
+        'proxyAddresses': ['SMTP:john.doe@domain.com', 'smtp:john.new@externo.com']
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    # comolatti.com.br é UPN válido, mas externo.com NÃO é
+    mocker.patch('routes.users.get_ad_upn_suffixes', return_value=['@domain.com', '@comolatti.com.br'])
+    mocker.patch('routes.users.save_to_history')
+    
+    # Define john.new@externo.com (UPN suffix inválido) como principal
+    response = authenticated_client.post('/api/set_primary_alias/john.doe', json={'alias': 'john.new@externo.com'})
+    assert response.status_code == 200
+    
+    service_conn.modify.assert_called_once()
+    args, kwargs = service_conn.modify.call_args
+    changes = args[1]
+    
+    # O UPN não deve ser alterado (não deve estar nas mudanças)
+    assert 'userPrincipalName' not in changes
+    # O targetAddress deve ser atualizado para o novo e-mail principal
+    assert changes['targetAddress'] == [('MODIFY_REPLACE', ['john.new@externo.com'])]
+    assert changes['mail'] == [('MODIFY_REPLACE', ['john.new@externo.com'])]
+
+def test_api_convert_user_shared_existing_mail_out_of_sync_target(authenticated_client, mocker):
+    service_conn = MagicMock()
+    service_conn.result = {'description': 'success'}
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userAccountControl': 512,
+        'userPrincipalName': 'john.doe@domain.com',
+        'mail': 'john.primary@comolatti.com.br',
+        'targetAddress': 'john.old@domain.com',  # targetAddress antigo/desatualizado
+        'mailNickname': 'john.doe',
+        'proxyAddresses': ['SMTP:john.primary@comolatti.com.br']
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    mocker.patch('routes.users.save_to_history')
+    
+    response = authenticated_client.post('/api/convert_user_shared/john.doe')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['success'] is True
+    
+    service_conn.modify.assert_called_once()
+    args, kwargs = service_conn.modify.call_args
+    changes = args[1]
+    
+    # O targetAddress deve ser atualizado para o e-mail principal atual do usuário
+    assert changes['targetAddress'] == [('MODIFY_REPLACE', ['john.primary@comolatti.com.br'])]
+    # Como mail, mailNickname e proxyAddresses principal já estão corretos e consistentes, eles não devem mudar
+    assert 'mail' not in changes
+    assert 'mailNickname' not in changes
+    assert 'proxyAddresses' not in changes
+
+def test_api_convert_user_normal_success(authenticated_client, mocker):
+    service_conn = MagicMock()
+    service_conn.result = {'description': 'success'}
+    mocker.patch('routes.users.get_service_account_connection', return_value=service_conn)
+    
+    mock_user = MockLDAPUser({
+        'sAMAccountName': 'john.doe',
+        'distinguishedName': 'CN=John Doe,OU=Users,DC=domain,DC=com',
+        'userAccountControl': 514,  # desabilitado
+        'msExchRecipientTypeDetails': 34359738368,
+        'msExchRemoteRecipientType': 97,
+        'targetAddress': 'john.doe@comolatti.com.br'
+    })
+    mocker.patch('routes.users.get_user_by_samaccountname', return_value=mock_user)
+    mocker.patch('routes.users.check_permission', return_value=True)
+    mocker.patch('routes.users.save_to_history')
+    
+    response = authenticated_client.post('/api/convert_user_normal/john.doe')
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data['success'] is True
+    
+    service_conn.modify.assert_called_once()
+    args, kwargs = service_conn.modify.call_args
+    changes = args[1]
+    
+    # 514 & ~2 = 512 (habilitado)
+    assert changes['userAccountControl'] == [('MODIFY_REPLACE', ['512'])]
+    assert changes['msExchRecipientTypeDetails'] == [('MODIFY_REPLACE', [])]
+    assert changes['msExchRemoteRecipientType'] == [('MODIFY_REPLACE', [])]
+    assert changes['targetAddress'] == [('MODIFY_REPLACE', [])]
+
+
