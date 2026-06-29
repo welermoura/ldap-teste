@@ -122,7 +122,8 @@ def inject_global_vars():
         'check_permission': check_permission,
         'is_authenticated': is_authenticated,
         'get_attr_value': get_attr_value,
-        'get_user_status': get_user_status
+        'get_user_status': get_user_status,
+        'zimbra_enabled': config.get('ZIMBRA_ENABLED', False)
     }
 
 # ==============================================================================

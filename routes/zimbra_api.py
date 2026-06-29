@@ -387,4 +387,93 @@ class ZimbraSOAPClient:
             logging.error(f"[ZIMBRA-API] Erro ao buscar conta '{account_email}': {e}")
         return None
 
+    def search_accounts_with_forwarding(self):
+        """
+        Busca contas que tenham encaminhamento de e-mail ativo (zimbraPrefMailForwardingAddress=*)
+        ou Reply-To configurado (zimbraPrefReplyToAddress=*).
+        """
+        if not self.auth_token:
+            self.authenticate()
+
+        body_xml = """
+        <SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" query="(|(zimbraPrefMailForwardingAddress=*)(zimbraPrefReplyToAddress=*))" attrs="zimbraId,zimbraPrefMailForwardingAddress,zimbraPrefMailLocalDeliveryDisabled,zimbraPrefReplyToAddress,displayName,cn,zimbraAccountStatus">
+        </SearchDirectoryRequest>
+        """
+        
+        try:
+            root = self._send_soap_request(body_xml)
+            body = root.find("{http://www.w3.org/2003/05/soap-envelope}Body")
+            accounts = []
+            if body is not None:
+                resp = body.find("{urn:zimbraAdmin}SearchDirectoryResponse")
+                if resp is not None:
+                    for acc_el in resp.findall("{urn:zimbraAdmin}account"):
+                        acc_id = acc_el.attrib.get("id")
+                        acc_name = acc_el.attrib.get("name")
+                        
+                        attrs = {
+                            "id": acc_id,
+                            "email": acc_name.strip().lower() if acc_name else "",
+                            "forwarding_addresses": [],
+                            "local_delivery_disabled": False,
+                            "reply_to": "",
+                            "display_name": "",
+                            "status": "active"
+                        }
+                        
+                        for a_el in acc_el.findall("{urn:zimbraAdmin}a"):
+                            n_attr = a_el.attrib.get("n")
+                            val = a_el.text or ""
+                            if n_attr == "zimbraPrefMailForwardingAddress":
+                                if val:
+                                    attrs["forwarding_addresses"].append(val.strip().lower())
+                            elif n_attr == "zimbraPrefMailLocalDeliveryDisabled":
+                                attrs["local_delivery_disabled"] = (val.strip().upper() == "TRUE")
+                            elif n_attr == "zimbraPrefReplyToAddress":
+                                if val:
+                                    attrs["reply_to"] = val.strip().lower()
+                            elif n_attr == "displayName":
+                                attrs["display_name"] = val.strip()
+                            elif n_attr == "zimbraAccountStatus":
+                                attrs["status"] = val.strip().lower()
+                                
+                        accounts.append(attrs)
+            return accounts
+        except Exception as e:
+            logging.error(f"[ZIMBRA-API] Erro ao buscar contas com encaminhamento: {e}")
+            raise e
+
+    def remove_zimbra_attribute(self, account_id, attr_type):
+        """
+        Remove um atributo específico da conta (forwarding ou reply_to).
+        """
+        if not self.auth_token:
+            self.authenticate()
+
+        if attr_type == 'forwarding':
+            attrs_xml = """
+            <a n="zimbraPrefMailForwardingAddress"></a>
+            <a n="zimbraPrefMailLocalDeliveryDisabled">FALSE</a>
+            """
+        elif attr_type == 'reply_to':
+            attrs_xml = """
+            <a n="zimbraPrefReplyToAddress"></a>
+            """
+        else:
+            raise Exception(f"Atributo desconhecido para remoção: {attr_type}")
+
+        body_xml = f"""
+        <ModifyAccountRequest xmlns="urn:zimbraAdmin">
+            <id>{escape(account_id)}</id>
+            {attrs_xml}
+        </ModifyAccountRequest>
+        """
+        try:
+            self._send_soap_request(body_xml)
+            return True
+        except Exception as e:
+            logging.error(f"[ZIMBRA-API] Erro ao remover atributo '{attr_type}' da conta '{account_id}': {e}")
+            raise e
+
+
 

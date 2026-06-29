@@ -239,3 +239,114 @@ def test_add_dl_alias(mocker):
     assert res is True
     mock_send.assert_called_once()
     assert 'AddDistributionListAliasRequest' in mock_send.call_args[0][0]
+
+
+def test_forwardings_page_enabled(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    response = authenticated_client.get('/admin/zimbra_forwardings')
+    assert response.status_code == 200
+    assert b'Gerenciador de Redirecionamentos Zimbra' in response.data
+
+
+def test_forwardings_page_disabled(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_ENABLED': False
+    })
+    response = authenticated_client.get('/admin/zimbra_forwardings')
+    assert response.status_code == 302  # redirects to admin.dashboard
+    assert response.headers['Location'].endswith('/admin/dashboard')
+
+
+def test_api_get_forwardings(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    
+    mock_accounts = [
+        {
+            'id': 'acc-id-joao',
+            'email': 'joao.silva@comolatti.com.br',
+            'forwarding_addresses': ['externo_joao@gmail.com'],
+            'local_delivery_disabled': True,
+            'reply_to': '',
+            'display_name': 'João Silva',
+            'status': 'active'
+        },
+        {
+            'id': 'acc-id-maria',
+            'email': 'maria.souza@comolatti.com.br',
+            'forwarding_addresses': ['externo_maria@outlook.com'],
+            'local_delivery_disabled': False,
+            'reply_to': 'reply_maria@gmail.com',
+            'display_name': 'Maria Souza',
+            'status': 'active'
+        }
+    ]
+    
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.search_accounts_with_forwarding.return_value = mock_accounts
+    
+    response = authenticated_client.get('/api/zimbra/forwardings')
+    assert response.status_code == 200
+    data = response.json
+    assert data['success'] is True
+    assert len(data['accounts']) == 2
+    assert data['accounts'][0]['email'] == 'joao.silva@comolatti.com.br'
+    assert data['accounts'][1]['reply_to'] == 'reply_maria@gmail.com'
+
+
+def test_api_remove_forwarding_attribute(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_remove = mock_client.return_value.remove_zimbra_attribute
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/forwardings/remove', json={
+        'account_id': 'acc-id-joao',
+        'email': 'joao.silva@comolatti.com.br',
+        'attr_type': 'forwarding'
+    })
+    
+    assert response.status_code == 200
+    assert response.json['success'] is True
+    assert 'Encaminhamento removido com sucesso' in response.json['message']
+    mock_remove.assert_called_once_with('acc-id-joao', 'forwarding')
+
+
+def test_api_remove_reply_to_attribute(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_remove = mock_client.return_value.remove_zimbra_attribute
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/forwardings/remove', json={
+        'account_id': 'acc-id-maria',
+        'email': 'maria.souza@comolatti.com.br',
+        'attr_type': 'reply_to'
+    })
+    
+    assert response.status_code == 200
+    assert response.json['success'] is True
+    assert 'Reply-To (Responder para) removido com sucesso' in response.json['message']
+    mock_remove.assert_called_once_with('acc-id-maria', 'reply_to')
+

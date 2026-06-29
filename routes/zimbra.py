@@ -789,6 +789,88 @@ def api_get_auto_matches():
         logging.error(f"Erro ao calcular auto-matches do AD/Zimbra: {e}", exc_info=True)
         return jsonify({'error': f"Erro ao calcular combinações: {str(e)}"}), 500
 
+@zimbra_bp.route('/admin/zimbra_forwardings')
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def forwardings_page():
+    config = load_config()
+    if not config.get('ZIMBRA_ENABLED', False):
+        flash('A integração com o Zimbra não está ativada nas configurações globais.', 'error')
+        return redirect(url_for('admin.dashboard'))
+    return render_template('admin/zimbra_forwardings.html')
+
+
+@zimbra_bp.route('/api/zimbra/forwardings', methods=['GET'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_get_forwardings():
+    try:
+        config = load_config()
+        if not config.get('ZIMBRA_ENABLED', False):
+            return jsonify({'error': 'A integração do Zimbra está desativada.'}), 403
+            
+        zimbra_url = config.get('ZIMBRA_API_URL', '')
+        zimbra_user = config.get('ZIMBRA_ADMIN_USER', '')
+        zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD', '')
+        
+        if not zimbra_url or not zimbra_user:
+            return jsonify({'error': 'A API do Zimbra não está configurada.'}), 400
+            
+        client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+        accounts = client.search_accounts_with_forwarding()
+        
+        # Obtém domínios corporativos para destacar encaminhamentos externos
+        domains_list = []
+        try:
+            domains = client.get_domains()
+            if domains:
+                domains_list = [d.get('name', '').strip().lower() for d in domains if d.get('name')]
+        except Exception as ex:
+            logging.error(f"Erro ao buscar domínios para realce de emails externos: {ex}")
+            
+        return jsonify({'success': True, 'accounts': accounts, 'domains': domains_list})
+    except Exception as e:
+        logging.error(f"Erro ao listar encaminhamentos do Zimbra: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@zimbra_bp.route('/api/zimbra/forwardings/remove', methods=['POST'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_remove_forwarding():
+    try:
+        config = load_config()
+        if not config.get('ZIMBRA_ENABLED', False):
+            return jsonify({'error': 'A integração do Zimbra está desativada.'}), 403
+            
+        data = request.get_json() or {}
+        account_id = data.get('account_id')
+        email = data.get('email')
+        attr_type = data.get('attr_type', 'forwarding')
+        
+        if not account_id or not email:
+            return jsonify({'error': 'Dados incompletos (account_id e email são obrigatórios).'}), 400
+            
+        zimbra_url = config.get('ZIMBRA_API_URL', '')
+        zimbra_user = config.get('ZIMBRA_ADMIN_USER', '')
+        zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD', '')
+        
+        client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+        client.remove_zimbra_attribute(account_id, attr_type)
+        
+        # Salva no histórico de ações
+        attr_label = 'Encaminhamento' if attr_type == 'forwarding' else 'Reply-To (Responder para)'
+        save_to_history(
+            f'REMOVER_{attr_type.upper()}_ZIMBRA',
+            session.get('ad_user', 'admin'),
+            f"Removido {attr_label} da conta do Zimbra {email} (ID: {account_id})."
+        )
+        
+        return jsonify({'success': True, 'message': f'{attr_label} removido com sucesso para {email}.'})
+    except Exception as e:
+        logging.error(f"Erro ao remover {attr_type} da conta {email}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 # ==============================================================================
 # Simulador de API SOAP do Zimbra (Para Testes Locais)
 # ==============================================================================
@@ -1033,6 +1115,41 @@ def mock_zimbra_soap():
                 
             response_body = """
             <DeleteDistributionListResponse xmlns="urn:zimbraAdmin"/>
+            """
+            
+        elif tag_name == "SearchDirectoryRequest":
+            logging.info("[ZIMBRA-MOCK] Buscando contas com encaminhamento ativo")
+            response_body = """
+            <SearchDirectoryResponse xmlns="urn:zimbraAdmin">
+                <account name="joao.silva@comolatti.com.br" id="acc-id-joao">
+                    <a n="zimbraPrefMailForwardingAddress">externo_joao@gmail.com</a>
+                    <a n="zimbraPrefMailLocalDeliveryDisabled">TRUE</a>
+                    <a n="displayName">João Silva</a>
+                    <a n="zimbraAccountStatus">active</a>
+                </account>
+                <account name="maria.souza@comolatti.com.br" id="acc-id-maria">
+                    <a n="zimbraPrefMailForwardingAddress">externo_maria@outlook.com</a>
+                    <a n="zimbraPrefMailLocalDeliveryDisabled">FALSE</a>
+                    <a n="zimbraPrefReplyToAddress">reply_maria@gmail.com</a>
+                    <a n="displayName">Maria Souza</a>
+                    <a n="zimbraAccountStatus">active</a>
+                </account>
+                <account name="pedro.santos@comolatti.com.br" id="acc-id-pedro">
+                    <a n="zimbraPrefReplyToAddress">reply_pedro@external.com</a>
+                    <a n="displayName">Pedro Santos</a>
+                    <a n="zimbraAccountStatus">active</a>
+                </account>
+            </SearchDirectoryResponse>
+            """
+            
+        elif tag_name == "ModifyAccountRequest":
+            id_el = request_el.find("{urn:zimbraAdmin}id")
+            acc_id = id_el.text.strip() if id_el is not None and id_el.text else ""
+            logging.info(f"[ZIMBRA-MOCK] Modificando conta Zimbra ID '{acc_id}'")
+            response_body = f"""
+            <ModifyAccountResponse xmlns="urn:zimbraAdmin">
+                <account name="mock-user@comolatti.com.br" id="{acc_id}"/>
+            </ModifyAccountResponse>
             """
             
         else:
