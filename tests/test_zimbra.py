@@ -350,3 +350,27 @@ def test_api_remove_reply_to_attribute(authenticated_client, mocker):
     assert 'Reply-To (Responder para) removido com sucesso' in response.json['message']
     mock_remove.assert_called_once_with('acc-id-maria', 'reply_to')
 
+
+def test_api_remove_notification_attribute(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_remove = mock_client.return_value.remove_zimbra_attribute
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/forwardings/remove', json={
+        'account_id': 'acc-id-maria',
+        'email': 'maria.souza@comolatti.com.br',
+        'attr_type': 'notification'
+    })
+    
+    assert response.status_code == 200
+    assert response.json['success'] is True
+    assert 'Notificação de Entrada removido com sucesso' in response.json['message']
+    mock_remove.assert_called_once_with('acc-id-maria', 'notification')
+

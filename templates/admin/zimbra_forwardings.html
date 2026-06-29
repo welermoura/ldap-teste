@@ -119,6 +119,7 @@
                         <th scope="col" style="min-width: 220px;">Usuário / Conta</th>
                         <th scope="col" style="min-width: 260px;">Encaminhando Para</th>
                         <th scope="col" style="min-width: 160px;">Entrega Local</th>
+                        <th scope="col" style="min-width: 220px;">Notificação de Entrada</th>
                         <th scope="col" style="min-width: 220px;">Reply-To (Responder para)</th>
                         <th scope="col" class="text-end" style="min-width: 220px;">Ações</th>
                     </tr>
@@ -279,6 +280,43 @@
                 }
                 const deliveryTd = `<td>${deliveryBadge}</td>`;
                 
+                // Coluna Notificação de Entrada
+                let notificationText = '<span class="text-muted small">Inativo</span>';
+                let hasNotification = false;
+                if (acc.notification_address) {
+                    const parsedNotification = [];
+                    acc.notification_address.split(/[\s,;]+/).forEach(email => {
+                        const trimmed = email.trim();
+                        if (trimmed) {
+                            parsedNotification.push(trimmed);
+                        }
+                    });
+
+                    if (parsedNotification.length > 0) {
+                        notificationText = parsedNotification.map(addr => {
+                            const parts = addr.split('@');
+                            const domain = parts.length > 1 ? parts[1].trim().toLowerCase() : '';
+                            const isCorporate = allowedDomains.includes(domain);
+                            
+                            if (isCorporate) {
+                                return `
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle py-1.5 px-2 me-1 mb-1 d-inline-block text-break" style="max-width: 100%; white-space: normal; word-break: break-all;">
+                                        <i class="fas fa-bell me-1 small"></i>${escapeHtml(addr)}
+                                    </span>
+                                `;
+                            } else {
+                                return `
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1.5 px-2 me-1 mb-1 d-inline-block text-break" style="max-width: 100%; white-space: normal; word-break: break-all;" title="Notificação Externa! Não faz parte dos domínios detectados no Zimbra.">
+                                        <i class="fas fa-exclamation-triangle me-1 text-danger"></i>${escapeHtml(addr)} <span class="badge bg-danger text-white ms-1" style="font-size: 0.65rem; vertical-align: middle; font-weight: 500;">Externo</span>
+                                    </span>
+                                `;
+                            }
+                        }).join('');
+                        hasNotification = true;
+                    }
+                }
+                const notificationTd = `<td>${notificationText}</td>`;
+                
                 // Coluna Reply-To
                 let replyToText = '<span class="text-muted small">Inativo</span>';
                 let hasReplyTo = false;
@@ -325,6 +363,13 @@
                         </button>
                     `;
                 }
+                if (hasNotification) {
+                    actionsHtml += `
+                        <button class="btn btn-sm btn-outline-warning action-btn mb-1" title="Remover Notificação de Entrada" onclick="confirmRemove('${acc.id}', '${acc.email}', '${nameText}', 'notification')">
+                            <i class="fas fa-bell me-1"></i>Limpar Notificação
+                        </button>
+                    `;
+                }
                 if (hasReplyTo) {
                     actionsHtml += `
                         <button class="btn btn-sm btn-outline-info action-btn mb-1" title="Remover Reply-To" onclick="confirmRemove('${acc.id}', '${acc.email}', '${nameText}', 'reply_to')">
@@ -335,7 +380,7 @@
                 actionsHtml += '</div>';
                 const actionsTd = `<td class="text-end">${actionsHtml}</td>`;
                 
-                tr.innerHTML = userTd + forwardingTd + deliveryTd + replyToTd + actionsTd;
+                tr.innerHTML = userTd + forwardingTd + deliveryTd + notificationTd + replyToTd + actionsTd;
                 listBody.appendChild(tr);
             });
         }
@@ -356,7 +401,13 @@
         window.confirmRemove = function(id, email, name, attrType) {
             activeRemoveData = { id, email, name, attrType };
             
-            const fieldLabel = attrType === 'forwarding' ? 'o Encaminhamento' : 'o campo Reply-To (Responder para)';
+            let fieldLabel = 'o Encaminhamento';
+            if (attrType === 'reply_to') {
+                fieldLabel = 'o campo Reply-To (Responder para)';
+            } else if (attrType === 'notification') {
+                fieldLabel = 'o campo Notificação de Entrada';
+            }
+            
             document.getElementById('modal-desc-text').innerHTML = `Você está prestes a desativar e limpar <strong>${fieldLabel}</strong> da seguinte conta:`;
             document.getElementById('modal-account-name').textContent = name;
             document.getElementById('modal-account-email').textContent = email;
@@ -366,9 +417,12 @@
             if (attrType === 'forwarding') {
                 modalHeader.className = 'modal-header bg-danger text-white';
                 confirmBtn.className = 'btn btn-danger';
-            } else {
+            } else if (attrType === 'reply_to') {
                 modalHeader.className = 'modal-header bg-info text-white';
                 confirmBtn.className = 'btn btn-info';
+            } else if (attrType === 'notification') {
+                modalHeader.className = 'modal-header bg-warning text-dark';
+                confirmBtn.className = 'btn btn-warning';
             }
             
             removeModal.show();
@@ -432,7 +486,8 @@
                 const emailMatch = acc.email && acc.email.toLowerCase().includes(term);
                 const forwardingMatch = acc.forwarding_addresses && acc.forwarding_addresses.some(addr => addr.toLowerCase().includes(term));
                 const replyToMatch = acc.reply_to && acc.reply_to.toLowerCase().includes(term);
-                return nameMatch || emailMatch || forwardingMatch || replyToMatch;
+                const notificationMatch = acc.notification_address && acc.notification_address.toLowerCase().includes(term);
+                return nameMatch || emailMatch || forwardingMatch || replyToMatch || notificationMatch;
             });
             
             renderTable(filtered);

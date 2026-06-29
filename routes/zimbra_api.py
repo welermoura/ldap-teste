@@ -390,13 +390,13 @@ class ZimbraSOAPClient:
     def search_accounts_with_forwarding(self):
         """
         Busca contas que tenham encaminhamento de e-mail ativo (zimbraPrefMailForwardingAddress=*)
-        ou Reply-To configurado (zimbraPrefReplyToAddress=*).
+        ou Reply-To configurado (zimbraPrefReplyToAddress=*) ou Notificação configurada (zimbraPrefNewMailNotificationAddress=*).
         """
         if not self.auth_token:
             self.authenticate()
 
         body_xml = """
-        <SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" query="(|(zimbraPrefMailForwardingAddress=*)(zimbraPrefReplyToAddress=*))" attrs="zimbraId,zimbraPrefMailForwardingAddress,zimbraPrefMailLocalDeliveryDisabled,zimbraPrefReplyToAddress,displayName,cn,zimbraAccountStatus">
+        <SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" query="(|(zimbraPrefMailForwardingAddress=*)(zimbraPrefReplyToAddress=*)(zimbraPrefNewMailNotificationAddress=*))" attrs="zimbraId,zimbraPrefMailForwardingAddress,zimbraPrefMailLocalDeliveryDisabled,zimbraPrefReplyToAddress,zimbraPrefNewMailNotificationAddress,displayName,cn,zimbraAccountStatus">
         </SearchDirectoryRequest>
         """
         
@@ -417,6 +417,7 @@ class ZimbraSOAPClient:
                             "forwarding_addresses": [],
                             "local_delivery_disabled": False,
                             "reply_to": "",
+                            "notification_address": "",
                             "display_name": "",
                             "status": "active"
                         }
@@ -432,6 +433,9 @@ class ZimbraSOAPClient:
                             elif n_attr == "zimbraPrefReplyToAddress":
                                 if val:
                                     attrs["reply_to"] = val.strip().lower()
+                            elif n_attr == "zimbraPrefNewMailNotificationAddress":
+                                if val:
+                                    attrs["notification_address"] = val.strip().lower()
                             elif n_attr == "displayName":
                                 attrs["display_name"] = val.strip()
                             elif n_attr == "zimbraAccountStatus":
@@ -445,7 +449,7 @@ class ZimbraSOAPClient:
 
     def remove_zimbra_attribute(self, account_id, attr_type):
         """
-        Remove um atributo específico da conta (forwarding ou reply_to).
+        Remove um atributo específico da conta (forwarding, reply_to ou notification).
         """
         if not self.auth_token:
             self.authenticate()
@@ -458,6 +462,13 @@ class ZimbraSOAPClient:
         elif attr_type == 'reply_to':
             attrs_xml = """
             <a n="zimbraPrefReplyToAddress"></a>
+            <a n="zimbraPrefReplyToDisplay"></a>
+            <a n="zimbraPrefReplyToEnabled">FALSE</a>
+            """
+        elif attr_type == 'notification':
+            attrs_xml = """
+            <a n="zimbraPrefNewMailNotificationAddress"></a>
+            <a n="zimbraPrefNewMailNotificationEnabled">FALSE</a>
             """
         else:
             raise Exception(f"Atributo desconhecido para remoção: {attr_type}")

@@ -859,7 +859,15 @@ def api_remove_forwarding():
         client.remove_zimbra_attribute(account_id, attr_type)
         
         # Salva no histórico de ações
-        attr_label = 'Encaminhamento' if attr_type == 'forwarding' else 'Reply-To (Responder para)'
+        if attr_type == 'forwarding':
+            attr_label = 'Encaminhamento'
+        elif attr_type == 'reply_to':
+            attr_label = 'Reply-To (Responder para)'
+        elif attr_type == 'notification':
+            attr_label = 'Notificação de Entrada'
+        else:
+            attr_label = attr_type
+
         save_to_history(
             f'REMOVER_{attr_type.upper()}_ZIMBRA',
             session.get('ad_user', 'admin'),
@@ -1131,11 +1139,13 @@ def mock_zimbra_soap():
                     <a n="zimbraPrefMailForwardingAddress">externo_maria@outlook.com</a>
                     <a n="zimbraPrefMailLocalDeliveryDisabled">FALSE</a>
                     <a n="zimbraPrefReplyToAddress">reply_maria@gmail.com</a>
+                    <a n="zimbraPrefNewMailNotificationAddress">notify_maria@external.com</a>
                     <a n="displayName">Maria Souza</a>
                     <a n="zimbraAccountStatus">active</a>
                 </account>
                 <account name="pedro.santos@comolatti.com.br" id="acc-id-pedro">
                     <a n="zimbraPrefReplyToAddress">reply_pedro@external.com</a>
+                    <a n="zimbraPrefNewMailNotificationAddress">notify_pedro@comolatti.com.br</a>
                     <a n="displayName">Pedro Santos</a>
                     <a n="zimbraAccountStatus">active</a>
                 </account>
