@@ -711,6 +711,10 @@ def get_ldap_connection(user=None, password=None, read_only=False):
                                       auto_bind=True, receive_timeout=15, read_only=read_only)
             raise
 
+    except Exception as e:
+        logging.error(f"Erro crítico de conexão LDAP: {e}")
+        raise
+
 def get_service_account_connection():
     """Atalho para obter a conexão da conta de serviço com reuso por requisição."""
     from flask import has_app_context, g
