@@ -856,6 +856,40 @@ def api_remove_forwarding():
         zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD', '')
         
         client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+        
+        if attr_type == 'forwarding':
+            # Valida se o encaminhamento é realmente externo antes de remover
+            has_external = False
+            try:
+                # Obtém domínios corporativos
+                domains_list = []
+                domains = client.get_domains()
+                if domains:
+                    domains_list = [d.get('name', '').strip().lower() for d in domains if d.get('name')]
+                
+                accounts = client.search_accounts_with_forwarding()
+                target_account = None
+                for acc in accounts:
+                    if acc.get('id') == account_id or acc.get('email') == email.strip().lower():
+                        target_account = acc
+                        break
+                
+                if target_account:
+                    for addr in target_account.get('forwarding_addresses', []):
+                        parts = addr.split('@')
+                        domain = parts[-1].strip().lower() if len(parts) > 1 else ''
+                        if domain not in domains_list:
+                            has_external = True
+                            break
+                else:
+                    return jsonify({'error': 'Esta conta não possui regras de encaminhamento ativas no Zimbra.'}), 400
+            except Exception as ex:
+                logging.error(f"Erro ao verificar se encaminhamento é externo: {ex}")
+                return jsonify({'error': f"Erro de validação de segurança: {str(ex)}"}), 500
+                
+            if not has_external:
+                return jsonify({'error': 'Não é permitido remover encaminhamentos corporativos internos.'}), 403
+                
         client.remove_zimbra_attribute(account_id, attr_type)
         
         # Salva no histórico de ações

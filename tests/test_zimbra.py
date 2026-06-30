@@ -312,6 +312,18 @@ def test_api_remove_forwarding_attribute(authenticated_client, mocker):
     })
     
     mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.get_domains.return_value = [{'name': 'comolatti.com.br', 'id': 'd1'}]
+    mock_client.return_value.search_accounts_with_forwarding.return_value = [
+        {
+            'id': 'acc-id-joao',
+            'email': 'joao.silva@comolatti.com.br',
+            'forwarding_addresses': ['externo_joao@gmail.com'], # external address
+            'local_delivery_disabled': True,
+            'reply_to': '',
+            'display_name': 'João Silva',
+            'status': 'active'
+        }
+    ]
     mock_remove = mock_client.return_value.remove_zimbra_attribute
     mocker.patch('routes.zimbra.save_to_history')
     
@@ -325,6 +337,41 @@ def test_api_remove_forwarding_attribute(authenticated_client, mocker):
     assert response.json['success'] is True
     assert 'Encaminhamento removido com sucesso' in response.json['message']
     mock_remove.assert_called_once_with('acc-id-joao', 'forwarding')
+
+
+def test_api_remove_forwarding_attribute_corporate_denied(authenticated_client, mocker):
+    mocker.patch('routes.zimbra.load_config', return_value={
+        'ZIMBRA_API_URL': 'http://localhost:5000/mock/zimbra/soap',
+        'ZIMBRA_ADMIN_USER': 'admin@comolatti.com.br',
+        'ZIMBRA_ADMIN_PASSWORD': 'adminpassword',
+        'ZIMBRA_ENABLED': True
+    })
+    
+    mock_client = mocker.patch('routes.zimbra.ZimbraSOAPClient')
+    mock_client.return_value.get_domains.return_value = [{'name': 'comolatti.com.br', 'id': 'd1'}]
+    mock_client.return_value.search_accounts_with_forwarding.return_value = [
+        {
+            'id': 'acc-id-joao',
+            'email': 'joao.silva@comolatti.com.br',
+            'forwarding_addresses': ['interno_joao@comolatti.com.br'], # corporate/internal address
+            'local_delivery_disabled': True,
+            'reply_to': '',
+            'display_name': 'João Silva',
+            'status': 'active'
+        }
+    ]
+    mock_remove = mock_client.return_value.remove_zimbra_attribute
+    mocker.patch('routes.zimbra.save_to_history')
+    
+    response = authenticated_client.post('/api/zimbra/forwardings/remove', json={
+        'account_id': 'acc-id-joao',
+        'email': 'joao.silva@comolatti.com.br',
+        'attr_type': 'forwarding'
+    })
+    
+    assert response.status_code == 403
+    assert 'Não é permitido remover encaminhamentos corporativos internos' in response.json['error']
+    mock_remove.assert_not_called()
 
 
 def test_api_remove_reply_to_attribute(authenticated_client, mocker):

@@ -142,10 +142,31 @@
             </div>
             <div class="modal-body">
                 <p id="modal-desc-text">Você está prestes a remover o encaminhamento da conta:</p>
-                <div class="p-3 rounded border" style="background: var(--input-background); border-color: var(--input-border-color) !important;">
+                <div class="p-3 rounded border mb-3" style="background: var(--input-background); border-color: var(--input-border-color) !important;">
                     <strong class="d-block" id="modal-account-name" style="color: var(--text-color); font-size: 1.1rem;">-</strong>
                     <span class="small" id="modal-account-email" style="color: var(--text-muted-color); font-size: 0.9rem;">-</span>
                 </div>
+
+                <div id="password-reset-fields" class="mb-3 d-none">
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i><strong>Atenção:</strong> Como esta conta possuía encaminhamento ou reply-to externo configurado, ela pode estar comprometida. <strong>A alteração de senha do usuário é obrigatória</strong> para desativar este recurso por motivos de segurança.
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal_new_password" class="form-label">Nova Senha do Usuário</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="modal_new_password" placeholder="Digite a nova senha..." autocomplete="new-password">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="modal_confirm_password" class="form-label">Confirmar Nova Senha</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                            <input type="password" class="form-control" id="modal_confirm_password" placeholder="Confirme a nova senha..." autocomplete="new-password">
+                        </div>
+                    </div>
+                </div>
+
                 <p class="mt-3 mb-0 text-danger small fw-semibold">
                     <i class="fas fa-info-circle me-1"></i> Esta ação é imediata e será registrada no histórico de segurança da aplicação.
                 </p>
@@ -231,6 +252,7 @@
                 // Coluna Encaminhamento
                 let forwardingText = '<span class="text-muted small">Inativo</span>';
                 let hasForwarding = false;
+                let hasExternalForwarding = false;
                 if (acc.forwarding_addresses && acc.forwarding_addresses.length > 0) {
                     const parsedAddresses = [];
                     acc.forwarding_addresses.forEach(addrStr => {
@@ -257,6 +279,7 @@
                                     </span>
                                 `;
                             } else {
+                                hasExternalForwarding = true;
                                 return `
                                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle py-1.5 px-2 me-1 mb-1 d-inline-block text-break" style="max-width: 100%; white-space: normal; word-break: break-all;" title="Domínio Externo! Não faz parte dos domínios detectados no Zimbra.">
                                         <i class="fas fa-exclamation-triangle me-1 text-danger"></i>${escapeHtml(addr)} <span class="badge bg-danger text-white ms-1" style="font-size: 0.65rem; vertical-align: middle; font-weight: 500;">Externo</span>
@@ -356,7 +379,7 @@
                 
                 // Coluna Ações
                 let actionsHtml = '<div class="d-flex flex-wrap justify-content-end gap-1.5">';
-                if (hasForwarding) {
+                if (hasExternalForwarding) {
                     actionsHtml += `
                         <button class="btn btn-sm btn-outline-danger action-btn mb-1" title="Remover Encaminhamento" onclick="confirmRemove('${acc.id}', '${acc.email}', '${nameText}', 'forwarding')">
                             <i class="fas fa-external-link-alt me-1"></i>Limpar Encaminhamento
@@ -372,7 +395,7 @@
                 }
                 if (hasReplyTo) {
                     actionsHtml += `
-                        <button class="btn btn-sm btn-outline-info action-btn mb-1" title="Remover Reply-To" onclick="confirmRemove('${acc.id}', '${acc.email}', '${nameText}', 'reply_to')">
+                        <button class="btn btn-sm btn-outline-primary action-btn mb-1" title="Remover Reply-To" onclick="confirmRemove('${acc.id}', '${acc.email}', '${nameText}', 'reply_to')">
                             <i class="fas fa-reply me-1"></i>Limpar Reply-To
                         </button>
                     `;
@@ -418,59 +441,138 @@
                 modalHeader.className = 'modal-header bg-danger text-white';
                 confirmBtn.className = 'btn btn-danger';
             } else if (attrType === 'reply_to') {
-                modalHeader.className = 'modal-header bg-info text-white';
-                confirmBtn.className = 'btn btn-info';
+                modalHeader.className = 'modal-header bg-primary text-white';
+                confirmBtn.className = 'btn btn-primary';
             } else if (attrType === 'notification') {
                 modalHeader.className = 'modal-header bg-warning text-dark';
                 confirmBtn.className = 'btn btn-warning';
+            }
+
+            // Limpa os campos de senha sempre que abrir o modal
+            document.getElementById('modal_new_password').value = '';
+            document.getElementById('modal_confirm_password').value = '';
+            
+            // Mostra/oculta os campos de reset de senha
+            const pwdFields = document.getElementById('password-reset-fields');
+            if (attrType === 'forwarding' || attrType === 'reply_to') {
+                pwdFields.classList.remove('d-none');
+            } else {
+                pwdFields.classList.add('d-none');
             }
             
             removeModal.show();
         };
         
-        // Confirma remoção via AJAX
+        // Confirma remoção via AJAX (e opcionalmente altera senha se for forwarding/reply_to)
         confirmBtn.addEventListener('click', function() {
             if (!activeRemoveData) return;
             
-            confirmBtn.disabled = true;
-            confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Processando...';
+            const isPasswordRequired = (activeRemoveData.attrType === 'forwarding' || activeRemoveData.attrType === 'reply_to');
+            let newPassword = '';
             
-            fetch("{{ url_for('zimbra.api_remove_forwarding') }}", {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
-                },
-                body: JSON.stringify({
-                    account_id: activeRemoveData.id,
-                    email: activeRemoveData.email,
-                    attr_type: activeRemoveData.attrType
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(err => { throw new Error(err.error || 'Erro ao remover atributo') });
-                }
-                return response.json();
-            })
-            .then(data => {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'Confirmar Remoção';
-                removeModal.hide();
+            if (isPasswordRequired) {
+                newPassword = document.getElementById('modal_new_password').value;
+                const confirmPassword = document.getElementById('modal_confirm_password').value;
                 
-                if (data.success) {
-                    showToast(data.message, 'success', 'Removido com Sucesso');
-                    loadForwardings(); // Recarrega a tabela
-                } else {
-                    showToast(data.error || 'Não foi possível completar a ação.', 'error', 'Erro');
+                if (!newPassword) {
+                    showToast('A nova senha é obrigatória para desativar este recurso.', 'error', 'Erro de Validação');
+                    return;
                 }
-            })
-            .catch(err => {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = 'Confirmar Remoção';
-                removeModal.hide();
-                showToast(err.message, 'error', 'Erro');
-            });
+                if (newPassword !== confirmPassword) {
+                    showToast('As senhas digitadas não coincidem.', 'error', 'Erro de Validação');
+                    return;
+                }
+            }
+
+            confirmBtn.disabled = true;
+            
+            const runAttributeRemoval = () => {
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Removendo Atributo...';
+                
+                return fetch("{{ url_for('zimbra.api_remove_forwarding') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                    },
+                    body: JSON.stringify({
+                        account_id: activeRemoveData.id,
+                        email: activeRemoveData.email,
+                        attr_type: activeRemoveData.attrType
+                    })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error || 'Erro ao remover atributo') });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirmar Remoção';
+                    removeModal.hide();
+                    
+                    if (data.success) {
+                        const successMsg = isPasswordRequired 
+                            ? 'Senha alterada e redirecionamento desativado com sucesso.' 
+                            : 'Atributo desativado com sucesso.';
+                        showToast(successMsg, 'success', 'Sucesso');
+                    } else {
+                        const errorMsg = isPasswordRequired 
+                            ? 'Senha alterada com sucesso, mas ocorreu um erro ao remover o redirecionamento: ' + (data.error || 'Erro desconhecido.')
+                            : (data.error || 'Não foi possível completar a ação.');
+                        showToast(errorMsg, isPasswordRequired ? 'warning' : 'error', isPasswordRequired ? 'Atenção' : 'Erro');
+                    }
+                    loadForwardings();
+                })
+                .catch(err => {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirmar Remoção';
+                    removeModal.hide();
+                    
+                    const errorMsg = isPasswordRequired 
+                        ? 'Senha alterada com sucesso, mas falhou ao desativar o recurso no Zimbra: ' + err.message
+                        : err.message;
+                    showToast(errorMsg, isPasswordRequired ? 'warning' : 'error', 'Erro');
+                    loadForwardings();
+                });
+            };
+
+            if (isPasswordRequired) {
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Alterando Senha...';
+                const username = activeRemoveData.email.split('@')[0].trim().toLowerCase();
+                
+                fetch(`/api/reset_password/${username}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                    },
+                    body: JSON.stringify({ new_password: newPassword })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => { throw new Error(err.error || 'Erro ao redefinir a senha no AD') });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.error || 'Falha ao redefinir a senha do usuário.');
+                    }
+                    // Senha alterada, agora desativa o atributo
+                    return runAttributeRemoval();
+                })
+                .catch(err => {
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirmar Remoção';
+                    showToast('Não foi possível alterar a senha do usuário no AD: ' + err.message, 'error', 'Erro de Segurança');
+                });
+            } else {
+                // Notificação não exige senha
+                confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Processando...';
+                runAttributeRemoval();
+            }
         });
         
         // Busca na tabela
@@ -495,9 +597,6 @@
         
         // Botão refresh
         document.getElementById('btn-refresh-list').addEventListener('click', loadForwardings);
-        
-        // Carga inicial
-        loadForwardings();
     });
 </script>
 {% endblock %}
