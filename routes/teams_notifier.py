@@ -32,13 +32,19 @@ def get_graph_user_identifier(email, headers):
         if res.ok:
             user_data = res.json()
             return user_data.get('userPrincipalName') or user_data.get('id')
-        else:
+        elif res.status_code in (401, 403):
+            # Token sem permissão de leitura de diretório (User.ReadBasic.All).
+            # O filtro usaria a mesma permissão e também falharia — vamos direto ao fallback.
+            logging.info(f"[TEAMS NOMINAL] Sem permissão para ler o diretório (status {res.status_code}). "
+                         f"Usando o e-mail '{email}' diretamente como identificador (comportamento esperado).")
+            return email
+        elif res.status_code != 404:
             logging.warning(f"[TEAMS NOMINAL] Retorno não-OK ao obter {email} diretamente no Graph: {res.status_code} - {res.text}")
     except Exception as e_direct:
         logging.warning(f"[TEAMS NOMINAL] Erro ao obter {email} diretamente no Graph API: {e_direct}")
 
-    # 2. Se falhar, faz uma busca por filtro
-    logging.info(f"[TEAMS NOMINAL] Usuário {email} não encontrado diretamente ou acesso restrito. Buscando via filtro no Entra ID...")
+    # 2. Em caso de 404 (e-mail pode diferir do UPN), tenta resolver via filtro
+    logging.info(f"[TEAMS NOMINAL] Usuário {email} não encontrado diretamente. Tentando resolver via filtro no Entra ID...")
     filter_url = f"https://graph.microsoft.com/v1.0/users?$filter=mail eq '{email}' or userPrincipalName eq '{email}'"
     try:
         filter_res = requests.get(filter_url, headers=headers, timeout=10)
@@ -49,6 +55,9 @@ def get_graph_user_identifier(email, headers):
                 resolved = user_data.get('userPrincipalName') or user_data.get('id')
                 logging.info(f"[TEAMS NOMINAL] Usuário {email} resolvido no Entra ID como: {resolved}")
                 return resolved
+        elif filter_res.status_code in (401, 403):
+            logging.info(f"[TEAMS NOMINAL] Sem permissão para filtrar no diretório (status {filter_res.status_code}). "
+                         f"Usando o e-mail '{email}' diretamente (comportamento esperado).")
         else:
             logging.warning(f"[TEAMS NOMINAL] Retorno não-OK ao filtrar {email} no Graph: {filter_res.status_code} - {filter_res.text}")
     except Exception as e_filter:

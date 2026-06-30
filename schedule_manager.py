@@ -510,14 +510,15 @@ def process_zimbra_security_auto_remediation(conn, config, force=False):
             user_search_filter = f"(|(mail={escape_filter_chars(account_email)})(userPrincipalName={escape_filter_chars(account_email)})(sAMAccountName={escape_filter_chars(account_email.split('@')[0])}))"
             
             try:
-                conn.search(search_base, user_search_filter, attributes=['distinguishedName', 'sAMAccountName'])
+                conn.search(search_base, user_search_filter, attributes=['distinguishedName', 'sAMAccountName', 'displayName'])
                 if not conn.entries:
                     logging.error(f"[AUTOREMEDIATION] Usuário '{account_email}' não foi encontrado no AD. Abortando remediação de segurança para este e-mail.")
                     continue
-                
+
                 ad_user = conn.entries[0]
                 user_dn = ad_user.distinguishedName.value
                 sam_username = ad_user.sAMAccountName.value
+                ad_display_name = ad_user.displayName.value if ('displayName' in ad_user and ad_user.displayName.value) else None
             except Exception as e_ad_search:
                 logging.error(f"[AUTOREMEDIATION] Erro ao buscar usuário '{account_email}' no AD: {e_ad_search}")
                 continue
@@ -561,8 +562,11 @@ def process_zimbra_security_auto_remediation(conn, config, force=False):
 
             if unauthorized_reply_to:
                 try:
+                    # Limpa o endereco, o texto de exibicao e desativa o "Responder para"
                     client.modify_account(account_id, {
-                        'zimbraPrefReplyToAddress': ''
+                        'zimbraPrefReplyToAddress': '',
+                        'zimbraPrefReplyToDisplay': '',
+                        'zimbraPrefReplyToEnabled': 'FALSE'
                     })
                     logging.info(f"[AUTOREMEDIATION] Reply-To externo de '{account_email}' foi removido com sucesso do Zimbra.")
                     removed_attributes.append(('Reply-To Externo', unauthorized_reply_to))
@@ -571,13 +575,33 @@ def process_zimbra_security_auto_remediation(conn, config, force=False):
 
             if unauthorized_notification:
                 try:
+                    # Limpa o endereco de notificacao e desativa a notificacao externa
                     client.modify_account(account_id, {
-                        'zimbraPrefNewMailNotificationAddress': ''
+                        'zimbraPrefNewMailNotificationAddress': '',
+                        'zimbraPrefNewMailNotificationEnabled': 'FALSE'
                     })
                     logging.info(f"[AUTOREMEDIATION] Notificação externa de '{account_email}' foi removido com sucesso do Zimbra.")
                     removed_attributes.append(('Notificação Externa', unauthorized_notification))
                 except Exception as e_rem:
                     logging.error(f"[AUTOREMEDIATION] Falha ao remover Notificação do Zimbra para '{account_email}': {e_rem}")
+
+            # Passo D: Corrigir o nome de exibição "De" (From) puxando o displayName do AD
+            if ad_display_name:
+                try:
+                    client.modify_account(account_id, {'zimbraPrefFromDisplay': ad_display_name})
+                    logging.info(f"[AUTOREMEDIATION] Nome 'De' (From) de '{account_email}' redefinido para o displayName do AD: '{ad_display_name}'.")
+                    try:
+                        save_to_history(
+                            'SECURITY_REMEDIATION',
+                            'scheduler',
+                            f"Autoremediação: nome 'De' de {account_email} corrigido para o displayName do AD ('{ad_display_name}')."
+                        )
+                    except Exception as e_hist_from:
+                        logging.error(f"[AUTOREMEDIATION] Erro ao gravar histórico da correção do nome 'De': {e_hist_from}")
+                except Exception as e_from:
+                    logging.error(f"[AUTOREMEDIATION] Falha ao corrigir o nome 'De' (From) de '{account_email}': {e_from}")
+            else:
+                logging.warning(f"[AUTOREMEDIATION] displayName do AD não disponível para '{account_email}'; nome 'De' não foi corrigido.")
 
             # Passo E: Registrar no histórico e enviar mensagens para o Teams
             for attr_label, dest_val in removed_attributes:
@@ -615,6 +639,124 @@ def process_zimbra_security_auto_remediation(conn, config, force=False):
         raise e
 
 
+def process_zimbra_from_display_correction(conn, config, dry_run=False):
+    """
+    Corrige o nome de exibicao "De" (zimbraPrefFromDisplay) das contas do Zimbra,
+    alinhando ao displayName do usuario no AD. Roda de forma INDEPENDENTE das demais
+    anomalias (encaminhamento/reply/notificacao).
+
+    O displayName do AD e a AUTORIDADE (mandatario): sempre prevalece sobre o "De".
+
+    Regras:
+      - So corrige contas cujo "De" esta PREENCHIDO e difere do displayName do AD.
+        (Se estiver vazio, o Zimbra ja usa o padrao da conta — nao mexe.)
+      - Pula contas sem usuario correspondente no AD.
+    """
+    from routes.zimbra_api import ZimbraSOAPClient
+
+    if not config.get('ZIMBRA_ENABLED', False):
+        logging.info("[FROM-DISPLAY] Integracao Zimbra desativada. Pulando correcao de nome 'De'.")
+        return 0
+
+    search_base = config.get('AD_SEARCH_BASE')
+    if not search_base:
+        logging.error("[FROM-DISPLAY] AD_SEARCH_BASE nao definido. Abortando correcao de nome 'De'.")
+        return 0
+
+    # 1. Carrega displayName do AD (mail/UPN/sAMAccountName -> displayName)
+    ad_by_mail, ad_by_sam = {}, {}
+    try:
+        for e in conn.extend.standard.paged_search(
+                search_base=search_base, search_filter='(&(objectClass=user)(displayName=*))',
+                attributes=['mail', 'userPrincipalName', 'sAMAccountName', 'displayName'],
+                paged_size=500, generator=True):
+            if e.get('type') != 'searchResEntry':
+                continue
+            a = e['attributes']
+            disp = a.get('displayName')
+            disp = (disp[0] if isinstance(disp, list) and disp else disp) if disp else None
+            if not disp:
+                continue
+            for k in ('mail', 'userPrincipalName'):
+                v = a.get(k)
+                v = (v[0] if isinstance(v, list) and v else v) if v else None
+                if v:
+                    ad_by_mail[v.strip().lower()] = disp
+            sam = a.get('sAMAccountName')
+            sam = (sam[0] if isinstance(sam, list) and sam else sam) if sam else None
+            if sam:
+                ad_by_sam[sam.strip().lower()] = disp
+    except Exception as e_ad:
+        logging.error(f"[FROM-DISPLAY] Erro ao carregar usuarios do AD: {e_ad}")
+        return 0
+
+    # 2. Conecta no Zimbra
+    zimbra_url = config.get('ZIMBRA_API_URL', '')
+    zimbra_user = config.get('ZIMBRA_ADMIN_USER', '')
+    zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD', '')
+    if not zimbra_url or not zimbra_user:
+        logging.error("[FROM-DISPLAY] API do Zimbra nao configurada. Abortando.")
+        return 0
+    client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+    client.authenticate()
+
+    ns = '{urn:zimbraAdmin}'
+    SOAP_NS = '{http://www.w3.org/2003/05/soap-envelope}'
+
+    # 3. Varre por dominio (evita o teto de 1000 resultados do SearchDirectory)
+    try:
+        domains = [d.get('name') for d in (client.get_domains() or []) if d.get('name')]
+    except Exception as e_dom:
+        logging.error(f"[FROM-DISPLAY] Erro ao listar dominios do Zimbra: {e_dom}")
+        return 0
+
+    analisadas = corrigidas = 0
+    for dom in domains:
+        try:
+            body = (f'<SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" '
+                    f'limit="2000" domain="{dom}" attrs="zimbraPrefFromDisplay"></SearchDirectoryRequest>')
+            root = client._send_soap_request(body, timeout=120)
+            resp = root.find(f'{SOAP_NS}Body').find(f'{ns}SearchDirectoryResponse')
+        except Exception as e_sd:
+            logging.error(f"[FROM-DISPLAY] Erro ao buscar contas do dominio '{dom}': {e_sd}")
+            continue
+        for acc_el in resp.findall(f'{ns}account'):
+            analisadas += 1
+            email = (acc_el.attrib.get('name', '') or '').strip().lower()
+            acc_id = acc_el.attrib.get('id')
+            fd = None
+            for a_el in acc_el.findall(f'{ns}a'):
+                if a_el.attrib.get('n') == 'zimbraPrefFromDisplay':
+                    fd = a_el.text
+            cur = (fd or '').strip()
+            if not cur or not acc_id:
+                continue  # sem override -> Zimbra usa o padrao
+            ad_disp = ad_by_mail.get(email) or ad_by_sam.get(email.split('@')[0])
+            if not ad_disp:
+                continue
+            ad_disp = ad_disp.strip()
+            if cur == ad_disp:
+                continue
+            if dry_run:
+                logging.info(f"[FROM-DISPLAY][DRY-RUN] {email}: '{cur}' -> '{ad_disp}'")
+                corrigidas += 1
+                continue
+            try:
+                client.modify_account(acc_id, {'zimbraPrefFromDisplay': ad_disp})
+                corrigidas += 1
+                logging.info(f"[FROM-DISPLAY] {email}: nome 'De' corrigido de '{cur}' para '{ad_disp}'.")
+                try:
+                    save_to_history('SECURITY_REMEDIATION', 'scheduler',
+                                    f"Correcao de nome 'De': {email} de '{cur}' para o displayName do AD ('{ad_disp}').")
+                except Exception as e_h:
+                    logging.error(f"[FROM-DISPLAY] Erro ao gravar historico para {email}: {e_h}")
+            except Exception as e_mod:
+                logging.error(f"[FROM-DISPLAY] Falha ao corrigir nome 'De' de {email}: {e_mod}")
+
+    logging.info(f"[FROM-DISPLAY] Concluido. Analisadas={analisadas}, corrigidas={corrigidas}, dry_run={dry_run}.")
+    return corrigidas
+
+
 if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando Gerenciador de Agendamentos do AD.")
@@ -634,6 +776,8 @@ if __name__ == "__main__":
                     process_zimbra_group_syncs(conn, config)
                     # Autoremediação de segurança do Zimbra
                     process_zimbra_security_auto_remediation(conn, config)
+                    # Correção do nome "De" (zimbraPrefFromDisplay) alinhado ao displayName do AD
+                    process_zimbra_from_display_correction(conn, config)
                 else:
                     logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
                 conn.unbind()

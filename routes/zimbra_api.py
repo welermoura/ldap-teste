@@ -14,7 +14,7 @@ class ZimbraSOAPClient:
         self.admin_password = admin_password
         self.auth_token = None
 
-    def _send_soap_request(self, body_xml):
+    def _send_soap_request(self, body_xml, timeout=15):
         """
         Método auxiliar para enviar uma requisição SOAP genérica para a API do Zimbra.
         """
@@ -43,7 +43,7 @@ class ZimbraSOAPClient:
         """
         
         try:
-            response = requests.post(self.url, data=soap_envelope.encode('utf-8'), headers=headers, timeout=10, verify=False)
+            response = requests.post(self.url, data=soap_envelope.encode('utf-8'), headers=headers, timeout=timeout, verify=False)
             
             # Parse do XML retornado se o status for 200 ou 500 (SOAP Faults usam 500)
             if response.status_code in [200, 500]:
@@ -396,12 +396,12 @@ class ZimbraSOAPClient:
             self.authenticate()
 
         body_xml = """
-        <SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" query="(|(zimbraPrefMailForwardingAddress=*)(zimbraPrefReplyToAddress=*)(zimbraPrefNewMailNotificationAddress=*))" attrs="zimbraId,zimbraPrefMailForwardingAddress,zimbraPrefMailLocalDeliveryDisabled,zimbraPrefReplyToAddress,zimbraPrefNewMailNotificationAddress,displayName,cn,zimbraAccountStatus">
+        <SearchDirectoryRequest xmlns="urn:zimbraAdmin" types="accounts" limit="1000" query="(|(zimbraPrefMailForwardingAddress=*)(zimbraPrefReplyToAddress=*)(zimbraPrefNewMailNotificationAddress=*))" attrs="zimbraId,zimbraPrefMailForwardingAddress,zimbraPrefMailLocalDeliveryDisabled,zimbraPrefReplyToAddress,zimbraPrefNewMailNotificationAddress,displayName,cn,zimbraAccountStatus">
         </SearchDirectoryRequest>
         """
         
         try:
-            root = self._send_soap_request(body_xml)
+            root = self._send_soap_request(body_xml, timeout=90)
             body = root.find("{http://www.w3.org/2003/05/soap-envelope}Body")
             accounts = []
             if body is not None:
@@ -486,5 +486,47 @@ class ZimbraSOAPClient:
             logging.error(f"[ZIMBRA-API] Erro ao remover atributo '{attr_type}' da conta '{account_id}': {e}")
             raise e
 
+    def modify_account(self, account_id, attrs):
+        """
+        Modifica atributos de uma conta via ModifyAccountRequest.
+        `attrs` e um dict {nome_atributo: valor}, onde valor pode ser:
+          - string: define o valor (string vazia limpa o atributo)
+          - lista/tupla: define multiplos valores (lista vazia limpa o atributo)
+        Ao limpar zimbraPrefMailForwardingAddress, reativa a entrega local
+        para evitar que a conta deixe de receber mensagens.
+        """
+        if not self.auth_token:
+            self.authenticate()
 
+        attrs_xml = ""
+        for name, value in attrs.items():
+            if isinstance(value, (list, tuple)):
+                if not value:
+                    attrs_xml += f'<a n="{escape(name)}"></a>'
+                else:
+                    for v in value:
+                        attrs_xml += f'<a n="{escape(name)}">{escape(str(v))}</a>'
+            else:
+                if value is None or value == '':
+                    attrs_xml += f'<a n="{escape(name)}"></a>'
+                else:
+                    attrs_xml += f'<a n="{escape(name)}">{escape(str(value))}</a>'
+
+        # Seguranca: se o encaminhamento foi totalmente removido, garante entrega local
+        fwd = attrs.get('zimbraPrefMailForwardingAddress')
+        if fwd is not None and (fwd == '' or (isinstance(fwd, (list, tuple)) and not fwd)):
+            attrs_xml += '<a n="zimbraPrefMailLocalDeliveryDisabled">FALSE</a>'
+
+        body_xml = f"""
+        <ModifyAccountRequest xmlns="urn:zimbraAdmin">
+            <id>{escape(account_id)}</id>
+            {attrs_xml}
+        </ModifyAccountRequest>
+        """
+        try:
+            self._send_soap_request(body_xml)
+            return True
+        except Exception as e:
+            logging.error(f"[ZIMBRA-API] Erro ao modificar conta '{account_id}': {e}")
+            raise e
 

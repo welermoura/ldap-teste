@@ -1307,8 +1307,13 @@
                 })
                 .catch(err => {
                     btnTestTeams.disabled = false;
-                    
-                    // Autocomplete para grupo do Entra ID/AD
+                    btnTestTeams.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Testar Integração Teams';
+                    showToast(err.message || 'Falha ao testar integração.', 'error', 'Erro Teams');
+                });
+            });
+        }
+
+        // Autocomplete para grupo do Entra ID/AD
         const groupInput = document.getElementById('zimbra_security_notify_group');
         const groupIdInput = document.getElementById('zimbra_security_notify_group_id');
         const groupSpinner = document.getElementById('group-search-spinner');
