@@ -78,6 +78,17 @@
             </div>
         </a>
     </div>
+    {% if zimbra_enabled and (session.get('is_admin') or check_permission(action='can_manage_zimbra')) %}
+    <div class="col-md-6 mb-4">
+        <a href="{{ url_for('zimbra.forwardings_page') }}" class="card glass-card text-decoration-none h-100 dashboard-card">
+            <div class="card-body text-center">
+                <i class="fas fa-share fa-3x mb-3 text-success"></i>
+                <h5 class="card-title">Encaminhamentos Zimbra</h5>
+                <p class="card-text text-muted">Gerenciamento e limpeza manual de encaminhamentos, reply-tos e notificações de e-mail suspeitas.</p>
+            </div>
+        </a>
+    </div>
+    {% endif %}
 </div>
 {% block styles %}
 <style>

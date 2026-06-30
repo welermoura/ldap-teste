@@ -349,6 +349,272 @@ def process_zimbra_group_syncs(conn, config):
     logging.info("Sincronização automática de grupos com o Zimbra concluída.")
 
 
+def generate_secure_password(length=12):
+    """Gera uma senha forte e randômica que atenda aos requisitos de complexidade do AD."""
+    import secrets
+    import string
+    
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special = "!@#$%-+=_?"
+    
+    password = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+        secrets.choice(special)
+    ]
+    
+    all_chars = uppercase + lowercase + digits + special
+    for _ in range(length - 4):
+        password.append(secrets.choice(all_chars))
+        
+    secrets.SystemRandom().shuffle(password)
+    return "".join(password)
+
+
+def process_zimbra_security_auto_remediation(conn, config, force=False):
+    """
+    Varre as contas do Zimbra em busca de encaminhamentos, reply-to ou notificações
+    direcionados para e-mails externos não autorizados em contas que não estão na whitelist.
+    Caso encontre, altera a senha no AD, desativa no Zimbra e envia alerta no Teams.
+    """
+    from datetime import datetime, timedelta
+    from common import save_config
+
+    logging.info("Iniciando verificação de segurança (Autoremediação Zimbra).")
+    
+    # 1. Verifica se a autoremediação está ativada nas configurações
+    remediation_enabled = config.get('ZIMBRA_AUTO_REMEDIATION_ENABLED')
+    if not remediation_enabled or str(remediation_enabled).lower() != 'true':
+        logging.info("Autoremediação automática do Zimbra está desativada.")
+        return
+
+    # 1.1. Verifica intervalo de execução agendado se não for forçado
+    if not force:
+        try:
+            interval_minutes = int(config.get('ZIMBRA_AUDIT_INTERVAL_MINUTES', '240'))
+        except (ValueError, TypeError):
+            interval_minutes = 240
+            
+        last_run_str = config.get('ZIMBRA_LAST_AUDIT_TIMESTAMP', '')
+        if last_run_str:
+            try:
+                last_run = datetime.strptime(last_run_str, '%Y-%m-%d %H:%M:%S')
+                if datetime.now() - last_run < timedelta(minutes=interval_minutes):
+                    logging.info(f"[AUTOREMEDIATION] Menos de {interval_minutes} minutos se passaram desde o último run ({last_run_str}). Pulando execução agendada.")
+                    return
+            except Exception as ex:
+                logging.error(f"[AUTOREMEDIATION] Erro ao analisar última data de auditoria '{last_run_str}': {ex}")
+
+    try:
+        # 2. Carrega a whitelist de segurança (lista de e-mails autorizados separados por vírgula)
+        whitelist_str = config.get('ZIMBRA_SECURITY_WHITELIST', '')
+        whitelist = {email.strip().lower() for email in whitelist_str.split(',') if email.strip()}
+
+        # 3. Conecta à API do Zimbra
+        zimbra_url = config.get('ZIMBRA_API_URL')
+        zimbra_user = config.get('ZIMBRA_ADMIN_USER')
+        zimbra_password = config.get('ZIMBRA_ADMIN_PASSWORD')
+        
+        if not zimbra_url or not zimbra_user or not zimbra_password:
+            logging.error("Configurações do Zimbra incompletas para auditoria de segurança.")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = 'Failed: Configurações do Zimbra incompletas'
+            save_config(config)
+            return
+
+        from routes.zimbra_api import ZimbraSOAPClient
+        try:
+            client = ZimbraSOAPClient(zimbra_url, zimbra_user, zimbra_password)
+        except Exception as e:
+            logging.error(f"Erro ao inicializar cliente Zimbra para autoremediação: {e}")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = f'Failed: Erro ao inicializar cliente Zimbra: {str(e)}'
+            save_config(config)
+            return
+
+        # 4. Obtém os domínios corporativos internos autorizados
+        try:
+            domains = client.get_domains()
+            internal_domains = {d.get('name', '').strip().lower() for d in domains if d.get('name')}
+            logging.info(f"Domínios internos autorizados: {', '.join(internal_domains)}")
+        except Exception as e:
+            logging.error(f"Erro ao obter domínios corporativos internos no Zimbra: {e}")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = f'Failed: Erro ao obter domínios corporativos internos: {str(e)}'
+            save_config(config)
+            return
+
+        # Helper para verificar se um e-mail é externo
+        def is_external_email(email_addr):
+            if not email_addr or '@' not in email_addr:
+                return False
+            parts = email_addr.split('@')
+            domain = parts[-1].strip().lower()
+            return domain not in internal_domains
+
+        # 5. Varre contas do Zimbra que possuam regras suspeitas
+        try:
+            accounts = client.search_accounts_with_forwarding()
+        except Exception as e:
+            logging.error(f"Erro ao buscar contas no Zimbra para verificação de segurança: {e}")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = f'Failed: Erro ao buscar contas no Zimbra: {str(e)}'
+            save_config(config)
+            return
+
+        if not accounts:
+            logging.info("Nenhuma conta com encaminhamento, reply-to ou notificação configurada encontrada.")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = 'Success'
+            save_config(config)
+            return
+
+        search_base = config.get('AD_SEARCH_BASE')
+        if not search_base:
+            logging.error("AD_SEARCH_BASE não definido. Não é possível rodar a autoremediação sem buscar usuários no AD.")
+            config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            config['ZIMBRA_LAST_AUDIT_STATUS'] = 'Failed: AD_SEARCH_BASE não definido'
+            save_config(config)
+            return
+
+        from ldap3.utils.conv import escape_filter_chars
+        from routes.teams_notifier import send_teams_security_alert
+
+        for account in accounts:
+            account_email = account.get('email', '').strip().lower()
+            account_id = account.get('id')
+            
+            if not account_email or not account_id:
+                continue
+
+            # Identifica as anomalias externas
+            unauthorized_forwardings = [addr for addr in account.get('forwarding_addresses', []) if is_external_email(addr)]
+            unauthorized_reply_to = account.get('reply_to', '') if is_external_email(account.get('reply_to', '')) else ''
+            unauthorized_notification = account.get('notification_address', '') if is_external_email(account.get('notification_address', '')) else ''
+
+            # Se não houver anomalias, pula esta conta
+            if not unauthorized_forwardings and not unauthorized_reply_to and not unauthorized_notification:
+                continue
+
+            # Se a conta estiver na whitelist, apenas loga e pula a remediação
+            if account_email in whitelist:
+                logging.info(f"[AUTOREMEDIATION] Conta '{account_email}' possui redirecionamento externo permitido por whitelist. Pulando remediação.")
+                continue
+
+            logging.warning(f"[AUTOREMEDIATION] Anomalia detectada na conta não autorizada '{account_email}'!")
+
+            # Passo A: Buscar usuário no AD por mail, userPrincipalName ou sAMAccountName para redefinição de senha
+            user_search_filter = f"(|(mail={escape_filter_chars(account_email)})(userPrincipalName={escape_filter_chars(account_email)})(sAMAccountName={escape_filter_chars(account_email.split('@')[0])}))"
+            
+            try:
+                conn.search(search_base, user_search_filter, attributes=['distinguishedName', 'sAMAccountName'])
+                if not conn.entries:
+                    logging.error(f"[AUTOREMEDIATION] Usuário '{account_email}' não foi encontrado no AD. Abortando remediação de segurança para este e-mail.")
+                    continue
+                
+                ad_user = conn.entries[0]
+                user_dn = ad_user.distinguishedName.value
+                sam_username = ad_user.sAMAccountName.value
+            except Exception as e_ad_search:
+                logging.error(f"[AUTOREMEDIATION] Erro ao buscar usuário '{account_email}' no AD: {e_ad_search}")
+                continue
+
+            # Passo B: Gerar nova senha segura e alterar no Active Directory
+            try:
+                security_pwd = config.get('ZIMBRA_SECURITY_DEFAULT_PASSWORD', '').strip()
+                new_pwd = security_pwd if security_pwd else generate_secure_password()
+            except Exception:
+                new_pwd = generate_secure_password()
+
+            logging.info(f"[AUTOREMEDIATION] Resetando senha para o usuário AD '{sam_username}' ({user_dn})...")
+            try:
+                import ldap3
+                password_value = f'"{new_pwd}"'.encode('utf-16-le')
+                conn.modify(user_dn, {'unicodePwd': [(ldap3.MODIFY_REPLACE, [password_value])]})
+                if conn.result['description'] == 'success':
+                    # Força a alteração de senha no próximo logon por segurança
+                    conn.modify(user_dn, {'pwdLastSet': [(ldap3.MODIFY_REPLACE, [0])]})
+                    logging.info(f"[AUTOREMEDIATION] Senha de '{sam_username}' alterada com sucesso no AD. Forçando alteração de senha no próximo logon.")
+                else:
+                    logging.error(f"[AUTOREMEDIATION] Falha ao resetar senha no AD para '{sam_username}': {conn.result['message']}")
+                    continue
+            except Exception as e_pwd:
+                logging.error(f"[AUTOREMEDIATION] Exceção ao resetar senha de '{sam_username}' no AD: {e_pwd}")
+                continue
+
+            # Passo C: Desativar os recursos irregulares no Zimbra
+            removed_attributes = []
+            if unauthorized_forwardings:
+                try:
+                    # Remove os encaminhamentos externos mantendo os corporativos (se houver)
+                    corporate_forwardings = [addr for addr in account.get('forwarding_addresses', []) if not is_external_email(addr)]
+                    client.modify_account(account_id, {
+                        'zimbraPrefMailForwardingAddress': corporate_forwardings
+                    })
+                    logging.info(f"[AUTOREMEDIATION] Encaminhamento externo de '{account_email}' foi removido com sucesso do Zimbra.")
+                    removed_attributes.append(('Encaminhamento Externo', ', '.join(unauthorized_forwardings)))
+                except Exception as e_rem:
+                    logging.error(f"[AUTOREMEDIATION] Falha ao remover encaminhamento do Zimbra para '{account_email}': {e_rem}")
+
+            if unauthorized_reply_to:
+                try:
+                    client.modify_account(account_id, {
+                        'zimbraPrefReplyToAddress': ''
+                    })
+                    logging.info(f"[AUTOREMEDIATION] Reply-To externo de '{account_email}' foi removido com sucesso do Zimbra.")
+                    removed_attributes.append(('Reply-To Externo', unauthorized_reply_to))
+                except Exception as e_rem:
+                    logging.error(f"[AUTOREMEDIATION] Falha ao remover Reply-To do Zimbra para '{account_email}': {e_rem}")
+
+            if unauthorized_notification:
+                try:
+                    client.modify_account(account_id, {
+                        'zimbraPrefNewMailNotificationAddress': ''
+                    })
+                    logging.info(f"[AUTOREMEDIATION] Notificação externa de '{account_email}' foi removido com sucesso do Zimbra.")
+                    removed_attributes.append(('Notificação Externa', unauthorized_notification))
+                except Exception as e_rem:
+                    logging.error(f"[AUTOREMEDIATION] Falha ao remover Notificação do Zimbra para '{account_email}': {e_rem}")
+
+            # Passo E: Registrar no histórico e enviar mensagens para o Teams
+            for attr_label, dest_val in removed_attributes:
+                try:
+                    save_to_history(
+                        'SECURITY_REMEDIATION',
+                        'scheduler',
+                        f"Autoremediação executada para {account_email}: removido {attr_label} apontando para {dest_val}. Senha AD alterada."
+                    )
+                except Exception as e_hist:
+                    logging.error(f"[AUTOREMEDIATION] Erro ao gravar histórico: {e_hist}")
+
+                try:
+                    send_teams_security_alert(
+                        config=config,
+                        email=account_email,
+                        anomaly_type=attr_label,
+                        destination=dest_val,
+                        new_password=new_pwd,
+                        conn=conn
+                    )
+                except Exception as e_teams:
+                    logging.error(f"[AUTOREMEDIATION] Erro ao disparar alerta Teams para {account_email}: {e_teams}")
+
+        logging.info("Verificação de segurança (Autoremediação Zimbra) concluída.")
+        config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        config['ZIMBRA_LAST_AUDIT_STATUS'] = 'Success'
+        save_config(config)
+
+    except Exception as e:
+        logging.error(f"Erro inesperado durante a auditoria de segurança do Zimbra: {e}", exc_info=True)
+        config['ZIMBRA_LAST_AUDIT_TIMESTAMP'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        config['ZIMBRA_LAST_AUDIT_STATUS'] = f'Failed: {str(e)}'
+        save_config(config)
+        raise e
+
+
 if __name__ == "__main__":
     logging.info("=============================================")
     logging.info("Iniciando Gerenciador de Agendamentos do AD.")
@@ -366,6 +632,8 @@ if __name__ == "__main__":
                     process_group_membership_changes(conn, search_base)
                     # Sincronização de grupos do Zimbra
                     process_zimbra_group_syncs(conn, config)
+                    # Autoremediação de segurança do Zimbra
+                    process_zimbra_security_auto_remediation(conn, config)
                 else:
                     logging.error("AD_SEARCH_BASE não definido. As operações de AD foram puladas.")
                 conn.unbind()

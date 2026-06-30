@@ -797,7 +797,445 @@ def forwardings_page():
     if not config.get('ZIMBRA_ENABLED', False):
         flash('A integração com o Zimbra não está ativada nas configurações globais.', 'error')
         return redirect(url_for('admin.dashboard'))
-    return render_template('admin/zimbra_forwardings.html')
+    return render_template(
+        'admin/zimbra_forwardings.html',
+        remediation_enabled=config.get('ZIMBRA_AUTO_REMEDIATION_ENABLED', 'False'),
+        whitelist_str=config.get('ZIMBRA_SECURITY_WHITELIST', ''),
+        security_default_password=config.get('ZIMBRA_SECURITY_DEFAULT_PASSWORD', ''),
+        teams_tenant_id=config.get('TEAMS_TENANT_ID', ''),
+        teams_client_id=config.get('TEAMS_CLIENT_ID', ''),
+        teams_client_secret=config.get('TEAMS_CLIENT_SECRET', ''),
+        teams_group_id=config.get('TEAMS_GROUP_ID', ''),
+        teams_channel_id=config.get('TEAMS_CHANNEL_ID', ''),
+        teams_user_email=config.get('TEAMS_USER_EMAIL', ''),
+        teams_user_password=config.get('TEAMS_USER_PASSWORD', ''),
+        zimbra_security_notify_nominal=config.get('ZIMBRA_SECURITY_NOTIFY_NOMINAL', 'False'),
+        zimbra_security_notify_group=config.get('ZIMBRA_SECURITY_NOTIFY_GROUP', ''),
+        zimbra_security_notify_group_id=config.get('ZIMBRA_SECURITY_NOTIFY_GROUP_ID', ''),
+        zimbra_audit_interval_minutes=config.get('ZIMBRA_AUDIT_INTERVAL_MINUTES', '240'),
+        zimbra_last_audit_timestamp=config.get('ZIMBRA_LAST_AUDIT_TIMESTAMP', ''),
+        zimbra_last_audit_status=config.get('ZIMBRA_LAST_AUDIT_STATUS', '')
+    )
+
+
+@zimbra_bp.route('/api/zimbra/save_security_config', methods=['POST'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_save_security_config():
+    try:
+        data = request.get_json() or {}
+        remediation_enabled = data.get('remediation_enabled', False)
+        whitelist = data.get('whitelist', '').strip()
+        security_default_password = data.get('security_default_password', '').strip()
+        teams_tenant_id = data.get('teams_tenant_id', '').strip()
+        teams_client_id = data.get('teams_client_id', '').strip()
+        teams_client_secret = data.get('teams_client_secret', '').strip()
+        teams_group_id = data.get('teams_group_id', '').strip()
+        teams_channel_id = data.get('teams_channel_id', '').strip()
+        teams_user_email = data.get('teams_user_email', '').strip()
+        teams_user_password = data.get('teams_user_password', '').strip()
+        zimbra_security_notify_nominal = data.get('zimbra_security_notify_nominal', False)
+        zimbra_security_notify_group = data.get('zimbra_security_notify_group', '').strip()
+        zimbra_security_notify_group_id = data.get('zimbra_security_notify_group_id', '').strip()
+        zimbra_audit_interval_minutes = str(data.get('zimbra_audit_interval_minutes', '240')).strip()
+
+        config = load_config()
+        config['ZIMBRA_AUTO_REMEDIATION_ENABLED'] = 'True' if remediation_enabled else 'False'
+        config['ZIMBRA_SECURITY_WHITELIST'] = whitelist
+        config['ZIMBRA_SECURITY_DEFAULT_PASSWORD'] = security_default_password
+        config['TEAMS_TENANT_ID'] = teams_tenant_id
+        config['TEAMS_CLIENT_ID'] = teams_client_id
+        
+        # Só atualiza se foi preenchido ou modificado (não mascarado)
+        if teams_client_secret and teams_client_secret != '********':
+            config['TEAMS_CLIENT_SECRET'] = teams_client_secret
+
+        config['TEAMS_GROUP_ID'] = teams_group_id
+        config['TEAMS_CHANNEL_ID'] = teams_channel_id
+        config['TEAMS_USER_EMAIL'] = teams_user_email
+        
+        if teams_user_password and teams_user_password != '********':
+            config['TEAMS_USER_PASSWORD'] = teams_user_password
+
+        config['ZIMBRA_SECURITY_NOTIFY_NOMINAL'] = 'True' if zimbra_security_notify_nominal else 'False'
+        config['ZIMBRA_SECURITY_NOTIFY_GROUP'] = zimbra_security_notify_group
+        config['ZIMBRA_SECURITY_NOTIFY_GROUP_ID'] = zimbra_security_notify_group_id
+        config['ZIMBRA_AUDIT_INTERVAL_MINUTES'] = zimbra_audit_interval_minutes
+
+        save_config(config)
+        return jsonify({'success': True, 'message': 'Configurações de segurança e notificações salvas com sucesso!'})
+    except Exception as e:
+        logging.error(f"Erro ao salvar configurações de segurança do Zimbra: {e}", exc_info=True)
+        return jsonify({'error': f"Erro ao salvar configurações: {str(e)}"}), 500
+
+
+@zimbra_bp.route('/api/zimbra/run_security_audit', methods=['POST'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_run_security_audit():
+    try:
+        import io
+        from common import load_config, get_service_account_connection
+        from schedule_manager import process_zimbra_security_auto_remediation
+
+        config = load_config()
+        if not config.get('ZIMBRA_ENABLED', False):
+            return jsonify({'success': False, 'error': 'A integração com o Zimbra não está ativada nas configurações globais.'}), 400
+
+        # Captura os logs gerados em tempo de execução
+        log_capture_string = io.StringIO()
+        ch = logging.StreamHandler(log_capture_string)
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter('[%(levelname)s] %(message)s')
+        ch.setFormatter(formatter)
+        
+        # Obtém o logger principal e adiciona nosso Handler
+        logger = logging.getLogger()
+        old_level = logger.level
+        logger.setLevel(logging.INFO)
+        logger.addHandler(ch)
+
+        try:
+            conn = get_service_account_connection()
+            if not conn:
+                raise Exception("Não foi possível estabelecer conexão com o Active Directory.")
+            
+            # Força a execução da auditoria ignorando intervalo de tempo
+            process_zimbra_security_auto_remediation(conn, config, force=True)
+            
+        except Exception as e:
+            logging.error(f"Erro durante execução manual: {e}")
+            raise e
+        finally:
+            logger.removeHandler(ch)
+            logger.setLevel(old_level)
+
+        log_contents = log_capture_string.getvalue()
+        
+        # Recarrega configurações atualizadas (com novo timestamp e status salvos pelo schedule_manager)
+        updated_config = load_config()
+        last_audit_timestamp = updated_config.get('ZIMBRA_LAST_AUDIT_TIMESTAMP', '')
+        last_audit_status = updated_config.get('ZIMBRA_LAST_AUDIT_STATUS', '')
+
+        if last_audit_status and 'Failed' in last_audit_status:
+            return jsonify({
+                'success': False,
+                'error': last_audit_status,
+                'logs': log_contents,
+                'last_audit_timestamp': last_audit_timestamp
+            })
+
+        return jsonify({
+            'success': True,
+            'logs': log_contents,
+            'last_audit_timestamp': last_audit_timestamp,
+            'last_audit_status': last_audit_status
+        })
+
+    except Exception as e:
+        logging.error(f"Erro ao forçar auditoria de segurança do Zimbra: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f"Erro ao executar auditoria: {str(e)}"}), 500
+
+
+@zimbra_bp.route('/api/zimbra/test_teams', methods=['POST'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_test_teams():
+    try:
+        import requests
+        data = request.get_json() or {}
+        tenant_id = data.get('teams_tenant_id', '').strip()
+        client_id = data.get('teams_client_id', '').strip()
+        client_secret = data.get('teams_client_secret', '').strip()
+        group_id = data.get('teams_group_id', '').strip()
+        channel_id = data.get('teams_channel_id', '').strip()
+        
+        is_nominal = data.get('zimbra_security_notify_nominal', False)
+        teams_user_email = data.get('teams_user_email', '').strip()
+        teams_user_password = data.get('teams_user_password', '').strip()
+        teams_user_group = data.get('zimbra_security_notify_group', '').strip()
+        teams_user_group_id = data.get('zimbra_security_notify_group_id', '').strip()
+
+        # Se o client secret ou a senha enviados forem os placeholders de exibição, pegamos do config
+        config = load_config()
+        if client_secret == '********' or not client_secret:
+            client_secret = config.get('TEAMS_CLIENT_SECRET', '')
+        if teams_user_password == '********' or not teams_user_password:
+            teams_user_password = config.get('TEAMS_USER_PASSWORD', '')
+
+        if is_nominal:
+            if not tenant_id or not client_id or not teams_user_email or not teams_user_password or not (teams_user_group or teams_user_group_id):
+                return jsonify({'error': 'Para teste nominal, Tenant ID, Client ID, E-mail da Conta, Senha e Grupo são obrigatórios.'}), 400
+
+            # 1. Tenta obter token ROPC delegado
+            logging.info("Iniciando teste nominal de conexão: Obtendo token delegado ROPC...")
+            token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+            token_payload = {
+                'grant_type': 'password',
+                'client_id': client_id,
+                'scope': 'https://graph.microsoft.com/.default',
+                'username': teams_user_email,
+                'password': teams_user_password
+            }
+            if client_secret:
+                token_payload['client_secret'] = client_secret
+
+            token_res = requests.post(token_url, data=token_payload, timeout=10)
+            if not token_res.ok:
+                return jsonify({'error': f"Falha na autenticação ROPC da conta de serviço: {token_res.status_code} - {token_res.text}"}), 400
+
+            access_token = token_res.json().get('access_token')
+            if not access_token:
+                return jsonify({'error': 'Token de acesso delegado não encontrado na resposta ROPC.'}), 400
+
+            # 2. Obter membros do grupo (do Entra ID ou do AD local)
+            member_emails = set()
+            is_entra_group = False
+            
+            import re
+            is_uuid = bool(re.match(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$', teams_user_group_id))
+            
+            if is_uuid:
+                logging.info(f"Buscando membros do grupo do Entra ID {teams_user_group_id}...")
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json'
+                }
+                members_url = f"https://graph.microsoft.com/v1.0/groups/{teams_user_group_id}/members?$select=id,userPrincipalName,mail,displayName"
+                try:
+                    members_res = requests.get(members_url, headers=headers, timeout=10)
+                    if members_res.ok:
+                        raw_members = members_res.json().get('value', [])
+                        for m in raw_members:
+                            upn = m.get('userPrincipalName') or m.get('mail')
+                            if upn:
+                                member_emails.add(upn.strip().lower())
+                        is_entra_group = True
+                        logging.info(f"Membros obtidos do Entra ID: {member_emails}")
+                    else:
+                        return jsonify({'error': f"Erro ao acessar membros do grupo no Entra ID: {members_res.status_code} - {members_res.text}"}), 400
+                except Exception as e_entra:
+                    return jsonify({'error': f"Exceção ao buscar membros no Entra ID: {str(e_entra)}"}), 400
+            
+            if not is_entra_group:
+                # Fallback clássico para o Active Directory local (LDAP)
+                from common import get_service_account_connection, get_group_by_name, get_group_members_emails
+                try:
+                    conn = get_service_account_connection()
+                    group_entry = get_group_by_name(conn, teams_user_group)
+                    if not group_entry:
+                        return jsonify({'error': f"Grupo '{teams_user_group}' não foi localizado no Active Directory local nem no Entra ID."}), 400
+                    
+                    member_emails = get_group_members_emails(conn, group_entry.entry_dn)
+                    if not member_emails:
+                        return jsonify({'error': f"Grupo '{teams_user_group}' localizado no AD, mas não contém membros com e-mails cadastrados para o teste."}), 400
+                except Exception as e:
+                    return jsonify({'error': f"Erro ao acessar o Active Directory para buscar o grupo: {str(e)}"}), 400
+
+            # 3. Enviar mensagem de teste para o primeiro membro do grupo (ou para o próprio remetente para testar se ele mesmo for o único membro)
+            target_test_email = list(member_emails)[0] if member_emails else teams_user_email
+            
+            # 4. Cria chat 1-on-1 com o destinatário de teste
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+
+            from routes.teams_notifier import get_graph_user_identifier, get_graph_me_identifier
+
+            # Usa /me para resolver a conta de serviço (requer apenas User.Read)
+            resolved_service_user = get_graph_me_identifier(headers)
+            if not resolved_service_user:
+                resolved_service_user = get_graph_user_identifier(teams_user_email, headers)
+            if not resolved_service_user:
+                return jsonify({'error': f"Não foi possível resolver a conta de serviço '{teams_user_email}' no Microsoft Entra ID. Verifique se a permissão User.Read está concedida com admin consent."}), 400
+                
+            resolved_member_user = get_graph_user_identifier(target_test_email, headers)
+            if not resolved_member_user:
+                return jsonify({'error': f"Não foi possível resolver o usuário de teste '{target_test_email}' no Microsoft Entra ID."}), 400
+
+            logging.info(f"Criando chat privado entre {resolved_service_user} e {resolved_member_user} para teste...")
+            chat_url = "https://graph.microsoft.com/v1.0/chats"
+            chat_payload = {
+                "chatType": "oneOnOne",
+                "members": [
+                    {
+                        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                        "roles": ["owner"],
+                        "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_service_user}')"
+                    },
+                    {
+                        "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                        "roles": ["owner"],
+                        "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_member_user}')"
+                    }
+                ]
+            }
+            chat_res = requests.post(chat_url, json=chat_payload, headers=headers, timeout=10)
+            if not chat_res.ok:
+                return jsonify({'error': f"Erro ao criar chat privado com {target_test_email}: {chat_res.status_code} - {chat_res.text}"}), 400
+
+            chat_id = chat_res.json().get('id')
+            if not chat_id:
+                return jsonify({'error': f"ID do chat privado não retornado para {target_test_email}."}), 400
+
+            # Envia a mensagem de teste
+            test_html = f"""
+            <div style="font-family: Arial, sans-serif; border-left: 5px solid #0078D4; padding-left: 15px; max-width: 600px;">
+                <h3 style="color: #0078D4; margin-top: 0; margin-bottom: 5px;">🔧 Teste de Integração Nominal - Portal Gestão AD</h3>
+                <p style="color: #323130; margin-top: 0; margin-bottom: 5px;">A conexão da API do Microsoft Graph via chat privado foi estabelecida com sucesso!</p>
+                <p style="font-size: 11px; color: #605E5C; margin: 0;">Sua conta de serviço <strong>{teams_user_email}</strong> está pronta para enviar alertas individuais automáticos.</p>
+            </div>
+            """
+            logging.info(f"Enviando mensagem de teste no chat privado {chat_id}...")
+            message_url = f"https://graph.microsoft.com/v1.0/chats/{chat_id}/messages"
+            message_payload = {
+                "body": {
+                    "contentType": "html",
+                    "content": test_html
+                }
+            }
+            msg_res = requests.post(message_url, json=message_payload, headers=headers, timeout=10)
+            if not msg_res.ok:
+                return jsonify({'error': f"Erro ao postar mensagem de teste no chat privado: {msg_res.status_code} - {msg_res.text}"}), 400
+
+            return jsonify({'success': True, 'message': f'Integração testada com sucesso! Uma mensagem privada nominal de teste foi enviada para {target_test_email}.'})
+
+        else:
+            # Fluxo clássico por canal público
+            if not tenant_id or not client_id or not client_secret or not group_id or not channel_id:
+                return jsonify({'error': 'Todos os campos do MS Teams são obrigatórios para o teste clássico.'}), 400
+
+            # 1. Tenta obter token OAuth2 do Entra ID
+            logging.info("Iniciando teste de conexão: Obtendo token do Entra ID...")
+            token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+            token_payload = {
+                'grant_type': 'client_credentials',
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'scope': 'https://graph.microsoft.com/.default'
+            }
+            token_res = requests.post(token_url, data=token_payload, timeout=10)
+            if not token_res.ok:
+                return jsonify({'error': f"Falha na autenticação do Entra ID: {token_res.status_code} - {token_res.text}"}), 400
+
+            access_token = token_res.json().get('access_token')
+            if not access_token:
+                return jsonify({'error': 'Token de acesso não encontrado na resposta do Entra ID.'}), 400
+
+            # 2. Envia mensagem HTML de teste via Graph API
+            logging.info("Token obtido. Enviando mensagem de teste...")
+            test_html = """
+            <div style="font-family: Arial, sans-serif; border-left: 5px solid #0078D4; padding-left: 15px; max-width: 600px;">
+                <h3 style="color: #0078D4; margin-top: 0; margin-bottom: 5px;">🔧 Teste de Integração de Segurança - Portal Gestão AD</h3>
+                <p style="color: #323130; margin-top: 0; margin-bottom: 5px;">A conexão da API do Microsoft Graph com o canal do Teams foi estabelecida com sucesso!</p>
+                <p style="font-size: 11px; color: #605E5C; margin: 0;">O Portal de Gestão AD está agora pronto para enviar notificações de alertas de segurança automáticos.</p>
+            </div>
+            """
+            graph_url = f"https://graph.microsoft.com/v1.0/teams/{group_id}/channels/{channel_id}/messages"
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            payload = {
+                "body": {
+                    "contentType": "html",
+                    "content": test_html
+                }
+            }
+            graph_res = requests.post(graph_url, json=payload, headers=headers, timeout=10)
+            if not graph_res.ok:
+                return jsonify({'error': f"Erro ao enviar mensagem no canal do Teams: {graph_res.status_code} - {graph_res.text}"}), 400
+
+            return jsonify({'success': True, 'message': 'Integração testada com sucesso! Uma mensagem de teste foi enviada para o canal.'})
+
+    except Exception as e:
+        logging.error(f"Erro ao testar integração com o Teams: {e}", exc_info=True)
+        return jsonify({'error': f"Erro ao testar conexão: {str(e)}"}), 500
+
+
+@zimbra_bp.route('/api/zimbra/search_teams_groups', methods=['GET'])
+@require_auth
+@require_permission(action='can_manage_zimbra')
+def api_search_teams_groups():
+    try:
+        import requests
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify({'groups': []})
+
+        # 1. Obter configurações de conexão do Teams
+        config = load_config()
+        all_groups = []
+
+        # Tentar buscar grupos no Entra ID caso as credenciais estejam preenchidas
+        tenant_id = config.get('TEAMS_TENANT_ID')
+        client_id = config.get('TEAMS_CLIENT_ID')
+        client_secret = config.get('TEAMS_CLIENT_SECRET')
+        user_email = config.get('TEAMS_USER_EMAIL')
+        user_password = config.get('TEAMS_USER_PASSWORD')
+
+        if tenant_id and client_id and user_email and user_password:
+            try:
+                # Obter Token OAuth2 Delegado usando fluxo ROPC
+                token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+                token_payload = {
+                    'grant_type': 'password',
+                    'client_id': client_id,
+                    'scope': 'https://graph.microsoft.com/.default',
+                    'username': user_email,
+                    'password': user_password
+                }
+                if client_secret:
+                    token_payload['client_secret'] = client_secret
+
+                token_res = requests.post(token_url, data=token_payload, timeout=5)
+                if token_res.ok:
+                    access_token = token_res.json().get('access_token')
+                    if access_token:
+                        headers = {
+                            'Authorization': f'Bearer {access_token}',
+                            'Content-Type': 'application/json'
+                        }
+                        # Filtro oData: começa com o nome digitado
+                        filter_str = f"startsWith(displayName, '{query}')"
+                        groups_url = f"https://graph.microsoft.com/v1.0/groups?$filter={filter_str}&$top=10"
+                        
+                        groups_res = requests.get(groups_url, headers=headers, timeout=5)
+                        if groups_res.ok:
+                            raw_groups = groups_res.json().get('value', [])
+                            for g in raw_groups:
+                                all_groups.append({
+                                    'id': g.get('id'),
+                                    'displayName': g.get('displayName'),
+                                    'mail': g.get('mail') or g.get('mailNickname') or '',
+                                    'source': 'Entra ID'
+                                })
+            except Exception as e_entra:
+                logging.error(f"Erro ao buscar grupos no Entra ID: {e_entra}")
+
+        # 2. Tentar buscar grupos no Active Directory Local (LDAP)
+        try:
+            from common import get_service_account_connection
+            conn = get_service_account_connection()
+            if conn and conn.bound:
+                search_base = config.get('AD_SEARCH_BASE', '')
+                search_filter = f"(&(objectClass=group)(|(cn={query}*)(cn=*{query}*)))"
+                conn.search(search_base, search_filter, attributes=['cn', 'mail', 'distinguishedName'])
+                for entry in conn.entries:
+                    all_groups.append({
+                        'id': str(entry.distinguishedName),
+                        'displayName': str(entry.cn),
+                        'mail': str(entry.mail) if 'mail' in entry and entry.mail.value else '',
+                        'source': 'AD Local'
+                    })
+        except Exception as e_ad:
+            logging.error(f"Erro ao buscar grupos no AD Local: {e_ad}")
+
+        return jsonify({'groups': all_groups})
+    except Exception as e:
+        logging.error(f"Erro ao buscar grupos: {e}", exc_info=True)
+        return jsonify({'error': str(e), 'groups': []}), 500
 
 
 @zimbra_bp.route('/api/zimbra/forwardings', methods=['GET'])

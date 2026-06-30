@@ -59,7 +59,7 @@ def get_flask_secret_key():
 key = load_key()
 cipher_suite = Fernet(key)
 
-SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD', 'ZIMBRA_ADMIN_PASSWORD', 'DB_PASSWORD', 'SQL_SERVER_URI']
+SENSITIVE_KEYS = ['DEFAULT_PASSWORD', 'SERVICE_ACCOUNT_PASSWORD', 'ZIMBRA_ADMIN_PASSWORD', 'DB_PASSWORD', 'SQL_SERVER_URI', 'TEAMS_CLIENT_SECRET', 'ZIMBRA_SECURITY_DEFAULT_PASSWORD', 'TEAMS_USER_PASSWORD']
 
 def get_sql_server_uri():
     # Priority 1: Environment variable
@@ -626,16 +626,25 @@ def get_ldap_connection(user=None, password=None, read_only=False):
                 try:
                     # Resolve os nomes válidos para a validação do certificado (ad_server e FQDN)
                     valid_names = [ad_server]
-                    if '.' not in ad_server:
-                        search_base = config.get('AD_SEARCH_BASE', '')
-                        if search_base:
-                            try:
-                                domain_parts = [part.split('=')[1] for part in search_base.split(',') if part.lower().startswith('dc=')]
-                                if domain_parts:
-                                    fqdn = f"{ad_server}.{'.'.join(domain_parts)}"
-                                    valid_names.append(fqdn)
-                            except Exception:
-                                pass
+                    search_base = config.get('AD_SEARCH_BASE', '')
+                    if search_base:
+                        try:
+                            domain_parts = [part.strip().split('=')[1] for part in search_base.split(',') if part.strip().lower().startswith('dc=')]
+                            if domain_parts:
+                                domain_name = '.'.join(domain_parts)
+                                if domain_name not in valid_names:
+                                    valid_names.append(domain_name)
+                                    valid_names.append(f"*.{domain_name}")
+                                if '.' not in ad_server:
+                                    fqdn = f"{ad_server}.{domain_name}"
+                                    if fqdn not in valid_names:
+                                        valid_names.append(fqdn)
+                                else:
+                                    # Se for IP (como 10.10.1.41), adicionamos nomes conhecidos comuns no certificado do AD
+                                    valid_names.append(f"DSMTZDC04.{domain_name}")
+                                    valid_names.append("DSMTZDC04")
+                        except Exception:
+                            pass
                     
                     tls_config = Tls(
                         validate=ssl.CERT_REQUIRED,
@@ -654,7 +663,17 @@ def get_ldap_connection(user=None, password=None, read_only=False):
         # Caso 1: Login de Usuário (Sempre Simples)
         if user and password:
             logging.debug(f"Autenticação simples para usuário: {user}")
-            return Connection(server, user=user, password=password, auto_bind=True, receive_timeout=10, read_only=read_only)
+            try:
+                return Connection(server, user=user, password=password, auto_bind=True, receive_timeout=10, read_only=read_only)
+            except Exception as e_bind:
+                if use_ldaps and tls_config and ("invalid server address" in str(e_bind) or "certificate verify" in str(e_bind) or "verify failed" in str(e_bind)):
+                    logging.warning(f"[LDAP] Erro de validação de SSL ({e_bind}). Tentando fallback para CERT_NONE...")
+                    import ssl as local_ssl
+                    from ldap3 import Tls as fallback_Tls
+                    fallback_tls = fallback_Tls(validate=local_ssl.CERT_NONE, version=local_ssl.PROTOCOL_TLSv1_2)
+                    fallback_server = Server(ad_server, use_ssl=True, tls=fallback_tls, get_info=ALL, connect_timeout=5)
+                    return Connection(fallback_server, user=user, password=password, auto_bind=True, receive_timeout=10, read_only=read_only)
+                raise
 
         # Caso 2: Conta de Serviço
         service_user = config.get('SERVICE_ACCOUNT_USER')
@@ -665,18 +684,32 @@ def get_ldap_connection(user=None, password=None, read_only=False):
 
         # Tenta Kerberos se disponível (requer libs do sistema)
         try:
-            logging.debug("Tentando SASL/GSSAPI (Kerberos)...")
-            return Connection(server, user=service_user, password=service_password,
-                              authentication='SASL', sasl_mechanism='GSSAPI',
-                              auto_bind=True, receive_timeout=15, read_only=read_only)
-        except Exception as e_sasl:
-            logging.debug(f"SASL falhou: {e_sasl}. Usando Simples...")
-            return Connection(server, user=service_user, password=service_password, 
-                              auto_bind=True, receive_timeout=15, read_only=read_only)
-
-    except Exception as e:
-        logging.error(f"Erro crítico de conexão LDAP: {e}")
-        raise
+            try:
+                logging.debug("Tentando SASL/GSSAPI (Kerberos)...")
+                return Connection(server, user=service_user, password=service_password,
+                                  authentication='SASL', sasl_mechanism='GSSAPI',
+                                  auto_bind=True, receive_timeout=15, read_only=read_only)
+            except Exception as e_sasl:
+                logging.debug(f"SASL falhou: {e_sasl}. Usando Simples...")
+                return Connection(server, user=service_user, password=service_password, 
+                                  auto_bind=True, receive_timeout=15, read_only=read_only)
+        except Exception as e_bind:
+            if use_ldaps and tls_config and ("invalid server address" in str(e_bind) or "certificate verify" in str(e_bind) or "verify failed" in str(e_bind)):
+                logging.warning(f"[LDAP] Erro de validação de SSL ({e_bind}). Tentando fallback para CERT_NONE...")
+                import ssl as local_ssl
+                from ldap3 import Tls as fallback_Tls
+                fallback_tls = fallback_Tls(validate=local_ssl.CERT_NONE, version=local_ssl.PROTOCOL_TLSv1_2)
+                fallback_server = Server(ad_server, use_ssl=True, tls=fallback_tls, get_info=ALL, connect_timeout=5)
+                try:
+                    logging.debug("Tentando SASL/GSSAPI (Kerberos) com CERT_NONE...")
+                    return Connection(fallback_server, user=service_user, password=service_password,
+                                      authentication='SASL', sasl_mechanism='GSSAPI',
+                                      auto_bind=True, receive_timeout=15, read_only=read_only)
+                except Exception as e_sasl:
+                    logging.debug(f"SASL falhou com CERT_NONE: {e_sasl}. Usando Simples...")
+                    return Connection(fallback_server, user=service_user, password=service_password, 
+                                      auto_bind=True, receive_timeout=15, read_only=read_only)
+            raise
 
 def get_service_account_connection():
     """Atalho para obter a conexão da conta de serviço com reuso por requisição."""
@@ -987,7 +1020,7 @@ def get_group_members_emails(conn, group_dn):
                 conn.search(dn, '(objectClass=*)', attributes=['mail', 'userPrincipalName'])
                 if conn.entries:
                     entry = conn.entries[0]
-                    email = get_attr_value(entry, 'mail') or get_attr_value(entry, 'userPrincipalName')
+                    email = get_attr_value(entry, 'userPrincipalName') or get_attr_value(entry, 'mail')
                     if email:
                         normalized = normalize_email(email)
                         if normalized:

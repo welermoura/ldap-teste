@@ -57,6 +57,118 @@
         font-size: 0.8rem;
         padding: 0.4em 0.8em;
     }
+
+    .transition-container {
+        transition: all 0.3s ease-in-out;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .transition-container.d-none {
+        display: none !important;
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    /* Terminal Console Style */
+    .terminal-container {
+        background-color: #0c0f12;
+        border: 1px solid #1f2d3d;
+        border-radius: 8px;
+        padding: 15px;
+        font-family: 'Courier New', Courier, monospace;
+        color: #39ff14; /* Cyberpunk Green */
+        height: 380px;
+        overflow-y: auto;
+        position: relative;
+        box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+
+    .terminal-container::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+        z-index: 10;
+        background-size: 100% 3px, 6px 100%;
+        pointer-events: none;
+    }
+
+    .terminal-line {
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin-bottom: 4px;
+        font-size: 0.9rem;
+    }
+
+    .terminal-line.error {
+        color: #ff3333;
+    }
+
+    .terminal-line.warning {
+        color: #ffaa00;
+    }
+
+    .terminal-line.info {
+        color: #39ff14;
+    }
+
+    .terminal-line.system {
+        color: #00ffff;
+    }
+
+    /* Custom Scrollbar for Terminal */
+    .terminal-container::-webkit-scrollbar {
+        width: 8px;
+    }
+    .terminal-container::-webkit-scrollbar-track {
+        background: #06080a;
+    }
+    .terminal-container::-webkit-scrollbar-thumb {
+        background: #1f2d3d;
+        border-radius: 4px;
+    }
+    .terminal-container::-webkit-scrollbar-thumb:hover {
+        background: #39ff14;
+    }
+
+    /* Autocomplete de Grupos */
+    #group-autocomplete-list {
+        background-color: var(--sidebar-bg, #ffffff) !important;
+        border: 1px solid var(--glass-border-color, rgba(0, 0, 0, 0.15)) !important;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    #group-autocomplete-list .list-group-item {
+        background-color: var(--sidebar-bg, #ffffff) !important;
+        color: var(--text-color, #212529) !important;
+        border-bottom: 1px solid var(--glass-border-color, rgba(0, 0, 0, 0.08)) !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    #group-autocomplete-list .list-group-item:last-child {
+        border-bottom: none !important;
+    }
+
+    #group-autocomplete-list .list-group-item:hover,
+    #group-autocomplete-list .list-group-item:focus {
+        background-color: var(--list-hover-bg, rgba(0, 0, 0, 0.05)) !important;
+        color: var(--text-color, #212529) !important;
+    }
+
+    #group-autocomplete-list .list-group-item.text-muted {
+        color: var(--text-muted-color, #6c757d) !important;
+    }
+
+    [data-bs-theme="dark"] #group-autocomplete-list .list-group-item.text-muted {
+        color: var(--text-muted-color, #94a3b8) !important;
+    }
 </style>
 {% endblock %}
 
@@ -65,71 +177,319 @@
 {% block content %}
 {{ render_page_header('<i class="fas fa-share me-2"></i>Gerenciador de Redirecionamentos Zimbra', back_url=url_for('admin.dashboard')) }}
 
-<div class="row mb-4">
-    <div class="col-md-8">
-        <p class="text-muted">
-            Visualize quais contas de e-mail corporativas possuem regras ativas de <strong>Encaminhamento de Mensagens</strong> ou campos de <strong>Responder para (Reply-To)</strong> configurados no Zimbra, e desative-os de forma simples e rápida.
-        </p>
-    </div>
-    <div class="col-md-4 text-md-end">
-        <button class="btn btn-outline-secondary animate-hover" id="btn-refresh-list">
-            <i class="fas fa-sync-alt me-1"></i> Atualizar Lista
+<!-- Abas de Navegação -->
+<ul class="nav nav-tabs mb-4 border-bottom border-secondary border-opacity-25" id="forwardingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active py-2.5 px-4 fw-bold" id="list-tab" data-bs-toggle="tab" data-bs-target="#list-tab-pane" type="button" role="tab" aria-controls="list-tab-pane" aria-selected="true" style="border-radius: 8px 8px 0 0;">
+            <i class="fas fa-share me-2 text-primary"></i>Encaminhamentos Ativos
         </button>
-    </div>
-</div>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link py-2.5 px-4 fw-bold" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-tab-pane" type="button" role="tab" aria-controls="config-tab-pane" aria-selected="false" style="border-radius: 8px 8px 0 0;">
+            <i class="fas fa-shield-alt me-2 text-success"></i>Configurações de Segurança e Notificação
+        </button>
+    </li>
+</ul>
 
-<div class="card glass-card">
-    <div class="card-header border-bottom-0 pb-0 pt-4 px-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-        <h5 class="card-title mb-0 fw-semibold"><i class="fas fa-list-ul me-2 text-primary"></i>Contas Identificadas</h5>
-        
-        <div class="search-input-wrapper" style="min-width: 300px;">
-            <i class="fas fa-search"></i>
-            <input type="text" class="form-control" id="table-search" placeholder="Buscar por nome ou e-mail...">
-        </div>
-    </div>
-    
-    <div class="card-body p-4">
-        <div id="loading-spinner" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Carregando...</span>
+<div class="tab-content" id="forwardingsTabsContent">
+    <!-- Aba 1: Lista de Encaminhamentos -->
+    <div class="tab-pane fade show active" id="list-tab-pane" role="tabpanel" aria-labelledby="list-tab" tabindex="0">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <p class="text-muted">
+                    Visualize quais contas de e-mail corporativas possuem regras ativas de <strong>Encaminhamento de Mensagens</strong> ou campos de <strong>Responder para (Reply-To)</strong> configurados no Zimbra, e desative-os de forma simples e rápida.
+                </p>
             </div>
-            <p class="mt-3 text-muted">Carregando redirecionamentos do Zimbra, por favor aguarde...</p>
-        </div>
-        
-        <div id="empty-state" class="text-center py-5 d-none">
-            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
-            <h5 class="fw-semibold">Nenhuma regra ativa encontrada!</h5>
-            <p class="text-muted">Todas as contas do Zimbra estão limpas e sem encaminhamentos ou campos de reply-to externos configurados.</p>
+            <div class="col-md-4 text-md-end">
+                <button class="btn btn-outline-secondary animate-hover" id="btn-refresh-list">
+                    <i class="fas fa-sync-alt me-1"></i> Atualizar Lista
+                </button>
+            </div>
         </div>
 
-        <div id="error-state" class="alert alert-danger d-none" role="alert">
-            <div class="d-flex">
-                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-                <div>
-                    <h5 class="alert-heading fw-semibold">Erro ao carregar dados</h5>
-                    <p class="mb-0" id="error-message">Não foi possível estabelecer conexão com a API do Zimbra.</p>
+        <div class="card glass-card">
+            <div class="card-header border-bottom-0 pb-0 pt-4 px-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                <h5 class="card-title mb-0 fw-semibold"><i class="fas fa-list-ul me-2 text-primary"></i>Contas Identificadas</h5>
+                
+                <div class="search-input-wrapper" style="min-width: 300px;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="form-control" id="table-search" placeholder="Buscar por nome ou e-mail...">
+                </div>
+            </div>
+            
+            <div class="card-body p-4">
+                <div id="loading-spinner" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Carregando redirecionamentos do Zimbra, por favor aguarde...</p>
+                </div>
+                
+                <div id="empty-state" class="text-center py-5 d-none">
+                    <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                    <h5 class="fw-semibold">Nenhuma regra ativa encontrada!</h5>
+                    <p class="text-muted">Todas as contas do Zimbra estão limpas e sem encaminhamentos ou campos de reply-to externos configurados.</p>
+                </div>
+
+                <div id="error-state" class="alert alert-danger d-none" role="alert">
+                    <div class="d-flex">
+                        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                        <div>
+                            <h5 class="alert-heading fw-semibold">Erro ao carregar dados</h5>
+                            <p class="mb-0" id="error-message">Não foi possível estabelecer conexão com a API do Zimbra.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive d-none" id="table-container">
+                    <table class="table table-hover align-middle" id="forwardings-table">
+                        <thead class="table-dark text-nowrap">
+                            <tr>
+                                <th scope="col" style="min-width: 220px;">Usuário / Conta</th>
+                                <th scope="col" style="min-width: 260px;">Encaminhando Para</th>
+                                <th scope="col" style="min-width: 160px;">Entrega Local</th>
+                                <th scope="col" style="min-width: 220px;">Notificação de Entrada</th>
+                                <th scope="col" style="min-width: 220px;">Reply-To (Responder para)</th>
+                                <th scope="col" class="text-end" style="min-width: 220px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="forwardings-list">
+                            <!-- Gerado dinamicamente via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aba 2: Configurações de Segurança e Notificações -->
+    <div class="tab-pane fade" id="config-tab-pane" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <!-- Card: Inteligência de Autoremediação -->
+                <div class="card glass-card h-100">
+                    <div class="card-header border-bottom border-secondary border-opacity-15 pt-4 px-4 pb-3">
+                        <h5 class="card-title mb-0 fw-semibold text-success">
+                            <i class="fas fa-shield-alt me-2"></i>Autoremediação Automática
+                        </h5>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column justify-content-between">
+                        <div>
+                            <p class="text-muted small">
+                                Ative a inteligência do sistema para varrer as contas do Zimbra periodicamente. Ao identificar encaminhamentos, reply-to ou notificações externos não autorizados, o sistema realiza automaticamente o reset de senha da conta no AD, desativa as regras irregulares no Zimbra e envia alertas rich HTML para o canal do MS Teams.
+                            </p>
+
+                            <!-- Switch: Ativar Inteligência -->
+                            <div class="form-check form-switch mb-4 p-3 rounded border border-secondary border-opacity-15" style="background-color: var(--input-background);">
+                                <input class="form-check-input ms-0 me-3" type="checkbox" role="switch" id="remediation_enabled" {% if remediation_enabled == 'True' %}checked{% endif %} style="transform: scale(1.2); cursor: pointer;">
+                                <label class="form-check-label fw-semibold" for="remediation_enabled" style="cursor: pointer; color: var(--text-color);">
+                                    Ativar Inteligência de Segurança Ativa
+                                </label>
+                                <span class="d-block text-muted small mt-1">Quando ativada, anomalias externas de encaminhamento em contas fora da whitelist serão desativadas imediatamente e a senha do usuário será resetada no AD.</span>
+                            </div>
+
+                            <!-- Intervalo de Execução e Status -->
+                            <div class="mb-4 p-3 rounded border border-secondary border-opacity-15" style="background-color: var(--input-background);">
+                                <div class="row align-items-center">
+                                    <div class="col-md-6 mb-3 mb-md-0">
+                                        <label for="zimbra_audit_interval_minutes" class="form-label fw-bold small text-muted text-uppercase mb-2">Intervalo de Verificação</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text border-secondary border-opacity-25" style="background-color: var(--input-background); color: var(--text-muted-color);"><i class="fas fa-clock"></i></span>
+                                            <select class="form-select border-secondary border-opacity-25" id="zimbra_audit_interval_minutes" style="cursor: pointer;">
+                                                <option value="15" {% if zimbra_audit_interval_minutes == '15' %}selected{% endif %}>A cada 15 minutos</option>
+                                                <option value="30" {% if zimbra_audit_interval_minutes == '30' %}selected{% endif %}>A cada 30 minutos</option>
+                                                <option value="60" {% if zimbra_audit_interval_minutes == '60' %}selected{% endif %}>A cada 1 hora</option>
+                                                <option value="120" {% if zimbra_audit_interval_minutes == '120' %}selected{% endif %}>A cada 2 horas</option>
+                                                <option value="240" {% if zimbra_audit_interval_minutes == '240' or not zimbra_audit_interval_minutes %}selected{% endif %}>A cada 4 horas (Recomendado)</option>
+                                                <option value="720" {% if zimbra_audit_interval_minutes == '720' %}selected{% endif %}>A cada 12 horas</option>
+                                                <option value="1440" {% if zimbra_audit_interval_minutes == '1440' %}selected{% endif %}>A cada 24 horas</option>
+                                            </select>
+                                        </div>
+                                        <span class="form-text text-muted small mt-1 d-block">
+                                            Frequência com que o robô em segundo plano irá varrer as contas do Zimbra.
+                                        </span>
+                                    </div>
+                                    <div class="col-md-6 text-md-end">
+                                        <label class="form-label fw-bold small text-muted text-uppercase mb-2 d-none d-md-block" style="visibility: hidden;">Ação</label>
+                                        <button class="btn btn-outline-success w-100 fw-bold py-2 animate-hover" id="btn-run-audit-now">
+                                            <i class="fas fa-play me-2"></i>Executar Auditoria Agora
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-3 border-secondary border-opacity-15">
+                                
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 small">
+                                    <div>
+                                        <span class="text-muted"><i class="fas fa-history me-1"></i>Última varredura:</span>
+                                        <strong id="audit-last-timestamp" style="color: var(--text-color);">
+                                            {% if zimbra_last_audit_timestamp %}{{ zimbra_last_audit_timestamp }}{% else %}Nunca executado{% endif %}
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <span class="text-muted">Status:</span>
+                                        <span id="audit-last-status">
+                                            {% if zimbra_last_audit_status %}
+                                                {% if 'Failed' in zimbra_last_audit_status %}
+                                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="fas fa-times-circle me-1"></i>Falhou</span>
+                                                {% else %}
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Sucesso</span>
+                                                {% endif %}
+                                            {% else %}
+                                                <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-2 py-1">Sem registro</span>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Input: Senha Padrão de Remediação -->
+                            <div class="mb-4">
+                                <label for="security_default_password" class="form-label fw-semibold">Senha Padrão para Remediação</label>
+                                <div class="input-group">
+                                    <span class="input-group-text border-secondary border-opacity-25" style="background-color: var(--input-background); color: var(--text-muted-color);"><i class="fas fa-key"></i></span>
+                                    <input type="text" class="form-control border-secondary border-opacity-25" id="security_default_password" value="{{ security_default_password }}" placeholder="Ex: GrpCml@2026Security" autocomplete="new-password">
+                                </div>
+                                <span class="form-text text-muted small">
+                                    Senha que será definida no Active Directory durante o reset automático. Se deixado em branco, o sistema gerará uma senha segura randômica para cada ocorrência.
+                                </span>
+                            </div>
+
+                            <!-- Textarea: Whitelist de Segurança -->
+                            <div class="mb-3">
+                                <label for="whitelist" class="form-label fw-semibold">Contas na Whitelist (Exceções Permitidas)</label>
+                                <textarea class="form-control border-secondary border-opacity-25" id="whitelist" rows="5" placeholder="diretoria@grupocomolatti.com.br,&#10;financeiro@grupocomolatti.com.br">{{ whitelist_str }}</textarea>
+                                <span class="form-text text-muted small">
+                                    Insira um e-mail corporativo por linha ou separados por vírgula. Estas contas terão permissão para manter encaminhamentos externos ativos sem disparar o reset automático ou bloqueios do sistema.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mb-4">
+                <!-- Card: Configurações do MS Teams (Graph API) -->
+                <div class="card glass-card h-100">
+                    <div class="card-header border-bottom border-secondary border-opacity-15 pt-4 px-4 pb-3">
+                        <h5 class="card-title mb-0 fw-semibold text-primary">
+                            <i class="fab fa-microsoft me-2"></i>Conexão do MS Teams (Graph API)
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small">
+                            Configure as credenciais do aplicativo corporativo cadastrado no Microsoft Entra ID para que o Portal de Gestão AD possa publicar alertas detalhados no Teams usando a Graph API oficial.
+                        </p>
+
+                        <!-- Input: Tenant ID -->
+                        <div class="mb-3">
+                            <label for="teams_tenant_id" class="form-label fw-semibold">Directory (tenant) ID</label>
+                            <input type="text" class="form-control border-secondary border-opacity-25" id="teams_tenant_id" value="{{ teams_tenant_id }}" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+
+                        <!-- Input: Client ID -->
+                        <div class="mb-3">
+                            <label for="teams_client_id" class="form-label fw-semibold">Application (client) ID</label>
+                            <input type="text" class="form-control border-secondary border-opacity-25" id="teams_client_id" value="{{ teams_client_id }}" placeholder="00000000-0000-0000-0000-000000000000">
+                        </div>
+
+                        <!-- Input: Client Secret -->
+                        <div class="mb-3">
+                            <label for="teams_client_secret" class="form-label fw-semibold">Client Secret Value</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control border-secondary border-opacity-25" id="teams_client_secret" value="{% if teams_client_secret %}********{% endif %}" placeholder="Insira o segredo do cliente corporativo...">
+                                <button class="btn btn-outline-secondary border-secondary border-opacity-25" type="button" id="btn-toggle-teams-secret">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Switch: Envio Nominal (Chats Privados) -->
+                        <div class="form-check form-switch mb-4 p-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-10 d-flex align-items-center justify-content-between">
+                            <div class="pe-3">
+                                <label class="form-check-label fw-bold text-primary mb-0" for="zimbra_security_notify_nominal" style="cursor: pointer;">
+                                    <i class="fas fa-comments me-1"></i> Enviar Alertas de forma Nominal
+                                </label>
+                                <div class="text-muted small mt-1">
+                                    Envia alertas por chat privado (1-on-1) com cada destinatário via conta de serviço em vez de canal público.
+                                </div>
+                            </div>
+                            <input class="form-check-input ms-0 fs-4" type="checkbox" id="zimbra_security_notify_nominal" {% if zimbra_security_notify_nominal == 'True' %}checked{% endif %} style="cursor: pointer;">
+                        </div>
+
+                        <!-- Seção: Canal Público (Teams) -->
+                        <div id="teams-channel-section" class="transition-container {% if zimbra_security_notify_nominal == 'True' %}d-none{% endif %}">
+                            <!-- Input: Group ID -->
+                            <div class="mb-3">
+                                <label for="teams_group_id" class="form-label fw-semibold">Team (group) ID</label>
+                                <input type="text" class="form-control border-secondary border-opacity-25" id="teams_group_id" value="{{ teams_group_id }}" placeholder="00000000-0000-0000-0000-000000000000">
+                            </div>
+
+                            <!-- Input: Channel ID -->
+                            <div class="mb-3">
+                                <label for="teams_channel_id" class="form-label fw-semibold">Channel ID</label>
+                                <input type="text" class="form-control border-secondary border-opacity-25" id="teams_channel_id" value="{{ teams_channel_id }}" placeholder="19:abcdef...@thread.v2">
+                            </div>
+                        </div>
+
+                        <!-- Seção: Envio Nominal Privado -->
+                        <div id="teams-nominal-section" class="transition-container {% if zimbra_security_notify_nominal != 'True' %}d-none{% endif %}">
+                            <!-- Input: E-mail da Conta de Serviço -->
+                            <div class="mb-3">
+                                <label for="teams_user_email" class="form-label fw-semibold">E-mail da Conta de Serviço Teams</label>
+                                <input type="email" class="form-control border-secondary border-opacity-25" id="teams_user_email" value="{{ teams_user_email }}" placeholder="conta_servico@comolatti.com.br">
+                            </div>
+
+                            <!-- Input: Senha da Conta de Serviço -->
+                            <div class="mb-3">
+                                <label for="teams_user_password" class="form-label fw-semibold">Senha da Conta de Serviço Teams</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control border-secondary border-opacity-25" id="teams_user_password" value="{% if teams_user_password %}********{% endif %}" placeholder="Senha da conta de serviço...">
+                                    <button class="btn btn-outline-secondary border-secondary border-opacity-25" type="button" id="btn-toggle-teams-user-password">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Input: Grupo do AD para Alertas Nominais -->
+                            <div class="mb-3 position-relative">
+                                <label for="zimbra_security_notify_group" class="form-label fw-semibold">Grupo do AD / Entra ID para Alertas Nominais</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control border-secondary border-opacity-25" id="zimbra_security_notify_group" value="{{ zimbra_security_notify_group }}" placeholder="Digite para buscar grupos do Entra ID ou AD local...">
+                                    <span class="input-group-text bg-transparent border-secondary border-opacity-25 d-none" id="group-search-spinner">
+                                        <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+                                    </span>
+                                </div>
+                                <input type="hidden" id="zimbra_security_notify_group_id" value="{{ zimbra_security_notify_group_id }}">
+                                <div id="group-autocomplete-list" class="list-group position-absolute w-100 mt-1 shadow-lg d-none" style="z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                                <div id="group-validation-status" class="mt-1" style="font-size: 11px; display: none;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="table-responsive d-none" id="table-container">
-            <table class="table table-hover align-middle" id="forwardings-table">
-                <thead class="table-dark text-nowrap">
-                    <tr>
-                        <th scope="col" style="min-width: 220px;">Usuário / Conta</th>
-                        <th scope="col" style="min-width: 260px;">Encaminhando Para</th>
-                        <th scope="col" style="min-width: 160px;">Entrega Local</th>
-                        <th scope="col" style="min-width: 220px;">Notificação de Entrada</th>
-                        <th scope="col" style="min-width: 220px;">Reply-To (Responder para)</th>
-                        <th scope="col" class="text-end" style="min-width: 220px;">Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="forwardings-list">
-                    <!-- Gerado dinamicamente via JS -->
-                </tbody>
-            </table>
+        <!-- Barra de Ações Inferior -->
+        <div class="row mt-2">
+            <div class="col-12">
+                <div class="card glass-card p-3 d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                    <span class="text-muted small">
+                        <i class="fas fa-info-circle me-1 text-info"></i> Lembre-se de salvar as configurações para que tenham validade imediata nos agendamentos.
+                    </span>
+                    <div class="d-flex gap-3 w-100 w-sm-auto justify-content-end">
+                        <button class="btn btn-outline-primary fw-semibold animate-hover" id="btn-test-teams">
+                            <i class="fas fa-paper-plane me-1"></i> Testar Integração Teams
+                        </button>
+                        <button class="btn btn-success fw-bold px-4 animate-hover" id="btn-save-security-config">
+                            <i class="fas fa-save me-1"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Modal de Confirmação de Remoção -->
@@ -174,6 +534,39 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-danger" id="btn-confirm-remove">Confirmar Remoção</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Console de Auditoria de Segurança -->
+<div class="modal fade" id="auditLogModal" tabindex="-1" aria-labelledby="auditLogModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="background-color: #12161a;">
+            <div class="modal-header border-bottom border-secondary border-opacity-15 py-3" style="background-color: #0c0f12;">
+                <h5 class="modal-title fw-bold text-success" id="auditLogModalLabel">
+                    <i class="fas fa-terminal me-2"></i>Console de Auditoria de Segurança Zimbra
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" id="btn-close-audit-modal" aria-label="Close" disabled></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="alert alert-info py-2 px-3 border-0 bg-info bg-opacity-10 text-info small mb-3 d-flex align-items-center">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span>A varredura está em andamento. Não feche esta janela até que o processo seja concluído.</span>
+                </div>
+                
+                <div class="terminal-container" id="terminal-screen">
+                    <div class="terminal-line system">[SISTEMA] Inicializando console seguro...</div>
+                    <div class="terminal-line system">[SISTEMA] Estabelecendo ponte de comunicação com o backend...</div>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-15" style="background-color: #0c0f12;">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <span class="small text-muted" id="audit-status-text">
+                        <span class="spinner-border spinner-border-sm text-success me-1" role="status" aria-hidden="true"></span> Executando varredura ativa...
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary px-4 fw-semibold" id="btn-close-audit-footer" data-bs-dismiss="modal" disabled>Fechar Console</button>
+                </div>
             </div>
         </div>
     </div>
@@ -596,7 +989,499 @@
         });
         
         // Botão refresh
-        document.getElementById('btn-refresh-list').addEventListener('click', loadForwardings);
+        const btnRefresh = document.getElementById('btn-refresh-list');
+        if (btnRefresh) {
+            btnRefresh.addEventListener('click', loadForwardings);
+        }
+        
+        // Toggle visibility for Teams Secret
+        const btnToggleSecret = document.getElementById('btn-toggle-teams-secret');
+        if (btnToggleSecret) {
+            btnToggleSecret.addEventListener('click', function() {
+                const input = document.getElementById('teams_client_secret');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    btnToggleSecret.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                } else {
+                    input.type = 'password';
+                    btnToggleSecret.innerHTML = '<i class="fas fa-eye"></i>';
+                }
+            });
+        }
+
+        // Toggle visibility for Teams User Password
+        const btnToggleUserPass = document.getElementById('btn-toggle-teams-user-password');
+        if (btnToggleUserPass) {
+            btnToggleUserPass.addEventListener('click', function() {
+                const input = document.getElementById('teams_user_password');
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    btnToggleUserPass.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                } else {
+                    input.type = 'password';
+                    btnToggleUserPass.innerHTML = '<i class="fas fa-eye"></i>';
+                }
+            });
+        }
+
+        // Intertravamento dos campos do Teams (Canal Público vs Nominal Chat)
+        const checkNominal = document.getElementById('zimbra_security_notify_nominal');
+        if (checkNominal) {
+            checkNominal.addEventListener('change', function() {
+                const channelSec = document.getElementById('teams-channel-section');
+                const nominalSec = document.getElementById('teams-nominal-section');
+                if (this.checked) {
+                    channelSec.classList.add('d-none');
+                    nominalSec.classList.remove('d-none');
+                } else {
+                    channelSec.classList.remove('d-none');
+                    nominalSec.classList.add('d-none');
+                }
+            });
+        }
+
+        // Terminal Helpers
+        function appendTerminalLine(text) {
+            if (!text) return;
+            const lineEl = document.createElement('div');
+            lineEl.className = 'terminal-line';
+            
+            if (text.startsWith('[ERROR]') || text.includes('ERROR]')) {
+                lineEl.classList.add('error');
+            } else if (text.startsWith('[WARNING]') || text.includes('WARNING]')) {
+                lineEl.classList.add('warning');
+            } else if (text.startsWith('[INFO]') || text.includes('INFO]')) {
+                lineEl.classList.add('info');
+            } else if (text.startsWith('[SISTEMA]') || text.includes('[SISTEMA]')) {
+                lineEl.classList.add('system');
+            }
+            
+            lineEl.textContent = text;
+            const screen = document.getElementById('terminal-screen');
+            if (screen) {
+                screen.appendChild(lineEl);
+                screen.scrollTop = screen.scrollHeight;
+            }
+        }
+
+        function printLogsWithStagger(lines, callback) {
+            let i = 0;
+            function printNext() {
+                if (i < lines.length) {
+                    appendTerminalLine(lines[i]);
+                    i++;
+                    setTimeout(printNext, 15); // extremely smooth 15ms stagger
+                } else {
+                    if (callback) callback();
+                }
+            }
+            printNext();
+        }
+
+        // Modal de Console de Auditoria
+        const auditLogModalEl = document.getElementById('auditLogModal');
+        const auditLogModal = new bootstrap.Modal(auditLogModalEl);
+        const btnRunAuditNow = document.getElementById('btn-run-audit-now');
+        const btnCloseAuditModal = document.getElementById('btn-close-audit-modal');
+        const btnCloseAuditFooter = document.getElementById('btn-close-audit-footer');
+        const auditStatusText = document.getElementById('audit-status-text');
+        const terminalScreen = document.getElementById('terminal-screen');
+
+        if (btnRunAuditNow) {
+            btnRunAuditNow.addEventListener('click', function() {
+                terminalScreen.innerHTML = '';
+                appendTerminalLine('[SISTEMA] Inicializando console seguro...');
+                appendTerminalLine('[SISTEMA] Enviando requisição de início de auditoria para o backend...');
+                
+                btnCloseAuditModal.disabled = true;
+                btnCloseAuditFooter.disabled = true;
+                btnRunAuditNow.disabled = true;
+                btnRunAuditNow.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Executando...';
+                
+                auditStatusText.innerHTML = '<span class="spinner-border spinner-border-sm text-success me-1" role="status" aria-hidden="true"></span> Executando varredura ativa...';
+                
+                auditLogModal.show();
+
+                fetch('/api/zimbra/run_security_audit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const lines = data.logs ? data.logs.split('\n') : [];
+                    
+                    if (data.success) {
+                        appendTerminalLine('[SISTEMA] Resposta recebida com sucesso do servidor.');
+                        printLogsWithStagger(lines, () => {
+                            appendTerminalLine('[SISTEMA] Auditoria concluída com sucesso!');
+                            
+                            btnCloseAuditModal.disabled = false;
+                            btnCloseAuditFooter.disabled = false;
+                            btnRunAuditNow.disabled = false;
+                            btnRunAuditNow.innerHTML = '<i class="fas fa-play me-2"></i>Executar Auditoria Agora';
+                            
+                            auditStatusText.innerHTML = '<i class="fas fa-check-circle text-success me-1"></i> Concluído com sucesso';
+                            
+                            if (data.last_audit_timestamp) {
+                                document.getElementById('audit-last-timestamp').textContent = data.last_audit_timestamp;
+                            }
+                            document.getElementById('audit-last-status').innerHTML = '<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="fas fa-check-circle me-1"></i>Sucesso</span>';
+                            
+                            showToast('Auditoria executada e concluída com sucesso!', 'success', 'Sucesso');
+                        });
+                    } else {
+                        appendTerminalLine('[ERROR] A execução retornou uma falha ou erro do sistema.');
+                        printLogsWithStagger(lines, () => {
+                            if (data.error) {
+                                appendTerminalLine('[ERROR] Detalhes do erro: ' + data.error);
+                            }
+                            appendTerminalLine('[SISTEMA] Processo de auditoria interrompido.');
+                            
+                            btnCloseAuditModal.disabled = false;
+                            btnCloseAuditFooter.disabled = false;
+                            btnRunAuditNow.disabled = false;
+                            btnRunAuditNow.innerHTML = '<i class="fas fa-play me-2"></i>Executar Auditoria Agora';
+                            
+                            auditStatusText.innerHTML = '<i class="fas fa-times-circle text-danger me-1"></i> Falha na auditoria';
+                            
+                            if (data.last_audit_timestamp) {
+                                document.getElementById('audit-last-timestamp').textContent = data.last_audit_timestamp;
+                            }
+                            document.getElementById('audit-last-status').innerHTML = '<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="fas fa-times-circle me-1"></i>Falhou</span>';
+                            
+                            showToast(data.error || 'A auditoria encontrou erros durante a execução.', 'error', 'Erro na Varredura');
+                        });
+                    }
+                })
+                .catch(err => {
+                    appendTerminalLine('[ERROR] Falha grave de comunicação com o servidor HTTP.');
+                    appendTerminalLine('[ERROR] Detalhes: ' + err.message);
+                    
+                    btnCloseAuditModal.disabled = false;
+                    btnCloseAuditFooter.disabled = false;
+                    btnRunAuditNow.disabled = false;
+                    btnRunAuditNow.innerHTML = '<i class="fas fa-play me-2"></i>Executar Auditoria Agora';
+                    
+                    auditStatusText.innerHTML = '<i class="fas fa-exclamation-triangle text-warning me-1"></i> Falha de comunicação';
+                    showToast('Não foi possível estabelecer contato com a API: ' + err.message, 'error', 'Erro de Conexão');
+                });
+            });
+        }
+
+        // Salvar Configurações de Segurança
+        const btnSaveSecurity = document.getElementById('btn-save-security-config');
+        if (btnSaveSecurity) {
+            btnSaveSecurity.addEventListener('click', function() {
+                const remediation_enabled = document.getElementById('remediation_enabled').checked;
+                const whitelist = document.getElementById('whitelist').value;
+                const security_default_password = document.getElementById('security_default_password').value;
+                const teams_tenant_id = document.getElementById('teams_tenant_id').value;
+                const teams_client_id = document.getElementById('teams_client_id').value;
+                const teams_client_secret = document.getElementById('teams_client_secret').value;
+                const teams_group_id = document.getElementById('teams_group_id').value;
+                const teams_channel_id = document.getElementById('teams_channel_id').value;
+                
+                const zimbra_security_notify_nominal = document.getElementById('zimbra_security_notify_nominal').checked;
+                const teams_user_email = document.getElementById('teams_user_email').value;
+                const teams_user_password = document.getElementById('teams_user_password').value;
+                const zimbra_security_notify_group = document.getElementById('zimbra_security_notify_group').value;
+                const zimbra_security_notify_group_id = document.getElementById('zimbra_security_notify_group_id').value;
+                const zimbra_audit_interval_minutes = document.getElementById('zimbra_audit_interval_minutes').value;
+
+                btnSaveSecurity.disabled = true;
+                btnSaveSecurity.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Salvando...';
+
+                fetch('/api/zimbra/save_security_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                    },
+                    body: JSON.stringify({
+                        remediation_enabled: remediation_enabled,
+                        whitelist: whitelist,
+                        security_default_password: security_default_password,
+                        teams_tenant_id: teams_tenant_id,
+                        teams_client_id: teams_client_id,
+                        teams_client_secret: teams_client_secret,
+                        teams_group_id: teams_group_id,
+                        teams_channel_id: teams_channel_id,
+                        zimbra_security_notify_nominal: zimbra_security_notify_nominal,
+                        teams_user_email: teams_user_email,
+                        teams_user_password: teams_user_password,
+                        zimbra_security_notify_group: zimbra_security_notify_group,
+                        zimbra_security_notify_group_id: zimbra_security_notify_group_id,
+                        zimbra_audit_interval_minutes: zimbra_audit_interval_minutes
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(err => { throw new Error(err.error || 'Erro ao salvar configurações') });
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    btnSaveSecurity.disabled = false;
+                    btnSaveSecurity.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Configurações';
+                    if (data.success) {
+                        showToast(data.message, 'success', 'Sucesso');
+                    } else {
+                        showToast(data.error || 'Erro ao salvar configurações.', 'error', 'Erro');
+                    }
+                })
+                .catch(err => {
+                    btnSaveSecurity.disabled = false;
+                    btnSaveSecurity.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Configurações';
+                    showToast('Erro ao salvar: ' + err.message, 'error', 'Erro');
+                });
+            });
+        }
+
+        // Testar Integração do Teams
+        const btnTestTeams = document.getElementById('btn-test-teams');
+        if (btnTestTeams) {
+            btnTestTeams.addEventListener('click', function() {
+                const teams_tenant_id = document.getElementById('teams_tenant_id').value;
+                const teams_client_id = document.getElementById('teams_client_id').value;
+                const teams_client_secret = document.getElementById('teams_client_secret').value;
+                const teams_group_id = document.getElementById('teams_group_id').value;
+                const teams_channel_id = document.getElementById('teams_channel_id').value;
+
+                const zimbra_security_notify_nominal = document.getElementById('zimbra_security_notify_nominal').checked;
+                const teams_user_email = document.getElementById('teams_user_email').value;
+                const teams_user_password = document.getElementById('teams_user_password').value;
+                const zimbra_security_notify_group = document.getElementById('zimbra_security_notify_group').value;
+                const zimbra_security_notify_group_id = document.getElementById('zimbra_security_notify_group_id').value;
+
+                if (zimbra_security_notify_nominal) {
+                    if (!teams_tenant_id || !teams_client_id || !teams_user_email || !teams_user_password || !zimbra_security_notify_group) {
+                        showToast('Por favor, preencha Tenant ID, Client ID, E-mail da Conta, Senha e Grupo do AD para executar o teste nominal.', 'warning', 'Aviso');
+                        return;
+                    }
+                } else {
+                    if (!teams_tenant_id || !teams_client_id || !teams_client_secret || !teams_group_id || !teams_channel_id) {
+                        showToast('Por favor, preencha todos os campos do Teams clássico para executar o teste.', 'warning', 'Aviso');
+                        return;
+                    }
+                }
+
+                btnTestTeams.disabled = true;
+                btnTestTeams.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Testando...';
+
+                fetch('/api/zimbra/test_teams', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': "{{ csrf_token() if csrf_token else '' }}"
+                    },
+                    body: JSON.stringify({
+                        teams_tenant_id: teams_tenant_id,
+                        teams_client_id: teams_client_id,
+                        teams_client_secret: teams_client_secret,
+                        teams_group_id: teams_group_id,
+                        teams_channel_id: teams_channel_id,
+                        zimbra_security_notify_nominal: zimbra_security_notify_nominal,
+                        teams_user_email: teams_user_email,
+                        teams_user_password: teams_user_password,
+                        zimbra_security_notify_group: zimbra_security_notify_group,
+                        zimbra_security_notify_group_id: zimbra_security_notify_group_id
+                    })
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        return res.json().then(err => { throw new Error(err.error || 'Erro ao testar integração') });
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    btnTestTeams.disabled = false;
+                    btnTestTeams.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Testar Integração Teams';
+                    if (data.success) {
+                        showToast(data.message, 'success', 'Sucesso');
+                    } else {
+                        showToast(data.error || 'Falha ao testar integração.', 'error', 'Erro');
+                    }
+                })
+                .catch(err => {
+                    btnTestTeams.disabled = false;
+                    
+                    // Autocomplete para grupo do Entra ID/AD
+        const groupInput = document.getElementById('zimbra_security_notify_group');
+        const groupIdInput = document.getElementById('zimbra_security_notify_group_id');
+        const groupSpinner = document.getElementById('group-search-spinner');
+        const autocompleteList = document.getElementById('group-autocomplete-list');
+        const validationStatus = document.getElementById('group-validation-status');
+        let searchTimeout = null;
+        let validationTimeout = null;
+
+        function showValidation(isValid, message) {
+            if (!validationStatus) return;
+            validationStatus.style.display = 'block';
+            if (isValid) {
+                validationStatus.className = 'mt-1 text-success d-flex align-items-center gap-1 animate-fade-in';
+                validationStatus.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i> ${message}`;
+            } else {
+                validationStatus.className = 'mt-1 text-danger d-flex align-items-center gap-1 animate-fade-in';
+                validationStatus.innerHTML = `<i class="fas fa-exclamation-circle text-danger me-1"></i> ${message}`;
+            }
+        }
+
+        function clearValidation() {
+            if (!validationStatus) return;
+            validationStatus.style.display = 'none';
+            validationStatus.innerHTML = '';
+        }
+
+        function validateCurrentGroup() {
+            const query = groupInput.value.trim();
+            const groupId = groupIdInput.value.trim();
+            if (!query) {
+                clearValidation();
+                return;
+            }
+            
+            // Se já tem um UUID selecionado, é um grupo do Entra ID verificado
+            if (groupId && groupId.match(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/)) {
+                showValidation(true, "Grupo localizado no Entra ID");
+                return;
+            }
+
+            // Se for apenas o nome (AD local), vamos fazer uma busca rápida para validar se o grupo existe
+            fetch(`/api/zimbra/search_teams_groups?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                const found = data.groups && data.groups.find(g => g.displayName.toLowerCase() === query.toLowerCase());
+                if (found) {
+                    groupIdInput.value = found.id;
+                    showValidation(true, `Grupo localizado no ${found.source}`);
+                } else {
+                    showValidation(false, "Grupo não localizado no AD local ou Entra ID");
+                }
+            })
+            .catch(err => {
+                console.error("Erro ao validar grupo:", err);
+            });
+        }
+
+        if (groupInput) {
+            // Carga inicial de validação
+            if (groupInput.value.trim()) {
+                validateCurrentGroup();
+            }
+
+            groupInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                // Se apagar o input, limpa o ID também
+                if (!query) {
+                    groupIdInput.value = '';
+                    autocompleteList.innerHTML = '';
+                    autocompleteList.classList.add('d-none');
+                    clearValidation();
+                    return;
+                }
+
+                clearTimeout(searchTimeout);
+                clearTimeout(validationTimeout);
+                
+                // Só busca se tiver pelo menos 2 caracteres
+                if (query.length < 2) {
+                    autocompleteList.innerHTML = '';
+                    autocompleteList.classList.add('d-none');
+                    clearValidation();
+                    return;
+                }
+
+                // Debounce de 300ms
+                searchTimeout = setTimeout(() => {
+                    const tenant = document.getElementById('teams_tenant_id').value || '';
+                    const client = document.getElementById('teams_client_id').value || '';
+                    const userEmail = document.getElementById('teams_user_email').value || '';
+                    const userPass = document.getElementById('teams_user_password').value || '';
+                    
+                    if (groupSpinner) groupSpinner.classList.remove('d-none');
+                    
+                    fetch(`/api/zimbra/search_teams_groups?q=${encodeURIComponent(query)}&tenant_id=${encodeURIComponent(tenant)}&client_id=${encodeURIComponent(client)}&user_email=${encodeURIComponent(userEmail)}&user_password=${encodeURIComponent(userPass)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (groupSpinner) groupSpinner.classList.add('d-none');
+                        autocompleteList.innerHTML = '';
+                        
+                        if (data.groups && data.groups.length > 0) {
+                            data.groups.forEach(g => {
+                                const item = document.createElement('button');
+                                item.type = 'button';
+                                item.className = 'list-group-item list-group-item-action text-start d-flex justify-content-between align-items-center py-2';
+                                item.style.fontSize = '13px';
+                                
+                                const badgeClass = g.source === 'Entra ID' ? 'bg-primary' : 'bg-success';
+                                
+                                item.innerHTML = `
+                                    <div>
+                                        <div class="fw-bold text-truncate" style="max-width: 250px;">${g.displayName}</div>
+                                        <span class="text-muted" style="font-size: 10px; display: block; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ID/DN: ${g.id}</span>
+                                    </div>
+                                    <span class="badge ${badgeClass} rounded-pill small ms-1" style="font-size: 10px;">${g.source}</span>
+                                `;
+                                
+                                item.addEventListener('click', function() {
+                                    groupInput.value = g.displayName;
+                                    groupIdInput.value = g.id;
+                                    autocompleteList.innerHTML = '';
+                                    autocompleteList.classList.add('d-none');
+                                    showValidation(true, `Grupo localizado no ${g.source}`);
+                                });
+                                autocompleteList.appendChild(item);
+                            });
+                            autocompleteList.classList.remove('d-none');
+                        } else {
+                            // Se nenhum grupo do Entra/AD foi encontrado, adiciona opção para usar como AD local clássico
+                            const item = document.createElement('button');
+                            item.type = 'button';
+                            item.className = 'list-group-item list-group-item-action text-start py-2 text-muted';
+                            item.style.fontSize = '12px';
+                            item.innerHTML = `
+                                <i class="fas fa-info-circle me-1 text-info"></i> Usar "${query}" como grupo do Active Directory local.
+                            `;
+                            item.addEventListener('click', function() {
+                                groupIdInput.value = ''; // limpa o UUID para forçar fallback
+                                autocompleteList.innerHTML = '';
+                                autocompleteList.classList.add('d-none');
+                                showValidation(true, "Nome inserido (AD Local Clássico)");
+                            });
+                            autocompleteList.appendChild(item);
+                            autocompleteList.classList.remove('d-none');
+                        }
+                    })
+                    .catch(err => {
+                        if (groupSpinner) groupSpinner.classList.add('d-none');
+                        console.error('Erro na busca de grupos:', err);
+                    });
+                }, 300);
+
+                // Validação em tempo real (debounce de 1s para não sobrecarregar)
+                validationTimeout = setTimeout(() => {
+                    validateCurrentGroup();
+                }, 1000);
+            });
+
+            // Valida ao perder o foco (blur)
+            groupInput.addEventListener('blur', function() {
+                setTimeout(() => {
+                    validateCurrentGroup();
+                }, 200); // pequeno timeout para permitir cliques em sugestões primeiro
+            });
+
+            // Fecha o autocomplete ao clicar fora
+            document.addEventListener('click', function(e) {
+                if (!groupInput.contains(e.target) && !autocompleteList.contains(e.target)) {
+                    autocompleteList.classList.add('d-none');
+                }
+            });
+        }
         
         // Carga inicial
         loadForwardings();
