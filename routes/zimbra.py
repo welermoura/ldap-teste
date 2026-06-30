@@ -1029,13 +1029,10 @@ def api_test_teams():
                     member_emails = get_group_members_emails(conn, group_entry.entry_dn)
                     if not member_emails:
                         return jsonify({'error': f"Grupo '{teams_user_group}' localizado no AD, mas não contém membros com e-mails cadastrados para o teste."}), 400
-                except Exception as e:
-                    return jsonify({'error': f"Erro ao acessar o Active Directory para buscar o grupo: {str(e)}"}), 400
+                except Exception as e_ad:
+                    return jsonify({'error': f"Erro ao acessar o Active Directory para buscar o grupo: {str(e_ad)}"}), 400
 
-            # 3. Enviar mensagem de teste para o primeiro membro do grupo (ou para o próprio remetente para testar se ele mesmo for o único membro)
-            target_test_email = list(member_emails)[0] if member_emails else teams_user_email
-            
-            # 4. Cria chat 1-on-1 com o destinatário de teste
+            # 3. Resolve a conta de serviço no Graph
             headers = {
                 'Authorization': f'Bearer {access_token}',
                 'Content-Type': 'application/json'
@@ -1049,57 +1046,86 @@ def api_test_teams():
                 resolved_service_user = get_graph_user_identifier(teams_user_email, headers)
             if not resolved_service_user:
                 return jsonify({'error': f"Não foi possível resolver a conta de serviço '{teams_user_email}' no Microsoft Entra ID. Verifique se a permissão User.Read está concedida com admin consent."}), 400
-                
-            resolved_member_user = get_graph_user_identifier(target_test_email, headers)
-            if not resolved_member_user:
-                return jsonify({'error': f"Não foi possível resolver o usuário de teste '{target_test_email}' no Microsoft Entra ID."}), 400
 
-            logging.info(f"Criando chat privado entre {resolved_service_user} e {resolved_member_user} para teste...")
-            chat_url = "https://graph.microsoft.com/v1.0/chats"
-            chat_payload = {
-                "chatType": "oneOnOne",
-                "members": [
-                    {
-                        "@odata.type": "#microsoft.graph.aadUserConversationMember",
-                        "roles": ["owner"],
-                        "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_service_user}')"
-                    },
-                    {
-                        "@odata.type": "#microsoft.graph.aadUserConversationMember",
-                        "roles": ["owner"],
-                        "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_member_user}')"
-                    }
-                ]
-            }
-            chat_res = requests.post(chat_url, json=chat_payload, headers=headers, timeout=10)
-            if not chat_res.ok:
-                return jsonify({'error': f"Erro ao criar chat privado com {target_test_email}: {chat_res.status_code} - {chat_res.text}"}), 400
+            # Se houver membros carregados, enviamos para todos eles
+            destinatarios = list(member_emails) if member_emails else [teams_user_email]
 
-            chat_id = chat_res.json().get('id')
-            if not chat_id:
-                return jsonify({'error': f"ID do chat privado não retornado para {target_test_email}."}), 400
+            success_count = 0
+            failures = []
 
-            # Envia a mensagem de teste
-            test_html = f"""
-            <div style="font-family: Arial, sans-serif; border-left: 5px solid #0078D4; padding-left: 15px; max-width: 600px;">
-                <h3 style="color: #0078D4; margin-top: 0; margin-bottom: 5px;">🔧 Teste de Integração Nominal - Portal Gestão AD</h3>
-                <p style="color: #323130; margin-top: 0; margin-bottom: 5px;">A conexão da API do Microsoft Graph via chat privado foi estabelecida com sucesso!</p>
-                <p style="font-size: 11px; color: #605E5C; margin: 0;">Sua conta de serviço <strong>{teams_user_email}</strong> está pronta para enviar alertas individuais automáticos.</p>
-            </div>
-            """
-            logging.info(f"Enviando mensagem de teste no chat privado {chat_id}...")
-            message_url = f"https://graph.microsoft.com/v1.0/chats/{chat_id}/messages"
-            message_payload = {
-                "body": {
-                    "contentType": "html",
-                    "content": test_html
+            for target_test_email in destinatarios:
+                # Evita enviar para a própria conta de serviço que está disparando, a não ser que ela seja a única destinatária
+                if len(destinatarios) > 1 and target_test_email.lower() == teams_user_email.lower():
+                    continue
+
+                resolved_member_user = get_graph_user_identifier(target_test_email, headers)
+                if not resolved_member_user:
+                    logging.warning(f"Não foi possível resolver o usuário de teste '{target_test_email}' no Microsoft Entra ID. Pulando.")
+                    failures.append(f"{target_test_email} (Não resolvido no Entra ID)")
+                    continue
+
+                logging.info(f"Criando chat privado entre {resolved_service_user} e {resolved_member_user} para teste...")
+                chat_url = "https://graph.microsoft.com/v1.0/chats"
+                chat_payload = {
+                    "chatType": "oneOnOne",
+                    "members": [
+                        {
+                            "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                            "roles": ["owner"],
+                            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_service_user}')"
+                        },
+                        {
+                            "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                            "roles": ["owner"],
+                            "user@odata.bind": f"https://graph.microsoft.com/v1.0/users('{resolved_member_user}')"
+                        }
+                    ]
                 }
-            }
-            msg_res = requests.post(message_url, json=message_payload, headers=headers, timeout=10)
-            if not msg_res.ok:
-                return jsonify({'error': f"Erro ao postar mensagem de teste no chat privado: {msg_res.status_code} - {msg_res.text}"}), 400
+                chat_res = requests.post(chat_url, json=chat_payload, headers=headers, timeout=10)
+                if not chat_res.ok:
+                    logging.error(f"Erro ao criar chat privado com {target_test_email}: {chat_res.status_code} - {chat_res.text}")
+                    failures.append(f"{target_test_email} (Erro ao criar chat)")
+                    continue
 
-            return jsonify({'success': True, 'message': f'Integração testada com sucesso! Uma mensagem privada nominal de teste foi enviada para {target_test_email}.'})
+                chat_id = chat_res.json().get('id')
+                if not chat_id:
+                    logging.error(f"ID do chat privado não retornado para {target_test_email}.")
+                    failures.append(f"{target_test_email} (ID do chat ausente)")
+                    continue
+
+                # Envia a mensagem de teste
+                test_html = f"""
+                <div style="font-family: Arial, sans-serif; border-left: 5px solid #0078D4; padding-left: 15px; max-width: 600px;">
+                    <h3 style="color: #0078D4; margin-top: 0; margin-bottom: 5px;">🔧 Teste de Integração Nominal - Portal Gestão AD</h3>
+                    <p style="color: #323130; margin-top: 0; margin-bottom: 5px;">A conexão da API do Microsoft Graph via chat privado foi estabelecida com sucesso!</p>
+                    <p style="font-size: 11px; color: #605E5C; margin: 0;">Sua conta de serviço <strong>{teams_user_email}</strong> está pronta para enviar alertas individuais automáticos.</p>
+                </div>
+                """
+                logging.info(f"Enviando mensagem de teste no chat privado {chat_id} para {target_test_email}...")
+                message_url = f"https://graph.microsoft.com/v1.0/chats/{chat_id}/messages"
+                message_payload = {
+                    "body": {
+                        "contentType": "html",
+                        "content": test_html
+                    }
+                }
+                msg_res = requests.post(message_url, json=message_payload, headers=headers, timeout=10)
+                if not msg_res.ok:
+                    logging.error(f"Erro ao postar mensagem de teste no chat privado para {target_test_email}: {msg_res.status_code} - {msg_res.text}")
+                    failures.append(f"{target_test_email} (Erro ao enviar mensagem)")
+                    continue
+
+                success_count += 1
+
+            if success_count == 0:
+                err_msg = "Falha ao enviar mensagem para os membros do grupo. " + ", ".join(failures)
+                return jsonify({'error': err_msg}), 400
+
+            success_msg = f'Integração testada com sucesso! Mensagens privadas nominais de teste foram enviadas para os membros do grupo ({success_count} enviadas com sucesso).'
+            if failures:
+                success_msg += f' Algumas falhas ocorreram: {", ".join(failures)}'
+
+            return jsonify({'success': True, 'message': success_msg})
 
         else:
             # Fluxo clássico por canal público
