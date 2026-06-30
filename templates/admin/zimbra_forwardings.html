@@ -540,9 +540,9 @@
 
             if (isPasswordRequired) {
                 confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Alterando Senha...';
-                const username = activeRemoveData.email.split('@')[0].trim().toLowerCase();
+                const userEmail = activeRemoveData.email.trim().toLowerCase();
                 
-                fetch(`/api/reset_password/${username}`, {
+                fetch(`/api/reset_password/${userEmail}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

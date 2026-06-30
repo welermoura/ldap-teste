@@ -610,7 +610,26 @@ def api_edit_user(username):
 def api_reset_password(username):
     try:
         conn = get_service_account_connection()
-        user = get_user_by_samaccountname(conn, username)
+        user = None
+        sam_username = username
+        if '@' in username:
+            from ldap3.utils.conv import escape_filter_chars
+            config = load_config()
+            search_base = config.get('AD_SEARCH_BASE')
+            if not search_base:
+                if conn.server.info and conn.server.info.other:
+                    search_base = conn.server.info.other['defaultNamingContext'][0]
+                else:
+                    raise Exception("AD_SEARCH_BASE não configurado.")
+            search_filter = f"(|(mail={escape_filter_chars(username)})(userPrincipalName={escape_filter_chars(username)}))"
+            conn.search(search_base, search_filter, attributes=['distinguishedName', 'sAMAccountName'])
+            if conn.entries:
+                user = conn.entries[0]
+                sam_username = user.sAMAccountName.value if hasattr(user, 'sAMAccountName') and user.sAMAccountName else username
+        else:
+            user = get_user_by_samaccountname(conn, username)
+            sam_username = username
+
         if not user:
             return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
         data = request.get_json()
@@ -621,8 +640,8 @@ def api_reset_password(username):
         conn.modify(user.distinguishedName.value, {'unicodePwd': [(MODIFY_REPLACE, [password_value])]})
         if conn.result['description'] == 'success':
             conn.modify(user.distinguishedName.value, {'pwdLastSet': [(MODIFY_REPLACE, [0])]})
-            logging.info(f"[ALTERAÇÃO] A senha para '{username}' foi resetada via API por '{session.get('user_display_name')}'.")
-            save_to_history('alteration', username, f"Senha resetada via API por '{session.get('user_display_name')}'")
+            logging.info(f"[ALTERAÇÃO] A senha para '{sam_username}' foi resetada via API por '{session.get('user_display_name')}'.")
+            save_to_history('alteration', sam_username, f"Senha resetada via API por '{session.get('user_display_name')}'")
             return jsonify({'success': True, 'message': 'Senha resetada com sucesso.'})
         else:
             error_message = get_password_reset_error_message(conn, conn.result['message'])
